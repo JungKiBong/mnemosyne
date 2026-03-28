@@ -55,3 +55,4 @@ tmp/
 temp/
 references/MiroFish-Offline/
 references/supermemory/
+src/.encryption_key
