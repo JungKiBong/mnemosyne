@@ -143,6 +143,7 @@
         /* Full width panel */
         .full-width { grid-column: 1 / -1; }
     </style>
+  <link rel="stylesheet" href="/theme.css">
 </head>
 <body>
     <!-- Header -->
@@ -157,6 +158,8 @@
             <a href="/memory/synaptic" class="btn btn-outline" style="text-decoration:none">🌐 시냅스 네트워크</a>
             <a href="/memory/history" class="btn btn-outline" style="text-decoration:none">📜 변경이력</a>
             <a href="/maturity" class="btn btn-outline" style="text-decoration:none">🌱 Maturity</a>
+            <a href="/workflows" class="btn btn-outline" style="text-decoration:none">⚙️ Workflows</a>
+            <a href="/api-explorer" class="btn btn-outline" style="text-decoration:none">📡 API</a>
             <button class="btn btn-outline" onclick="refreshAll()">🔄 새로고침</button>
             <button class="btn btn-danger" onclick="runDecay(false)">⏳ 망각 실행</button>
             <button class="btn btn-primary" onclick="runDecay(true)">🔍 망각 시뮬레이션</button>
@@ -361,7 +364,7 @@
     <div class="toast" id="toast"></div>
 
     <script>
-        const API_BASE = window.location.origin + '/api/memory';
+        const API_BASE = '/api/memory';
         let distributionChart = null;
         let decayCurveChart = null;
 
@@ -792,5 +795,6 @@
         loadMemories();
         loadPMDashboard();
     </script>
+<script src="/theme.js"></script>
 </body>
 </html>

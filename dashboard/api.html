@@ -184,6 +184,7 @@ a { color: var(--accent); text-decoration: none; }
   .main { max-width: 100%; }
 }
 </style>
+  <link rel="stylesheet" href="/theme.css">
 </head>
 <body>
 
@@ -193,6 +194,12 @@ a { color: var(--accent); text-decoration: none; }
     <div class="sidebar-header">
       <h1>🧠 <span>Mories</span> API</h1>
       <p>Interactive API Explorer & Testing Console</p>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;">
+        <a href="/" style="font-size:11px;color:#8888a0;text-decoration:none;padding:3px 8px;border:1px solid #2a2a3a;border-radius:6px;">🏠 Dashboard</a>
+        <a href="/graph" style="font-size:11px;color:#8888a0;text-decoration:none;padding:3px 8px;border:1px solid #2a2a3a;border-radius:6px;">🕸️ Graph</a>
+        <a href="/memory" style="font-size:11px;color:#8888a0;text-decoration:none;padding:3px 8px;border:1px solid #2a2a3a;border-radius:6px;">🧠 Memory</a>
+        <a href="/workflows" style="font-size:11px;color:#8888a0;text-decoration:none;padding:3px 8px;border:1px solid #2a2a3a;border-radius:6px;">⚙️ Workflows</a>
+      </div>
     </div>
 
     <div class="search-box">
@@ -290,7 +297,7 @@ a { color: var(--accent); text-decoration: none; }
           <div class="try-body">
             <div class="try-row" id="urlRow">
               <label>Request URL</label>
-              <input type="text" id="tryUrl" placeholder="http://localhost:5001/api/...">
+              <input type="text" id="tryUrl" placeholder="/api/...">
             </div>
             <div class="try-row" id="queryRow" style="display:none">
               <label>Query Parameters</label>
@@ -394,7 +401,7 @@ a { color: var(--accent); text-decoration: none; }
           <div class="try-body">
             <div class="try-row">
               <label>MCP Endpoint</label>
-              <input type="text" id="mcpUrl" value="http://localhost:5001/api/mcp">
+              <input type="text" id="mcpUrl" value="/api/mcp">
             </div>
             <div class="try-row">
               <label>JSON-RPC Body</label>
@@ -433,7 +440,7 @@ a { color: var(--accent); text-decoration: none; }
 // ──────────────────────────────────────────
 // API Registry — All Mories Endpoints
 // ──────────────────────────────────────────
-const BASE = 'http://localhost:5001';
+const BASE = '';
 
 const API_REGISTRY = {
   "System": [
@@ -860,5 +867,6 @@ renderSidebar();
 checkConnection();
 setInterval(checkConnection, 15000);
 </script>
+<script src="/theme.js"></script>
 </body>
 </html>

@@ -18,7 +18,7 @@ a:hover{text-decoration:underline}
 
 /* ── Layout ── */
 .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 32px;display:flex;align-items:center;gap:16px}
-.topbar h1{font-size:20px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.topbar h1{font-size:20px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .topbar .nav{margin-left:auto;display:flex;gap:12px}
 .topbar .nav a{color:var(--muted);font-size:13px;padding:6px 14px;border-radius:8px;transition:.2s}
 .topbar .nav a:hover,.topbar .nav a.active{color:var(--text);background:var(--card);text-decoration:none}
@@ -96,6 +96,7 @@ a:hover{text-decoration:underline}
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/theme.css">
 </head>
 <body>
 
@@ -103,13 +104,14 @@ a:hover{text-decoration:underline}
 <div class="topbar">
   <h1>🧠 Mories</h1>
   <div class="nav">
-    <a href="/">Dashboard</a>
-    <a href="/graph">Graph Explorer</a>
-    <a href="/memory">Memory</a>
-    <a href="/memory/synaptic">Synaptic</a>
-    <a href="/maturity">Maturity</a>
-    <a href="/api-docs">API Explorer</a>
-    <a href="/workflows" class="active">Workflows</a>
+    <a href="/">🏠 Dashboard</a>
+    <a href="/graph">🕸️ Graph Explorer</a>
+    <a href="/memory">🧠 Memory</a>
+    <a href="/memory/synaptic">🌐 Synaptic</a>
+    <a href="/memory/history">📜 Audit</a>
+    <a href="/maturity">🌱 Maturity</a>
+    <a href="/api-explorer">📡 API Explorer</a>
+    <a href="/workflows" class="active">⚙️ Workflows</a>
   </div>
 </div>
 
@@ -135,6 +137,15 @@ a:hover{text-decoration:underline}
 
   <!-- Grid -->
   <div class="wf-grid" id="wfGrid"></div>
+
+  <!-- Executions -->
+  <div class="arch-section" style="margin-top:24px; margin-bottom: 24px;">
+    <h3>📊 최근 실행 현황 (Webhooks)</h3>
+    <table class="env-table" style="margin-top:16px;">
+      <thead><tr><th>시간</th><th>소스</th><th>상태</th><th>상세 (생성/승격)</th></tr></thead>
+      <tbody id="executionsTable"><tr><td colspan="4" style="text-align:center; color:var(--muted)">로딩 중...</td></tr></tbody>
+    </table>
+  </div>
 
   <!-- Architecture -->
   <div class="arch-section">
@@ -207,7 +218,7 @@ a:hover{text-decoration:underline}
 </div>
 
 <script>
-const BASE = window.location.origin;
+const BASE = '';
 
 // Workflow metadata enrichment
 const WORKFLOW_META = {
@@ -231,14 +242,43 @@ let currentWfFile = null;
 
 async function loadWorkflows() {
   try {
-    const resp = await fetch(`${BASE}/api/workflows`);
+    const resp = await fetch(`${BASE}/api/workflows/list`);
     const data = await resp.json();
     allWorkflows = data.workflows || [];
     document.getElementById('totalCount').textContent = allWorkflows.length;
     renderGrid(allWorkflows);
+    loadExecutions();
   } catch(e) {
     document.getElementById('wfGrid').innerHTML =
       '<div style="text-align:center;color:var(--muted);padding:40px">워크플로우를 불러올 수 없습니다. 서버 상태를 확인해주세요.</div>';
+  }
+}
+
+async function loadExecutions() {
+  try {
+    const resp = await fetch(`${BASE}/api/workflows/executions`);
+    const data = await resp.json();
+    const exTbody = document.getElementById('executionsTable');
+    if (!data.executions || data.executions.length === 0) {
+      exTbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted)">최근 실행 기록이 없습니다.</td></tr>';
+      return;
+    }
+    exTbody.innerHTML = data.executions.map(ex => {
+      const ts = new Date(ex.timestamp).toLocaleString();
+      const statusColor = ex.status === 'success' ? 'var(--green)' : 'var(--red)';
+      const stm = ex.details?.stm_created || 0;
+      const pro = ex.details?.auto_promoted || 0;
+      return `
+        <tr>
+          <td>${ts}</td>
+          <td><span class="tag tag-source">${ex.source}</span></td>
+          <td style="color:${statusColor};font-weight:600">${ex.status}</td>
+          <td>STM: ${stm} / LTM-Promoted: ${pro}</td>
+        </tr>
+      `;
+    }).join('');
+  } catch (e) {
+    document.getElementById('executionsTable').innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--red)">실행 로그를 불러오지 못했습니다.</td></tr>';
   }
 }
 
@@ -327,5 +367,6 @@ document.getElementById('modal').addEventListener('click', e => { if (e.target =
 // Init
 loadWorkflows();
 </script>
+<script src="/theme.js"></script>
 </body>
 </html>

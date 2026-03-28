@@ -132,6 +132,7 @@
         @media (max-width: 1200px) { .stats-grid { grid-template-columns: repeat(3, 1fr); } .rules-grid { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 768px) { .stats-grid { grid-template-columns: 1fr 1fr; } .charts-row { grid-template-columns: 1fr; } .rules-grid { grid-template-columns: 1fr; } }
     </style>
+  <link rel="stylesheet" href="/theme.css">
 </head>
 <body>
 
@@ -147,6 +148,8 @@
         <a href="/memory">🧬 Memory</a>
         <a href="/memory/synaptic">🌐 Synaptic</a>
         <a href="/memory/history">📜 Audit Trail</a>
+        <a href="/workflows">⚙️ Workflows</a>
+        <a href="/api-explorer">📡 API</a>
         <a href="/maturity" style="background:var(--accent-pink);color:white;border-color:transparent;">🌱 Maturity</a>
     </div>
 </div>
@@ -567,5 +570,6 @@ async function submitSetMaturity() {
 })();
 </script>
 
+<script src="/theme.js"></script>
 </body>
 </html>

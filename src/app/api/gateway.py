@@ -20,9 +20,26 @@ import hmac
 import time
 from functools import wraps
 from datetime import datetime, timezone
+import json
 from flask import Blueprint, request, jsonify
 
 logger = logging.getLogger('mirofish.gateway')
+
+def log_execution(source: str, status: str, details: dict):
+    """Log external workflow executions (e.g., n8n, NiFi) to Neo4j."""
+    try:
+        from ..config import Config
+        from neo4j import GraphDatabase
+        driver = GraphDatabase.driver(Config.NEO4J_URI, auth=(Config.NEO4J_USER, Config.NEO4J_PASSWORD))
+        with driver.session() as session:
+            session.run(
+                "CREATE (e:ExecutionLog {source: $source, status: $status, timestamp: datetime(), details: $details})",
+                source=source, status=status, details=json.dumps(details, ensure_ascii=False)
+            )
+        driver.close()
+    except Exception as e:
+        logger.error(f"Failed to log execution: {e}")
+
 
 gateway_bp = Blueprint('gateway', __name__, url_prefix='/api/gateway')
 
@@ -55,15 +72,20 @@ def require_api_key(f):
             return jsonify({"error": "API key required (X-API-Key header or api_key param)"}), 401
 
         rbac = _get_rbac()
-        principal = rbac.validate_api_key(api_key)
-        if not principal:
-            return jsonify({"error": "Invalid API key"}), 403
+        from ..security.memory_rbac import RateLimitExceeded, ApiKeyExpired
+        try:
+            principal = rbac.validate_api_key(api_key)
+            if not principal:
+                return jsonify({"error": "Invalid API key"}), 403
+        except ApiKeyExpired as e:
+            return jsonify({"error": str(e)}), 403
+        except RateLimitExceeded as e:
+            return jsonify({"error": str(e)}), 429
 
         # Attach principal to request context
         request._gateway_principal = principal
         return f(*args, **kwargs)
     return decorated
-
 
 # ──────────────────────────────────────────
 # n8n Webhook Gateway
@@ -90,9 +112,15 @@ def n8n_webhook():
     api_key = data.get('api_key') or request.headers.get('X-API-Key', '')
     if api_key:
         rbac = _get_rbac()
-        principal = rbac.validate_api_key(api_key)
-        if not principal:
-            return jsonify({"error": "Invalid API key"}), 403
+        from ..security.memory_rbac import RateLimitExceeded, ApiKeyExpired
+        try:
+            principal = rbac.validate_api_key(api_key)
+            if not principal:
+                return jsonify({"error": "Invalid API key"}), 403
+        except ApiKeyExpired as e:
+            return jsonify({"error": str(e)}), 403
+        except RateLimitExceeded as e:
+            return jsonify({"error": str(e)}), 429
     # Allow unauthenticated if RBAC is not enforced (dev mode)
 
     content = data.get('content', '')
@@ -110,6 +138,16 @@ def n8n_webhook():
     )
 
     logger.info(f"n8n webhook processed: {result.get('stm_created', 0)} STM, {result.get('auto_promoted', 0)} promoted")
+    
+    # + Execute execution logging
+    log_execution("n8n", "success", {
+        "workflow_id": data.get("metadata", {}).get("workflow_id"),
+        "execution_id": data.get("metadata", {}).get("execution_id"),
+        "source": data.get("source", "n8n:webhook"),
+        "stm_created": result.get("stm_created", 0),
+        "auto_promoted": result.get("auto_promoted", 0)
+    })
+    
     return jsonify({"gateway": "n8n", **result})
 
 
@@ -131,8 +169,14 @@ def nifi_gateway():
     api_key = request.headers.get('X-API-Key', '')
     if api_key:
         rbac = _get_rbac()
-        if not rbac.validate_api_key(api_key):
-            return jsonify({"error": "Invalid API key"}), 403
+        from ..security.memory_rbac import RateLimitExceeded, ApiKeyExpired
+        try:
+            if not rbac.validate_api_key(api_key):
+                return jsonify({"error": "Invalid API key"}), 403
+        except ApiKeyExpired as e:
+            return jsonify({"error": str(e)}), 403
+        except RateLimitExceeded as e:
+            return jsonify({"error": str(e)}), 429
 
     # Extract NiFi metadata from headers
     nifi_uuid = request.headers.get('X-NiFi-FlowFile-UUID', '')
@@ -188,8 +232,14 @@ def spark_gateway():
     api_key = data.get('api_key') or request.headers.get('X-API-Key', '')
     if api_key:
         rbac = _get_rbac()
-        if not rbac.validate_api_key(api_key):
-            return jsonify({"error": "Invalid API key"}), 403
+        from ..security.memory_rbac import RateLimitExceeded, ApiKeyExpired
+        try:
+            if not rbac.validate_api_key(api_key):
+                return jsonify({"error": "Invalid API key"}), 403
+        except ApiKeyExpired as e:
+            return jsonify({"error": str(e)}), 403
+        except RateLimitExceeded as e:
+            return jsonify({"error": str(e)}), 429
 
     records = data.get('records', [])
     if not records:

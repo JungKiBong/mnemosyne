@@ -30,6 +30,7 @@ import logging
 import hashlib
 import secrets
 import time
+import json
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 
@@ -39,6 +40,9 @@ from ..config import Config
 
 logger = logging.getLogger('mirofish.rbac')
 
+class SecurityError(Exception): pass
+class RateLimitExceeded(SecurityError): pass
+class ApiKeyExpired(SecurityError): pass
 
 # ──────────────────────────────────────────
 # Permission Matrix
@@ -82,6 +86,7 @@ class MemoryRBAC:
             self._owns_driver = True
 
         self._api_keys: Dict[str, Dict[str, Any]] = {}  # hash → principal
+        self._rate_limit_cache: Dict[str, List[float]] = {}  # hash → list of sliding window timestamps
         self._ensure_schema()
         self._load_api_keys()
 
@@ -93,6 +98,7 @@ class MemoryRBAC:
         queries = [
             "CREATE CONSTRAINT principal_id IF NOT EXISTS FOR (p:Principal) REQUIRE p.principal_id IS UNIQUE",
             "CREATE INDEX apikey_hash IF NOT EXISTS FOR (k:ApiKey) ON (k.key_hash)",
+            "CREATE INDEX security_event_time IF NOT EXISTS FOR (e:SecurityEvent) ON (e.timestamp)",
         ]
         with self._driver.session() as session:
             for q in queries:
@@ -100,6 +106,22 @@ class MemoryRBAC:
                     session.run(q)
                 except Exception as e:
                     logger.debug(f"RBAC schema: {e}")
+
+    def _log_security_event(self, event_type: str, severity: str, details: dict):
+        """Log a security event into the Audit Trail (Neo4j)."""
+        try:
+            with self._driver.session() as session:
+                session.run("""
+                    CREATE (e:SecurityEvent {
+                        event_id: randomUUID(),
+                        event_type: $event_type,
+                        severity: $severity,
+                        timestamp: datetime(),
+                        details: $details
+                    })
+                """, event_type=event_type, severity=severity, details=json.dumps(details, ensure_ascii=False))
+        except Exception as e:
+            logger.error(f"Failed to log security event: {e}")
 
     # ──────────────────────────────────────────
     # Principal Management
@@ -308,7 +330,12 @@ class MemoryRBAC:
                         f"🚨 ACCESS DENIED: API key '{principal.get('name')}' "
                         f"expired at {expires_at_str}. Key hash: {key_hash[:12]}..."
                     )
-                    return None  # Expired — do NOT increment usage_count
+                    self._log_security_event(
+                        "API_KEY_EXPIRED_DENIAL", 
+                        "CRITICAL", 
+                        {"key_hash": key_hash[:16], "name": principal.get("name"), "owner_id": principal.get("owner_id"), "expires_at": expires_at_str}
+                    )
+                    raise ApiKeyExpired(f"API key expired at {expires_at_str}")
                     
                 # Expiration warnings (logged per-request for ops visibility)
                 days_left = (expires_at - now).days
@@ -332,6 +359,29 @@ class MemoryRBAC:
                         f"ℹ️ [NOTICE] API key '{principal.get('name')}' "
                         f"expires in {days_left} days."
                     )
+                    
+            # Rate limiting check (sliding window)
+            rate_limit = principal.get("rate_limit", 100)
+            current_time = time.time()
+            if key_hash not in self._rate_limit_cache:
+                self._rate_limit_cache[key_hash] = []
+                
+            requests = self._rate_limit_cache[key_hash]
+            # Prune requests older than 60 seconds
+            requests = [req for req in requests if current_time - req < 60]
+            
+            if len(requests) >= rate_limit:
+                logger.warning(f"🚨 RATE LIMIT EXCEEDED: API key '{principal.get('name')}' exceeded {rate_limit} req/min.")
+                self._log_security_event(
+                    "RATE_LIMIT_EXCEEDED", 
+                    "WARNING", 
+                    {"key_hash": key_hash[:16], "name": principal.get("name"), "owner_id": principal.get("owner_id"), "limit": rate_limit}
+                )
+                self._rate_limit_cache[key_hash] = requests  # Save pruned list
+                raise RateLimitExceeded(f"Rate limit exceeded: {rate_limit} req/min")
+                
+            requests.append(current_time)
+            self._rate_limit_cache[key_hash] = requests
 
             # Update usage count — only for valid (non-expired) keys
             try:
@@ -356,6 +406,42 @@ class MemoryRBAC:
 
         self._api_keys.pop(key_hash, None)
         return {"status": "revoked", "key_hash": key_hash[:16] + "..."}
+
+    def extend_api_key(self, key_hash: str, additional_days: int = 30) -> dict:
+        """Extend an API key's expiration by a given number of days."""
+        from datetime import timedelta
+        
+        principal = self._api_keys.get(key_hash)
+        if not principal:
+            return {"status": "error", "error": "API Key not found or inactive"}
+            
+        expires_at_str = principal.get("expires_at")
+        now = datetime.now(timezone.utc)
+        
+        # If the key never expires, we don't need to extend it
+        if not expires_at_str:
+            return {"status": "skipped", "message": "Key does not expire"}
+            
+        current_exp = datetime.fromisoformat(expires_at_str)
+        if current_exp.tzinfo is None:
+            current_exp = current_exp.replace(tzinfo=timezone.utc)
+            
+        # If expired, extend from 'now', otherwise extend from current expiration
+        base_time = now if current_exp < now else current_exp
+        new_exp = base_time + timedelta(days=additional_days)
+        new_exp_str = new_exp.isoformat()
+        
+        with self._driver.session() as session:
+            session.run("""
+                MATCH (k:ApiKey {key_hash: $hash})
+                SET k.expires_at = $new_exp
+            """, hash=key_hash, new_exp=new_exp_str)
+            
+        # Update cache
+        self._api_keys[key_hash]["expires_at"] = new_exp_str
+        
+        logger.info(f"API key extended: {principal.get('name')} (New Expiry: {new_exp_str})")
+        return {"status": "extended", "key_hash": key_hash[:16] + "...", "new_expires_at": new_exp_str}
 
     def list_api_keys(self, owner_id: str = None) -> List[Dict[str, Any]]:
         """List API keys (without showing the actual key)."""
@@ -403,6 +489,65 @@ class MemoryRBAC:
             logger.info(f"Loaded {len(records)} API keys into RBAC cache")
         except Exception as e:
             logger.debug(f"API key load: {e}")
+
+    # ──────────────────────────────────────────
+    # Security Audit & Admin
+    # ──────────────────────────────────────────
+
+    def get_security_events(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Retrieve the most recent security events for the Audit Trail."""
+        try:
+            with self._driver.session() as session:
+                records = session.run("""
+                    MATCH (e:SecurityEvent)
+                    RETURN e.event_id AS event_id, e.event_type AS event_type,
+                           e.severity AS severity, e.timestamp AS timestamp,
+                           e.details AS details
+                    ORDER BY e.timestamp DESC
+                    LIMIT $limit
+                """, limit=limit).data()
+            
+            # Details are stored as JSON strings, so parse them back.
+            for rec in records:
+                if isinstance(rec.get("details"), str):
+                    try:
+                        rec["details"] = json.loads(rec["details"])
+                    except json.JSONDecodeError:
+                        pass
+                if rec.get("timestamp"):
+                    if hasattr(rec["timestamp"], "isoformat"):
+                        rec["timestamp"] = rec["timestamp"].isoformat()
+            return records
+        except Exception as e:
+            logger.error(f"Failed to get security events: {e}")
+            return []
+
+    def update_api_key_rate_limit(self, key_hash: str, new_limit: int) -> Dict[str, Any]:
+        """Dynamically update the rate limit for an API key."""
+        try:
+            with self._driver.session() as session:
+                rec = session.run("""
+                    MATCH (k:ApiKey {key_hash: $key_hash})
+                    SET k.rate_limit = $new_limit, k.updated_at = datetime()
+                    RETURN k.rate_limit AS rate_limit, k.name AS name
+                """, key_hash=key_hash, new_limit=new_limit).single()
+                
+                if not rec:
+                    return {"status": "error", "error": "API key not found"}
+                
+                # Update in-memory cache if present
+                if key_hash in self._api_keys:
+                    self._api_keys[key_hash]["rate_limit"] = new_limit
+                
+                logger.info(f"Updated rate limit for key '{rec['name']}' to {new_limit}")
+                return {
+                    "status": "success",
+                    "key_hash": key_hash,
+                    "new_rate_limit": new_limit
+                }
+        except Exception as e:
+            logger.error(f"Failed to update API key rate limit: {e}")
+            return {"status": "error", "error": str(e)}
 
     # ──────────────────────────────────────────
     # Role Info

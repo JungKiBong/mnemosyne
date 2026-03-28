@@ -1,0 +1,7 @@
+# docker-compose.override.yml — Additional volume mappings (safe extension)
+services:
+  mirofish-api:
+    volumes:
+      - ./n8n_workflows:/app/n8n_workflows:ro
+    environment:
+      - WORKFLOW_DIR=/app/n8n_workflows

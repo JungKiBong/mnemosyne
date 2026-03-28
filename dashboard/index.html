@@ -10,28 +10,30 @@
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
     :root {
-      --bg-primary: #0a0a0f;
-      --bg-secondary: #12121a;
-      --bg-card: #16161f;
-      --bg-card-hover: #1c1c28;
-      --border: #2a2a3a;
-      --border-active: #4a4aff;
-      --text-primary: #e8e8f0;
-      --text-secondary: #8888a0;
-      --text-muted: #555568;
-      --accent-blue: #4a7dff;
+      --bg-primary: #050508;
+      --bg-secondary: #0a0a10;
+      --bg-card: rgba(18, 18, 28, 0.55);
+      --bg-card-hover: rgba(28, 28, 42, 0.75);
+      --border: rgba(255, 255, 255, 0.08);
+      --border-active: rgba(74, 125, 255, 0.6);
+      --text-primary: #f8f8fd;
+      --text-secondary: #a0a0b8;
+      --text-muted: #8585a0;
+      --accent-blue: #3b82f6;
       --accent-purple: #8b5cf6;
       --accent-cyan: #06b6d4;
       --accent-orange: #f97316;
       --accent-green: #22c55e;
       --accent-red: #ef4444;
       --accent-pink: #ec4899;
-      --gradient-primary: linear-gradient(135deg, #4a7dff 0%, #8b5cf6 100%);
+      --gradient-primary: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
       --gradient-warm: linear-gradient(135deg, #f97316 0%, #ec4899 100%);
-      --glass: rgba(22, 22, 31, 0.7);
-      --radius: 12px;
+      --glass: rgba(12, 12, 20, 0.65);
+      --glass-bright: rgba(255, 255, 255, 0.03);
+      --radius: 16px;
       --radius-sm: 8px;
-      --shadow: 0 4px 24px rgba(0,0,0,0.3);
+      --shadow: 0 8px 32px rgba(0,0,0,0.4);
+      --shadow-glow: 0 0 20px rgba(139, 92, 246, 0.15);
     }
 
     body {
@@ -56,6 +58,7 @@
       z-index: 0; pointer-events: none; animation: float 20s ease-in-out infinite;
     }
     @keyframes float { 0%,100% { transform: translate(0,0); } 50% { transform: translate(-80px, 80px); } }
+    @keyframes fade-in { 0% { opacity: 0; transform: translateY(10px); } 100% { opacity: 1; transform: translateY(0); } }
 
     /* ========== LAYOUT ========== */
     .app { position: relative; z-index: 1; }
@@ -147,8 +150,15 @@
 
     /* ========== PANELS ========== */
     .panel {
-      background: var(--bg-card); border: 1px solid var(--border);
+      background: var(--bg-card); backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--border);
       border-radius: var(--radius); overflow: hidden;
+      box-shadow: var(--shadow);
+      transition: box-shadow 0.3s ease;
+    }
+    .panel:hover {
+      box-shadow: var(--shadow-glow);
     }
     .panel-header {
       display: flex; justify-content: space-between; align-items: center;
@@ -186,31 +196,56 @@
       width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
       border: 2px solid; margin-top: 4px;
     }
-    .timeline-dot.personal { border-color: var(--accent-cyan); background: rgba(6,182,212,0.3); }
-    .timeline-dot.event { border-color: var(--accent-orange); background: rgba(249,115,22,0.3); }
-    .timeline-dot.social { border-color: var(--accent-pink); background: rgba(236,72,153,0.3); }
-    .timeline-content { flex: 1; }
+    .timeline-dot.share { border-color: var(--accent-purple); background: rgba(139,92,246,0.3); }
+    .timeline-dot.empathy_boost { border-color: var(--accent-pink); background: rgba(236,72,153,0.3); }
+    .timeline-dot.broadcast { border-color: var(--accent-cyan); background: rgba(6,182,212,0.3); }
+    .timeline-dot.sync_request { border-color: var(--accent-orange); background: rgba(249,115,22,0.3); }
+    .timeline-dot.error { border-color: var(--accent-red); background: rgba(239,68,68,0.3); }
+    .timeline-dot.event { border-color: var(--accent-green); background: rgba(34,197,94,0.3); }
+    
+    .timeline-content { flex: 1; padding-bottom: 2px; }
     .timeline-agent {
-      font-size: 12px; font-weight: 600; color: var(--accent-blue); margin-bottom: 2px;
+      font-size: 13px; font-weight: 600; color: var(--accent-blue); margin-bottom: 4px;
+      letter-spacing: -0.2px;
     }
-    .timeline-text { font-size: 13px; line-height: 1.5; color: var(--text-secondary); }
+    .timeline-text { font-size: 13.5px; line-height: 1.6; color: var(--text-secondary); }
+    .timeline-text strong { color: var(--text-primary); font-weight: 600; }
     .timeline-tag {
-      display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 4px;
-      font-family: 'JetBrains Mono', monospace; margin-top: 4px;
+      display: inline-block; font-size: 10px; padding: 3px 8px; border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace; margin-top: 8px; text-transform: uppercase;
+      font-weight: 600; letter-spacing: 0.5px;
     }
-    .timeline-tag.personal { background: rgba(6,182,212,0.12); color: var(--accent-cyan); }
-    .timeline-tag.event { background: rgba(249,115,22,0.12); color: var(--accent-orange); }
-    .timeline-tag.social { background: rgba(236,72,153,0.12); color: var(--accent-pink); }
+    
+    .timeline-tag.share { background: rgba(139,92,246,0.12); color: var(--accent-purple); border: 1px solid rgba(139,92,246,0.2); }
+    .timeline-tag.empathy_boost { background: rgba(236,72,153,0.12); color: var(--accent-pink); border: 1px solid rgba(236,72,153,0.2); }
+    .timeline-tag.broadcast { background: rgba(6,182,212,0.12); color: var(--accent-cyan); border: 1px solid rgba(6,182,212,0.2); }
+    .timeline-tag.sync_request { background: rgba(249,115,22,0.12); color: var(--accent-orange); border: 1px solid rgba(249,115,22,0.2); }
+    .timeline-tag.event { background: rgba(34,197,94,0.12); color: var(--accent-green); border: 1px solid rgba(34,197,94,0.2); }
 
     /* ========== AGENT CARDS ========== */
     .agents-grid {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;
     }
     .agent-card {
-      background: var(--bg-card); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 20px; transition: all 0.3s;
+      background: var(--glass); backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px; transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
     }
-    .agent-card:hover { border-color: var(--accent-purple); transform: translateY(-2px); box-shadow: var(--shadow); }
+    .agent-card::before {
+      content: ""; position: absolute; inset: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.03) 0%, transparent 100%);
+      pointer-events: none; opacity: 0; transition: opacity 0.3s ease;
+    }
+    .agent-card:hover { 
+      border-color: var(--border-active); 
+      transform: translateY(-4px) scale(1.02); 
+      box-shadow: var(--shadow-glow); 
+    }
+    .agent-card:hover::before { opacity: 1; }
     .agent-card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
     .agent-avatar {
       width: 40px; height: 40px; border-radius: 10px;
@@ -255,8 +290,10 @@
     /* ========== SETTINGS TAB ========== */
     .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
     .setting-group {
-      background: var(--bg-card); border: 1px solid var(--border);
+      background: rgba(22, 22, 31, 0.5); backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.05);
       border-radius: var(--radius); padding: 24px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
     }
     .setting-group h3 { font-size: 15px; font-weight: 600; margin-bottom: 16px; }
     .setting-row {
@@ -310,6 +347,7 @@
     .tab-content.active { display: block; animation: fadeIn 0.3s ease; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
   </style>
+  <link rel="stylesheet" href="/theme.css">
 </head>
 <body>
   <div class="bg-grid"></div>
@@ -331,6 +369,8 @@
         <a href="/memory/synaptic" style="padding:6px 14px;border-radius:8px;background:linear-gradient(135deg,#22c55e,#06b6d4);color:white;text-decoration:none;font-size:12px;font-weight:600;transition:transform 0.2s;margin-right:6px;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">🌐 Synaptic</a>
         <a href="/memory/history" style="padding:6px 14px;border-radius:8px;background:linear-gradient(135deg,#f97316,#ef4444);color:white;text-decoration:none;font-size:12px;font-weight:600;transition:transform 0.2s;margin-right:6px;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">📜 Audit</a>
         <a href="/maturity" style="padding:6px 14px;border-radius:8px;background:linear-gradient(135deg,#ec4899,#8b5cf6);color:white;text-decoration:none;font-size:12px;font-weight:600;transition:transform 0.2s;margin-right:6px;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">🌱 Maturity</a>
+        <a href="/workflows" style="padding:6px 14px;border-radius:8px;background:linear-gradient(135deg,#a855f7,#ec4899);color:white;text-decoration:none;font-size:12px;font-weight:600;transition:transform 0.2s;margin-right:6px;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">⚙️ Workflows</a>
+        <a href="/api-explorer" style="padding:6px 14px;border-radius:8px;background:linear-gradient(135deg,#6366f1,#3b82f6);color:white;text-decoration:none;font-size:12px;font-weight:600;transition:transform 0.2s;margin-right:6px;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">📡 API</a>
         <div class="status-pill">
           <div class="status-dot green" id="neo4j-status"></div>
           Neo4j
@@ -353,6 +393,7 @@
         <button class="tab" data-tab="agents">Agent Profiles</button>
         <button class="tab" data-tab="projects">Projects & Scopes</button>
         <button class="tab" data-tab="access">Access Keys</button>
+        <button class="tab" data-tab="audit">Audit Feed</button>
         <button class="tab" data-tab="settings">Settings</button>
       </div>
 
@@ -477,6 +518,7 @@
             <div style="display:flex;gap:12px;margin:16px 0;padding:16px;background:var(--bg-secondary);border-radius:8px;border:1px solid var(--border)">
               <input type="text" id="new-key-name" placeholder="Key Name (e.g., Cursor Agent)" class="setting-input" style="flex:1;background:var(--bg-card);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:8px 12px;outline:none;font-family:'JetBrains Mono',monospace;font-size:13px">
               <input type="text" id="new-key-scopes" placeholder="Scopes (comma separated, e.g. project_a, public)" class="setting-input" style="flex:2;background:var(--bg-card);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:8px 12px;outline:none;font-family:'JetBrains Mono',monospace;font-size:13px">
+              <input type="number" id="new-key-rl" placeholder="Rate Limit" value="100" class="setting-input" style="width:100px;background:var(--bg-card);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:8px 12px;outline:none;font-family:'JetBrains Mono',monospace;font-size:13px">
               <select id="new-key-expires" class="setting-select" style="width:120px;background:var(--bg-card);color:var(--text-primary);border-radius:6px;border:1px solid var(--border);">
                 <option value="7">7 Days</option>
                 <option value="30" selected>30 Days</option>
@@ -488,6 +530,21 @@
             </div>
             <div id="keys-list">
               <div style="padding:20px;text-align:center;color:var(--text-muted)">Loading access keys...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AUDIT TAB -->
+      <div class="tab-content" id="tab-audit">
+        <div class="settings-grid">
+          <div class="setting-group" style="grid-column:1/-1">
+            <h3 style="display:flex;justify-content:space-between;align-items:center;">
+              Security Events (Audit Trail Feed)
+              <button onclick="loadAuditEvents()" style="padding:4px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-primary);cursor:pointer;font-size:12px;transition:background 0.2s" onmouseover="this.style.background='var(--bg-card)'" onmouseout="this.style.background='var(--bg-secondary)'">🔄 Refresh</button>
+            </h3>
+            <div id="audit-list">
+              <div style="padding:20px;text-align:center;color:var(--text-muted)">Loading audit trail...</div>
             </div>
           </div>
         </div>
@@ -774,8 +831,59 @@
       { time: 'R09', type: 'event', agent: 'Eve Tanaka', text: 'Created a collaborative thread with Carol about weekend cooking. First cross-agent content creation.' },
     ];
 
+    // ========== LIVE API POLLING & BASE ==========
+    // Auto-detect API base: same origin (Flask serves dashboard) or fallback
+    const API_BASE = '/api';
+
+    async function fetchAPI(endpoint) {
+      try {
+        const res = await fetch(`${API_BASE}/${endpoint}`, { mode: 'cors' });
+        if (res.ok) return await res.json();
+      } catch(e) { /* backend not available */ }
+      return null;
+    }
+
     // ========== RENDER FUNCTIONS ==========
-    function renderTimeline() {
+    async function loadTimeline() {
+      const container = document.getElementById('timeline-list');
+      try {
+        container.innerHTML = '<div style="padding:40px 20px;text-align:center;color:var(--text-muted)">Loading Synaptic Events...</div>';
+        const res = await fetchAPI('memory/synaptic/events?limit=50');
+        if (!res || !res.length) {
+          renderTimelineDemo();
+          return;
+        }
+        container.innerHTML = res.map((item, idx) => {
+          let text = '';
+          const msg = item.message || item.reason || '';
+          if (item.event_type === 'share') {
+            text = `Shared memory <strong>"${item.memory_name || 'Unknown'}"</strong> to scope <span style="color:var(--text-primary)">${item.target_scope}</span>. ${msg ? '<br><em style="opacity:0.8; font-size:12px; margin-top:4px; display:inline-block;">“' + msg + '”</em>' : ''}`;
+          } else if (item.event_type === 'empathy_boost') {
+            text = `Boosted memory <strong>"${item.memory_name || 'Unknown'}"</strong> by <strong style="color:var(--accent-pink)">+${item.boost_amount}</strong>. ${msg ? '<br><em style="opacity:0.8; font-size:12px; margin-top:4px; display:inline-block;">“' + msg + '”</em>' : ''}`;
+          } else {
+            text = msg || item.event_type;
+          }
+
+          return `
+          <div class="timeline-item" style="animation: fade-in 0.5s ease-out forwards; opacity: 0; animation-delay: ${idx * 0.05}s;">
+            <div class="timeline-time" style="font-size:11px">${new Date(item.created_at || item.timestamp || Date.now()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}</div>
+            <div class="timeline-dot-col">
+              <div class="timeline-dot ${item.event_type || 'event'}"></div>
+              <div style="flex: 1; width: 1px; background: rgba(255,255,255,0.05); margin-top: 6px; margin-bottom: -12px;"></div>
+            </div>
+            <div class="timeline-content">
+              <div class="timeline-agent">${item.agent_name || item.from_agent || 'System'}</div>
+              <div class="timeline-text">${text}</div>
+              <span class="timeline-tag ${item.event_type || 'event'}">${(item.event_type || 'event').replace('_', ' ')}</span>
+            </div>
+          </div>
+        `}).join('');
+      } catch (e) {
+        renderTimelineDemo();
+      }
+    }
+
+    function renderTimelineDemo() {
       const container = document.getElementById('timeline-list');
       container.innerHTML = TIMELINE_DEMO.map(item => `
         <div class="timeline-item">
@@ -784,15 +892,64 @@
             <div class="timeline-dot ${item.type}"></div>
           </div>
           <div class="timeline-content">
-            <div class="timeline-agent">${item.agent}</div>
-            <div class="timeline-text">${item.text}</div>
-            <span class="timeline-tag ${item.type}">${item.type}</span>
+             <div class="timeline-agent">${item.agent}</div>
+             <div class="timeline-text">${item.text}</div>
+             <span class="timeline-tag ${item.type}">${item.type}</span>
           </div>
         </div>
       `).join('');
     }
 
-    function renderAgents() {
+    async function loadAgents() {
+      const grid = document.getElementById('agents-grid');
+      try {
+        grid.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);grid-column:1/-1;">Loading...</div>';
+        const res = await fetchAPI('memory/synaptic/agents');
+        if (!res || !res.length) {
+          renderAgentsDemo();
+          return;
+        }
+        
+        const colors = ['#4a7dff', '#8b5cf6', '#ec4899', '#f97316', '#22c55e', '#06b6d4'];
+        
+        grid.innerHTML = res.map((agent, i) => {
+          const color = colors[i % colors.length];
+          const traits = agent.capabilities ? agent.capabilities.map(t => `<span class="trait-tag">${t}</span>`).join('') : '';
+          
+          return `
+            <div class="agent-card">
+              <div class="agent-card-header">
+                <div class="agent-avatar" style="background:${color}">
+                  ${agent.name ? agent.name.charAt(0) : 'A'}
+                </div>
+                <div>
+                  <div class="agent-name">${agent.name || agent.agent_id}</div>
+                  <div class="agent-id">${agent.agent_id}</div>
+                </div>
+              </div>
+              <div class="agent-traits">
+                <span class="trait-tag" style="border:1px solid ${color};color:${color};background:transparent">${agent.role || 'agent'}</span>
+                ${traits}
+              </div>
+              <div class="agent-dynamic" style="font-family:'JetBrains Mono',monospace; opacity:0.8; font-size:11px;">
+                Scopes: ${(agent.subscribed_scopes || []).join(', ')}<br>
+                Last Active: ${new Date(agent.last_active || agent.registered_at).toLocaleString()}
+              </div>
+              <div class="agent-stats">
+                <div class="agent-stat"><strong>${agent.shared_count || 0}</strong>shared</div>
+                <div class="agent-stat"><strong>${agent.received_count || 0}</strong>received</div>
+              </div>
+            </div>
+          `;
+        }).join('');
+        
+        updateStatsDynamic(res);
+      } catch (e) {
+        renderAgentsDemo();
+      }
+    }
+
+    function renderAgentsDemo() {
       const grid = document.getElementById('agents-grid');
       grid.innerHTML = AGENTS_DEMO.map(agent => `
         <div class="agent-card">
@@ -815,6 +972,7 @@
           </div>
         </div>
       `).join('');
+      updateStats();
     }
 
     function updateStats() {
@@ -822,8 +980,16 @@
       const totalMem = AGENTS_DEMO.reduce((s, a) => s + a.memories, 0);
       document.getElementById('stat-memories').textContent = totalMem;
       document.getElementById('stat-memories-rate').textContent = `+${Math.floor(totalMem / 12)}/round avg`;
-      document.getElementById('stat-nodes').textContent = '1,247';
+      document.getElementById('stat-nodes').textContent = '1,247'; // overridden by health check
       document.getElementById('stat-latency').textContent = '48ms';
+    }
+
+    function updateStatsDynamic(agents) {
+      document.getElementById('stat-agents').textContent = agents.length;
+      const totalShared = agents.reduce((s, a) => s + (a.shared_count || 0), 0);
+      document.getElementById('stat-memories').textContent = totalShared;
+      document.getElementById('stat-memories-rate').textContent = `+${Math.floor(totalShared / Math.max(1, agents.length))}/agent avg`;
+      // stat-nodes is from backend health
     }
 
     function updateSystemStatus() {
@@ -847,26 +1013,12 @@
     }
 
     // ========== INIT ==========
-    renderTimeline();
-    renderAgents();
-    updateStats();
+    loadTimeline();
+    loadAgents();
     updateSystemStatus();
     loadGraphs();
     loadApiKeys();
-
-    // ========== LIVE API POLLING ==========
-    // Auto-detect API base: same origin (Flask serves dashboard) or fallback
-    const API_BASE = window.location.port === '5001'
-      ? `${window.location.origin}/api`
-      : 'http://localhost:5001/api';
-
-    async function fetchAPI(endpoint) {
-      try {
-        const res = await fetch(`${API_BASE}/${endpoint}`, { mode: 'cors' });
-        if (res.ok) return await res.json();
-      } catch(e) { /* backend not available */ }
-      return null;
-    }
+    loadAuditEvents();
 
     async function pollStatus() {
       const h = await fetchAPI('health');
@@ -1158,22 +1310,31 @@
              expireBadge = `<span style="padding:2px 8px;border-radius:4px;background:rgba(139,92,246,0.1);color:var(--accent-purple);border:1px solid rgba(139,92,246,0.3);font-size:10px;margin-left:8px;">Never Expires</span>`;
           }
 
+          const isExpiring = keyObj.expires_at && daysLeft <= 10;
           return `
-          <div class="setting-row" style="padding:16px;background:var(--bg-secondary);border-radius:8px;margin-bottom:12px;border:1px solid var(--border); ${expireBadge.includes('EXPIRED') ? 'opacity:0.6;' : ''}">
+          <div class="setting-row" style="padding:16px;background:rgba(18,18,26,0.6);backdrop-filter:blur(8px);border-radius:8px;margin-bottom:12px;border:1px solid rgba(255,255,255,0.05); ${expireBadge.includes('EXPIRED') ? 'opacity:0.6;' : ''} box-shadow:0 2px 8px rgba(0,0,0,0.1); transition:transform 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
             <div>
-              <div style="font-weight:600;font-size:14px;color:var(--text-primary)">
-                🔑 ${keyObj.name || 'Unnamed Key'} ${expireBadge}
+              <div style="font-weight:600;font-size:14px;color:var(--text-primary);display:flex;align-items:center;gap:8px;">
+                <span style="font-size:16px;">🔑</span> ${keyObj.name || 'Unnamed Key'} ${expireBadge}
               </div>
-              <div style="font-size:12px;margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+              <div style="font-size:12px;margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
                 ${(keyObj.allowed_scopes || []).map(s => `<span style="padding:2px 6px;border-radius:4px;background:rgba(139,92,246,0.1);color:var(--accent-purple);border:1px solid rgba(139,92,246,0.2)">${s}</span>`).join('')}
               </div>
-              <div style="font-size:11px;color:var(--text-muted);margin-top:6px;font-family:'JetBrains Mono',monospace">
-                Hash: ${hash.substring(0, 12)}... | Roles: ${(keyObj.roles || []).join(', ')} | Used: ${keyObj.usage_count || 0} times
+              <div style="font-size:11px;color:var(--text-muted);margin-top:8px;font-family:'JetBrains Mono',monospace">
+                Hash: ${hash.substring(0, 12)}... &nbsp;|&nbsp; Roles: ${(keyObj.roles || []).join(', ')} &nbsp;|&nbsp; Used: ${keyObj.usage_count || 0} times
               </div>
             </div>
-            <button onclick="revokeApiKey('${hash}')" style="padding:6px 12px;border-radius:6px;border:1px solid rgba(239,68,68,0.3);background:transparent;color:var(--accent-red);cursor:pointer;font-size:12px;transition:all 0.2s;font-weight:600" onmouseover="this.style.background='rgba(239,68,68,0.1)'" onmouseout="this.style.background='transparent'">
-              Revoke
-            </button>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <div style="display:flex;align-items:center;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:0 8px;">
+                <span style="font-size:10px;color:var(--text-muted);margin-right:4px;">LIMIT/s:</span>
+                <input type="number" id="rl_input_${hash}" value="${keyObj.rate_limit || 100}" style="width:50px;background:transparent;border:none;color:var(--text-primary);font-family:'JetBrains Mono',monospace;font-size:12px;outline:none;padding:6px;text-align:center;">
+                <button onclick="updateRateLimit('${hash}')" style="background:transparent;border:none;color:var(--accent-blue);cursor:pointer;font-size:10px;font-weight:bold;padding:4px 6px;transition:0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--accent-blue)'">SET</button>
+              </div>
+              ${isExpiring ? `<button onclick="extendApiKey('${hash}')" style="padding:6px 12px;border-radius:6px;border:1px solid rgba(34,197,94,0.3);background:rgba(34,197,94,0.1);color:var(--accent-green);cursor:pointer;font-size:12px;transition:all 0.2s;font-weight:600" onmouseover="this.style.background='rgba(34,197,94,0.2)'" onmouseout="this.style.background='rgba(34,197,94,0.1)'">⚡ Extend 30d</button>` : ''}
+              <button onclick="revokeApiKey('${hash}')" style="padding:6px 12px;border-radius:6px;border:1px solid rgba(239,68,68,0.3);background:transparent;color:var(--accent-red);cursor:pointer;font-size:12px;transition:all 0.2s;font-weight:600" onmouseover="this.style.background='rgba(239,68,68,0.1)'" onmouseout="this.style.background='transparent'">
+                Revoke
+              </button>
+            </div>
           </div>
           `;
         }).join('');
@@ -1199,6 +1360,7 @@
             name: name,
             roles: ['agent'],
             allowed_scopes: scopes,
+            rate_limit: parseInt(document.getElementById('new-key-rl').value, 10) || 100,
             expires_in_days: parseInt(expires, 10)
           })
         });
@@ -1235,8 +1397,85 @@
       }
     }
 
+    async function extendApiKey(hash) {
+      if (!confirm("Extend this key for another 30 days?")) return;
+      try {
+        const res = await fetch(`${API_BASE}/security/keys/${hash}/extend`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ days: 30 })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          loadApiKeys();
+        } else {
+          alert("Failed to extend key: " + (data.error || "Unknown error"));
+        }
+      } catch(e) {
+        alert("Error extending key: " + e.message);
+      }
+    }
+
+    async function updateRateLimit(hash) {
+      const newLimit = document.getElementById(`rl_input_${hash}`).value;
+      if (!newLimit) return;
+      try {
+        const res = await fetch(`${API_BASE}/security/keys/${hash}/rate_limit`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rate_limit: parseInt(newLimit, 10) })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          loadApiKeys();
+        } else {
+          alert("Failed to update rate limit: " + (data.error || "Unknown error"));
+        }
+      } catch(e) {
+        alert("Error updating rate limit: " + e.message);
+      }
+    }
+
+    async function loadAuditEvents() {
+      const container = document.getElementById('audit-list');
+      try {
+        container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted)">Loading...</div>';
+        const res = await fetchAPI('security/events?limit=50');
+        if (!res || !res.events) {
+          container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--accent-red)">Failed to load audit events</div>';
+          return;
+        }
+        
+        if (res.events.length === 0) {
+          container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted)">No security events recorded yet.</div>';
+          return;
+        }
+        
+        container.innerHTML = res.events.map(ev => {
+          let badgeColor = ev.severity === 'high' ? 'var(--accent-red)' : ev.severity === 'medium' ? 'var(--accent-orange)' : 'var(--accent-cyan)';
+          return `
+          <div class="setting-row" style="padding:16px;background:var(--bg-secondary);border-radius:8px;margin-bottom:12px;border:1px solid var(--border);flex-direction:column;align-items:flex-start;gap:8px;">
+            <div style="font-weight:600;font-size:14px;color:var(--text-primary);display:flex;align-items:center;gap:8px">
+              <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.1);color:${badgeColor};border:1px solid ${badgeColor}">${(ev.severity || 'info').toUpperCase()}</span>
+              ${ev.event_type}
+            </div>
+            <div style="font-size:12px;color:var(--text-muted);width:100%;">
+              ${new Date(ev.timestamp).toLocaleString()}
+            </div>
+            <div style="font-size:12px;color:var(--text-secondary);width:100%;font-family:'JetBrains Mono',monospace;background:rgba(0,0,0,0.3);padding:10px;border-radius:4px;overflow-x:auto;">
+              ${JSON.stringify(ev.details, null, 2)}
+            </div>
+          </div>
+          `;
+        }).join('');
+      } catch (e) {
+        container.innerHTML = `<div style="padding:20px;color:var(--accent-red)">Error: ${e.message}</div>`;
+      }
+    }
+
     // Load settings on page load
     loadSettings();
   </script>
+<script src="/theme.js"></script>
 </body>
 </html>

@@ -157,6 +157,10 @@ def create_app(config_class=Config):
     from .api.settings import settings_bp
     app.register_blueprint(settings_bp)
 
+    # Workflow Gallery API (n8n workflow JSON serving)
+    from .api.workflows import workflow_bp
+    app.register_blueprint(workflow_bp, url_prefix='/api/workflows')
+
     # Start Memory Scheduler (background thread)
     try:
         from .services.memory_scheduler import start_scheduler
@@ -256,6 +260,49 @@ def create_app(config_class=Config):
                 elif 'manualTrigger' in ntype:
                     return '👆 Manual'
             return '❓ Unknown'
+
+        @app.route('/api/workflows/executions')
+        def list_workflow_executions():
+            """List recent n8n workflow executions from Neo4j."""
+            storage = app.extensions.get('neo4j_storage')
+            if storage is None:
+                from flask import jsonify as _jf
+                return _jf({"executions": []}), 503
+
+            try:
+                from neo4j import GraphDatabase
+                from .config import Config
+                driver = GraphDatabase.driver(Config.NEO4J_URI, auth=(Config.NEO4J_USER, Config.NEO4J_PASSWORD))
+                with driver.session() as session:
+                    result = session.run('''
+                        MATCH (e:ExecutionLog)
+                        RETURN e.source AS source, e.status AS status, 
+                               e.timestamp AS timestamp, e.details AS details
+                        ORDER BY e.timestamp DESC LIMIT 50
+                    ''')
+                    executions = []
+                    for record in result:
+                        try:
+                            details = _json.loads(record['details']) if record['details'] else {}
+                        except:
+                            details = {}
+                        if hasattr(record['timestamp'], 'iso_format'):
+                            ts = record['timestamp'].iso_format()
+                        else:
+                            ts = str(record['timestamp'])
+                        executions.append({
+                            'source': record['source'],
+                            'status': record['status'],
+                            'timestamp': ts,
+                            'details': details
+                        })
+                driver.close()
+                from flask import jsonify as _jf
+                return _jf({"executions": executions})
+            except Exception as e:
+                logger.error(f"Failed to fetch execution logs: {e}")
+                from flask import jsonify as _jf
+                return _jf({"executions": [], "error": str(e)}), 500
 
     # --- Health / Status API ---
     @app.route('/health')

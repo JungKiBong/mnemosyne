@@ -8,6 +8,7 @@
   - Neo4j 연결 시 로컬의 `.env` 파일이 도커 환경 변수를 덮어쓰는 문제(override) 해결.
   - Graph Explorer(`graph.html`) 뷰어 내 DOM 요소(`loading`) 참조 에러 및 `TypeError` 예방을 위한 방어 코드 추가.
   - 위의 트러블슈팅 이력을 `docs/07_troubleshooting_and_deployment.md`에 문서화하고, Neo4j Mories Memory DB에도 Ingestion 완료.
+  - **n8n 워크플로우 실행 현황 모니터링 연동 완료**: `api/gateway.py`에 Neo4j 기반 ExecutionLog 저장 구현 및 `workflows.html` 대시보드 API 연동을 통한 실시간 로깅 시각화.
 
 ## 2. 개발 및 코딩 가이드라인 (Coding Guidelines)
 다음 세션의 에이전트는 아래 규칙을 **엄격히 준수**하여 작업을 진행해야 합니다.
@@ -30,7 +31,10 @@
 7. **컨텍스트 길이 모니터링 경고**:
    - AI 에이전트는 대화 트리가 지나치게 길어져 맥락이 희미해지기 전, 사용자에게 능동적으로 "새로운 대화 세션 생성"을 제안하고 그 시점까지의 핸드오버와 기억을 정리해야 함.
 
-## 3. 남아있는 백로그 및 다음 단계 (Next Steps)
-- n8n 통합 기반 Workflow Catalog와 대시보드 연동(실행 현황 모니터링).
-- Graph Viewer 상의 대규모 노드 군집화(Clustering) 및 시맨틱 필터기 도입.
-- 만료 임박 API 키/토큰 갱신 관리자 전용 UI 패널 설계 및 연동.
+## 3. 완료된 백로그 (Completed Backlog)
+- ✅ Graph Viewer 상의 대규모 노드 군집화(Clustering) 및 시맨틱 필터기 도입 완료. (동적 `API_BASE` 연동 및 통합)
+- ✅ 만료 임박 API 키/토큰 갱신 관리자 전용 UI 패널 설계 및 연동 완료 (Mories 대시보드의 Audit, Security 패널).
+
+## 4. 다음 단계 제안 (Next Phase Suggestions)
+- **프론트엔드 성능 최적화 (Web Worker 등 활용)**: 수만 건의 노드가 렌더링될 때의 지연 현상(Vis.js) 방지를 위해 물리 연산(Physics) 오프로딩 도입 검토.
+- **n8n / Dify 워크플로우와의 양방향 제어 연동**: Mories Memory Dashboard에서 직접 이벤트를 발생시키거나 워크플로우를 트리거할 수 있는 Action Hook 시스템 설계.
