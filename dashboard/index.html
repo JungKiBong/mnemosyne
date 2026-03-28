@@ -532,22 +532,134 @@
             </div>
           </div>
 
-          <div class="setting-group">
+          <div class="setting-group" style="grid-column:1/-1">
             <h3>LLM Configuration</h3>
             <div class="setting-row">
               <div>
                 <div class="setting-label">Provider</div>
-                <div class="setting-desc">LLM backend for NER and Observers</div>
+                <div class="setting-desc">LLM backend for NER, Observers, and Agents</div>
               </div>
-              <select class="setting-select" id="setting-llm-provider">
-                <option value="ollama" selected>Ollama (Local)</option>
+              <select class="setting-select" id="setting-llm-provider" onchange="onProviderChange()">
+                <option value="ollama">Ollama (Local)</option>
+                <option value="vllm">vLLM (Local/Remote)</option>
                 <option value="openai">OpenAI API</option>
-                <option value="anthropic">Anthropic API</option>
+                <option value="gemini">Google Gemini</option>
+                <option value="anthropic">Anthropic (via proxy)</option>
+                <option value="azure">Azure OpenAI</option>
+                <option value="groq">Groq Cloud</option>
+                <option value="together">Together AI</option>
+                <option value="custom">Custom OpenAI-Compatible</option>
               </select>
             </div>
             <div class="setting-row">
               <div>
-                <div class="setting-label">Observer Batch Size</div>
+                <div class="setting-label">API Key</div>
+                <div class="setting-desc" id="apikey-hint">For Ollama, use any non-empty value (e.g., 'ollama')</div>
+              </div>
+              <input type="password" class="setting-input" id="setting-llm-apikey"
+                     placeholder="sk-..." autocomplete="off"
+                     style="background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:12px;font-family:'JetBrains Mono',monospace;width:260px;outline:none">
+            </div>
+            <div class="setting-row">
+              <div>
+                <div class="setting-label">Base URL</div>
+                <div class="setting-desc">API endpoint (including /v1 for OpenAI-compatible providers)</div>
+              </div>
+              <input type="text" class="setting-input" id="setting-llm-baseurl"
+                     placeholder="http://localhost:11434/v1"
+                     style="background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:12px;font-family:'JetBrains Mono',monospace;width:320px;outline:none">
+            </div>
+            <div class="setting-row">
+              <div>
+                <div class="setting-label">Model Name</div>
+                <div class="setting-desc">Model ID used for chat completions (NER, observers, etc.)</div>
+              </div>
+              <input type="text" class="setting-input" id="setting-llm-model"
+                     placeholder="qwen2.5:32b"
+                     style="background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:12px;font-family:'JetBrains Mono',monospace;width:260px;outline:none">
+            </div>
+            <div class="setting-row">
+              <div>
+                <div class="setting-label">Context Window (num_ctx)</div>
+                <div class="setting-desc">Ollama context window size (prevents prompt truncation)</div>
+              </div>
+              <select class="setting-select" id="setting-llm-numctx">
+                <option value="4096">4,096</option>
+                <option value="8192" selected>8,192</option>
+                <option value="16384">16,384</option>
+                <option value="32768">32,768</option>
+                <option value="65536">65,536</option>
+                <option value="131072">131,072</option>
+              </select>
+            </div>
+            <div class="setting-row" style="justify-content:flex-end;gap:8px">
+              <button onclick="testLLM()" id="btn-test-llm"
+                style="padding:6px 16px;border-radius:6px;border:1px solid var(--accent-cyan);background:transparent;color:var(--accent-cyan);font-size:12px;font-family:'JetBrains Mono',monospace;cursor:pointer;transition:all 0.2s"
+                onmouseover="this.style.background='rgba(6,182,212,0.15)'" onmouseout="this.style.background='transparent'">
+                ⚡ Test LLM Connection
+              </button>
+            </div>
+            <div id="llm-test-result" style="display:none;margin-top:8px;padding:10px 14px;border-radius:8px;font-size:12px;font-family:'JetBrains Mono',monospace;"></div>
+          </div>
+
+          <div class="setting-group" style="grid-column:1/-1">
+            <h3>Embedding Configuration</h3>
+            <div class="setting-row">
+              <div>
+                <div class="setting-label">Embedding Provider</div>
+                <div class="setting-desc">Vector generation backend for semantic search</div>
+              </div>
+              <select class="setting-select" id="setting-emb-provider">
+                <option value="ollama" selected>Ollama (/api/embed)</option>
+                <option value="openai">OpenAI (/v1/embeddings)</option>
+                <option value="vllm">vLLM (/v1/embeddings)</option>
+                <option value="custom">Custom OpenAI-Compatible</option>
+              </select>
+            </div>
+            <div class="setting-row">
+              <div>
+                <div class="setting-label">Embedding Base URL</div>
+                <div class="setting-desc">Separate from LLM — can use a different server</div>
+              </div>
+              <input type="text" class="setting-input" id="setting-emb-baseurl"
+                     placeholder="http://localhost:11434"
+                     style="background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:12px;font-family:'JetBrains Mono',monospace;width:320px;outline:none">
+            </div>
+            <div class="setting-row">
+              <div>
+                <div class="setting-label">Embedding Model</div>
+                <div class="setting-desc">Model ID for vector generation</div>
+              </div>
+              <input type="text" class="setting-input" id="setting-emb-model"
+                     placeholder="nomic-embed-text"
+                     style="background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:12px;font-family:'JetBrains Mono',monospace;width:260px;outline:none">
+            </div>
+            <div class="setting-row" style="justify-content:flex-end;gap:8px">
+              <button onclick="testEmbedding()" id="btn-test-emb"
+                style="padding:6px 16px;border-radius:6px;border:1px solid var(--accent-purple);background:transparent;color:var(--accent-purple);font-size:12px;font-family:'JetBrains Mono',monospace;cursor:pointer;transition:all 0.2s"
+                onmouseover="this.style.background='rgba(139,92,246,0.15)'" onmouseout="this.style.background='transparent'">
+                🧬 Test Embedding
+              </button>
+            </div>
+            <div id="emb-test-result" style="display:none;margin-top:8px;padding:10px 14px;border-radius:8px;font-size:12px;font-family:'JetBrains Mono',monospace;"></div>
+          </div>
+
+          <div class="setting-group" style="grid-column:1/-1">
+            <div class="setting-row" style="justify-content:flex-end;gap:12px;border:none;padding-top:0">
+              <button onclick="saveSettings()" id="btn-save-settings"
+                style="padding:8px 28px;border-radius:8px;border:none;background:var(--gradient-primary);color:white;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;transition:all 0.2s;box-shadow:0 2px 12px rgba(74,125,255,0.3)"
+                onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">
+                💾 Save All Settings
+              </button>
+            </div>
+            <div id="save-result" style="display:none;margin-top:8px;padding:10px 14px;border-radius:8px;font-size:12px;font-family:'JetBrains Mono',monospace;text-align:center"></div>
+          </div>
+
+          <div class="setting-group">
+            <h3>Observer Batch Size</h3>
+            <div class="setting-row">
+              <div>
+                <div class="setting-label">Batch Size</div>
                 <div class="setting-desc">Activities per cognitive extraction batch</div>
               </div>
               <select class="setting-select" id="setting-batch-size">
@@ -740,6 +852,175 @@
     // Poll every 5s
     setInterval(pollStatus, 5000);
     pollStatus();
+
+    // ========== SETTINGS MANAGEMENT ==========
+    const PROVIDER_DEFAULTS = {
+      ollama:   { url: 'http://localhost:11434/v1', model: 'qwen2.5:32b', hint: "For Ollama, use any non-empty value (e.g., 'ollama')" },
+      vllm:     { url: 'http://localhost:8000/v1', model: 'Qwen/Qwen2.5-32B-Instruct', hint: "For vLLM, use any non-empty value (e.g., 'vllm')" },
+      openai:   { url: 'https://api.openai.com/v1', model: 'gpt-4o', hint: 'Enter your OpenAI API key (sk-...)' },
+      gemini:   { url: 'https://generativelanguage.googleapis.com/v1beta/openai/', model: 'gemini-2.0-flash', hint: 'Enter your Google AI API key (AIza...)' },
+      anthropic:{ url: 'https://api.anthropic.com/v1', model: 'claude-3-5-sonnet-20241022', hint: 'Requires an OpenAI-compatible proxy for Anthropic' },
+      azure:    { url: 'https://{resource}.openai.azure.com/openai/deployments/{deploy}/v1', model: 'gpt-4o', hint: 'Enter your Azure OpenAI API key' },
+      groq:     { url: 'https://api.groq.com/openai/v1', model: 'llama-3.3-70b-versatile', hint: 'Enter your Groq API key (gsk-...)' },
+      together: { url: 'https://api.together.xyz/v1', model: 'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo', hint: 'Enter your Together AI API key' },
+      custom:   { url: '', model: '', hint: 'Enter API key for your custom OpenAI-compatible endpoint' },
+    };
+
+    function onProviderChange() {
+      const provider = document.getElementById('setting-llm-provider').value;
+      const defaults = PROVIDER_DEFAULTS[provider] || PROVIDER_DEFAULTS.custom;
+      document.getElementById('setting-llm-baseurl').placeholder = defaults.url;
+      document.getElementById('setting-llm-model').placeholder = defaults.model;
+      document.getElementById('apikey-hint').textContent = defaults.hint;
+    }
+
+    async function loadSettings() {
+      try {
+        const res = await fetch(`${API_BASE}/settings`);
+        if (!res.ok) return;
+        const s = await res.json();
+        if (s.llm) {
+          const sel = document.getElementById('setting-llm-provider');
+          for (let opt of sel.options) { if (opt.value === s.llm.provider) opt.selected = true; }
+          document.getElementById('setting-llm-baseurl').value = s.llm.base_url || '';
+          document.getElementById('setting-llm-model').value = s.llm.model || '';
+          document.getElementById('setting-llm-apikey').placeholder = s.llm.api_key_set ? '••••••••' : 'sk-...';
+          const numSel = document.getElementById('setting-llm-numctx');
+          for (let opt of numSel.options) { if (opt.value === String(s.llm.num_ctx)) opt.selected = true; }
+        }
+        if (s.embedding) {
+          const embSel = document.getElementById('setting-emb-provider');
+          for (let opt of embSel.options) { if (opt.value === s.embedding.provider) opt.selected = true; }
+          document.getElementById('setting-emb-baseurl').value = s.embedding.base_url || '';
+          document.getElementById('setting-emb-model').value = s.embedding.model || '';
+        }
+        onProviderChange();
+      } catch(e) { /* backend not available */ }
+    }
+
+    async function saveSettings() {
+      const btn = document.getElementById('btn-save-settings');
+      const resultDiv = document.getElementById('save-result');
+      btn.textContent = '⏳ Saving...';
+
+      const payload = {
+        llm: {
+          provider: document.getElementById('setting-llm-provider').value,
+          base_url: document.getElementById('setting-llm-baseurl').value || undefined,
+          model: document.getElementById('setting-llm-model').value || undefined,
+          num_ctx: document.getElementById('setting-llm-numctx').value,
+        },
+        embedding: {
+          provider: document.getElementById('setting-emb-provider').value,
+          base_url: document.getElementById('setting-emb-baseurl').value || undefined,
+          model: document.getElementById('setting-emb-model').value || undefined,
+        },
+      };
+      const apikey = document.getElementById('setting-llm-apikey').value;
+      if (apikey) payload.llm.api_key = apikey;
+
+      try {
+        const res = await fetch(`${API_BASE}/settings`, {
+          method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        resultDiv.style.display = 'block';
+        resultDiv.style.background = 'rgba(34,197,94,0.12)';
+        resultDiv.style.color = 'var(--accent-green)';
+        resultDiv.textContent = `✅ ${data.message}`;
+        document.getElementById('setting-llm-apikey').value = '';
+        setTimeout(() => resultDiv.style.display = 'none', 4000);
+      } catch(e) {
+        resultDiv.style.display = 'block';
+        resultDiv.style.background = 'rgba(239,68,68,0.12)';
+        resultDiv.style.color = 'var(--accent-red)';
+        resultDiv.textContent = `❌ Save failed: ${e.message}`;
+      }
+      btn.textContent = '💾 Save All Settings';
+    }
+
+    async function testLLM() {
+      const btn = document.getElementById('btn-test-llm');
+      const resultDiv = document.getElementById('llm-test-result');
+      btn.textContent = '⏳ Testing...';
+      resultDiv.style.display = 'block';
+      resultDiv.style.background = 'rgba(74,125,255,0.08)';
+      resultDiv.style.color = 'var(--text-secondary)';
+      resultDiv.textContent = 'Connecting to LLM...';
+
+      const payload = {};
+      const urlVal = document.getElementById('setting-llm-baseurl').value;
+      const modelVal = document.getElementById('setting-llm-model').value;
+      const keyVal = document.getElementById('setting-llm-apikey').value;
+      if (urlVal) payload.base_url = urlVal;
+      if (modelVal) payload.model = modelVal;
+      if (keyVal) payload.api_key = keyVal;
+
+      try {
+        const res = await fetch(`${API_BASE}/settings/test/llm`, {
+          method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.status === 'connected') {
+          resultDiv.style.background = 'rgba(34,197,94,0.12)';
+          resultDiv.style.color = 'var(--accent-green)';
+          resultDiv.textContent = `✅ Connected — ${data.model} responded "${data.response}" in ${data.latency_ms}ms`;
+        } else {
+          resultDiv.style.background = 'rgba(239,68,68,0.12)';
+          resultDiv.style.color = 'var(--accent-red)';
+          resultDiv.textContent = `❌ ${data.error}`;
+        }
+      } catch(e) {
+        resultDiv.style.background = 'rgba(239,68,68,0.12)';
+        resultDiv.style.color = 'var(--accent-red)';
+        resultDiv.textContent = `❌ Connection failed: ${e.message}`;
+      }
+      btn.textContent = '⚡ Test LLM Connection';
+      setTimeout(() => resultDiv.style.display = 'none', 8000);
+    }
+
+    async function testEmbedding() {
+      const btn = document.getElementById('btn-test-emb');
+      const resultDiv = document.getElementById('emb-test-result');
+      btn.textContent = '⏳ Testing...';
+      resultDiv.style.display = 'block';
+      resultDiv.style.background = 'rgba(139,92,246,0.08)';
+      resultDiv.style.color = 'var(--text-secondary)';
+      resultDiv.textContent = 'Generating test embedding...';
+
+      const payload = {
+        provider: document.getElementById('setting-emb-provider').value,
+      };
+      const urlVal = document.getElementById('setting-emb-baseurl').value;
+      const modelVal = document.getElementById('setting-emb-model').value;
+      if (urlVal) payload.base_url = urlVal;
+      if (modelVal) payload.model = modelVal;
+
+      try {
+        const res = await fetch(`${API_BASE}/settings/test/embedding`, {
+          method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.status === 'connected') {
+          resultDiv.style.background = 'rgba(34,197,94,0.12)';
+          resultDiv.style.color = 'var(--accent-green)';
+          resultDiv.textContent = `✅ Connected — ${data.model} generated ${data.dimensions}-dim vector in ${data.latency_ms}ms`;
+        } else {
+          resultDiv.style.background = 'rgba(239,68,68,0.12)';
+          resultDiv.style.color = 'var(--accent-red)';
+          resultDiv.textContent = `❌ ${data.error}`;
+        }
+      } catch(e) {
+        resultDiv.style.background = 'rgba(239,68,68,0.12)';
+        resultDiv.style.color = 'var(--accent-red)';
+        resultDiv.textContent = `❌ Connection failed: ${e.message}`;
+      }
+      btn.textContent = '🧬 Test Embedding';
+      setTimeout(() => resultDiv.style.display = 'none', 8000);
+    }
+
+    // Load settings on page load
+    loadSettings();
   </script>
 </body>
 </html>

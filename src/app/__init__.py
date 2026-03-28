@@ -149,6 +149,10 @@ def create_app(config_class=Config):
     from .api.permanent_memory import permanent_bp
     app.register_blueprint(permanent_bp, url_prefix='/api/memory')
 
+    # Settings API (Runtime LLM/Embedding configuration)
+    from .api.settings import settings_bp
+    app.register_blueprint(settings_bp)
+
     # Start Memory Scheduler (background thread)
     try:
         from .services.memory_scheduler import start_scheduler
