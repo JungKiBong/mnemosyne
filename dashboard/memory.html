@@ -196,6 +196,7 @@
             <button class="tab active" data-tab="overview">📊 메모리 분포</button>
             <button class="tab" data-tab="stm">📋 단기 기억(STM)</button>
             <button class="tab" data-tab="memories">🧠 기억 목록</button>
+            <button class="tab" data-tab="pm">💎 영구 기억(PM)</button>
             <button class="tab" data-tab="config">⚙️ 파라미터 설정</button>
         </div>
 
@@ -314,6 +315,40 @@
                 <div class="panel-body">
                     <div class="config-grid" id="configGrid">
                         <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Permanent Memory -->
+        <div class="tab-content" id="tab-pm">
+            <div class="main-grid">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>💎 보호된 기억 (Imprint & Frozen)</h2>
+                    </div>
+                    <div class="panel-body" style="padding:0">
+                        <table class="memory-table">
+                            <thead>
+                                <tr>
+                                    <th>Title</th>
+                                    <th>Type</th>
+                                    <th>Scope</th>
+                                    <th>Created At</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pmTableBody">
+                                <tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:20px">로딩 중...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>⚠️ Priority Overrides & Alerts</h2>
+                    </div>
+                    <div class="panel-body" id="pmAlertsList">
+                        <p style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px">알림이 없습니다</p>
                     </div>
                 </div>
             </div>
@@ -710,9 +745,50 @@
             showToast('새로고침 완료', 'info');
         }
 
+        async function loadPMDashboard() {
+            try {
+                const data = await apiGet('/permanent/dashboard-data');
+                // Render PMs
+                const pms = [...(data.imprints || []), ...(data.frozen || [])];
+                const tbody = document.getElementById('pmTableBody');
+                if (pms.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:20px">보호된 영구 기억이 없습니다</td></tr>';
+                } else {
+                    tbody.innerHTML = pms.map(m => `
+                        <tr>
+                            <td style="font-weight:600">${escapeHtml(m.title || m.name || m.uuid)}</td>
+                            <td><span class="header-badge" style="background:rgba(79,140,255,0.1);color:#4f8cff;border:none">${m.type || 'PM'}</span></td>
+                            <td style="font-size:12px;color:var(--text-muted)">${m.scope || 'Personal'}</td>
+                            <td style="font-size:11px;color:var(--text-muted)">${formatDate(m.created_at)}</td>
+                        </tr>
+                    `).join('');
+                }
+
+                // Render Alerts
+                const alertsContainer = document.getElementById('pmAlertsList');
+                if (!data.alerts || data.alerts.length === 0) {
+                    alertsContainer.innerHTML = '<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px">최근 보고된 충돌 알림이 없습니다 💎</p>';
+                } else {
+                    alertsContainer.innerHTML = data.alerts.map(a => `
+                        <div style="padding:12px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center">
+                            <div>
+                                <div style="font-size:13px;color:var(--accent-red);font-weight:600">${a.severity.toUpperCase()}</div>
+                                <div style="font-size:12px;color:var(--text-primary);margin-top:4px">${escapeHtml(a.message)}</div>
+                            </div>
+                            <div style="font-size:11px;color:var(--text-muted)">${formatDate(a.timestamp)}</div>
+                        </div>
+                    `).join('');
+                }
+            } catch (e) {
+                console.error("PM Load Error:", e);
+                // Fail silently since this is optional tab
+            }
+        }
+
         // ──── Init ────
         loadOverview();
         loadMemories();
+        loadPMDashboard();
     </script>
 </body>
 </html>
