@@ -219,11 +219,29 @@ class MemoryRBAC:
         roles: List[str] = None,
         allowed_scopes: List[str] = None,
         rate_limit: int = 100,  # requests per minute
+        expires_in_days: int = 30,  # Default to 30 days. 0 = never
     ) -> Dict[str, Any]:
-        """Generate a new API key."""
+        """Generate a new API key.
+        
+        Args:
+            expires_in_days: 0 = never expires, 1-3650 = days until expiration.
+                             Negative values are rejected.
+        """
+        from datetime import timedelta
+
+        # Input validation — governance: reject invalid expiration values
+        if expires_in_days < 0:
+            raise ValueError("expires_in_days must be >= 0 (0 = never expires)")
+        if expires_in_days > 3650:  # 10 years max
+            raise ValueError("expires_in_days must be <= 3650 (10 years)")
+
         raw_key = f"mnem_{secrets.token_urlsafe(32)}"
         key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(timezone.utc)
+        
+        expires_at = None
+        if expires_in_days > 0:
+            expires_at = (now + timedelta(days=expires_in_days)).isoformat()
 
         roles = roles or ["writer"]
         allowed_scopes = allowed_scopes or ["personal", "tribal"]
@@ -238,13 +256,15 @@ class MemoryRBAC:
                     allowed_scopes: $scopes,
                     rate_limit: $rate_limit,
                     created_at: $now,
+                    expires_at: $expires_at,
                     active: true,
                     usage_count: 0
                 })
             """,
                 hash=key_hash, owner=owner_id, name=name,
                 roles=roles, scopes=allowed_scopes,
-                rate_limit=rate_limit, now=now,
+                rate_limit=rate_limit, now=now.isoformat(),
+                expires_at=expires_at
             )
 
         # Update in-memory cache
@@ -254,15 +274,17 @@ class MemoryRBAC:
             "roles": roles,
             "allowed_scopes": allowed_scopes,
             "rate_limit": rate_limit,
+            "expires_at": expires_at,
         }
 
-        logger.info(f"API key generated: {name} for {owner_id}")
+        logger.info(f"API key generated: {name} for {owner_id} (Expires: {expires_at or 'Never'})")
         return {
             "api_key": raw_key,  # Only returned once!
             "name": name,
             "owner_id": owner_id,
             "roles": roles,
             "allowed_scopes": allowed_scopes,
+            "expires_at": expires_at,
             "warning": "Save this key — it won't be shown again",
         }
 
@@ -272,7 +294,46 @@ class MemoryRBAC:
         principal = self._api_keys.get(key_hash)
 
         if principal:
-            # Update usage count (async-safe)
+            # Check expiration — governance: expired keys MUST be rejected
+            expires_at_str = principal.get("expires_at")
+            if expires_at_str:
+                expires_at = datetime.fromisoformat(expires_at_str)
+                # Ensure timezone-aware comparison
+                if expires_at.tzinfo is None:
+                    expires_at = expires_at.replace(tzinfo=timezone.utc)
+                now = datetime.now(timezone.utc)
+
+                if now > expires_at:
+                    logger.warning(
+                        f"🚨 ACCESS DENIED: API key '{principal.get('name')}' "
+                        f"expired at {expires_at_str}. Key hash: {key_hash[:12]}..."
+                    )
+                    return None  # Expired — do NOT increment usage_count
+                    
+                # Expiration warnings (logged per-request for ops visibility)
+                days_left = (expires_at - now).days
+                if days_left <= 0:
+                    logger.warning(
+                        f"⚠️ [URGENT] API key '{principal.get('name')}' "
+                        f"expires TODAY or within 24 hours!"
+                    )
+                elif days_left <= 1:
+                    logger.warning(
+                        f"⚠️ [CRITICAL] API key '{principal.get('name')}' "
+                        f"expires in {days_left} day(s)."
+                    )
+                elif days_left <= 5:
+                    logger.info(
+                        f"⚠️ [WARNING] API key '{principal.get('name')}' "
+                        f"expires in {days_left} days."
+                    )
+                elif days_left <= 10:
+                    logger.info(
+                        f"ℹ️ [NOTICE] API key '{principal.get('name')}' "
+                        f"expires in {days_left} days."
+                    )
+
+            # Update usage count — only for valid (non-expired) keys
             try:
                 with self._driver.session() as session:
                     session.run("""
@@ -307,6 +368,7 @@ class MemoryRBAC:
                        k.owner_id AS owner_id, k.roles AS roles,
                        k.allowed_scopes AS allowed_scopes,
                        k.rate_limit AS rate_limit,
+                       k.expires_at AS expires_at,
                        k.usage_count AS usage_count,
                        k.created_at AS created_at,
                        k.last_used AS last_used
@@ -324,6 +386,7 @@ class MemoryRBAC:
                     RETURN k.key_hash AS hash, k.owner_id AS owner_id,
                            k.name AS name, k.roles AS roles,
                            k.allowed_scopes AS allowed_scopes,
+                           k.expires_at AS expires_at,
                            k.rate_limit AS rate_limit
                 """).data()
 
@@ -333,6 +396,7 @@ class MemoryRBAC:
                     "name": rec["name"],
                     "roles": rec["roles"],
                     "allowed_scopes": rec["allowed_scopes"],
+                    "expires_at": rec["expires_at"],
                     "rate_limit": rec["rate_limit"],
                 }
 

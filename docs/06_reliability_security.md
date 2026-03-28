@@ -399,6 +399,77 @@ class PostgresAdapter:
                 raise ValueError(f"Forbidden SQL operation: {tokens[0]}")
 ```
 
+### 3.4 API 키 만료 라이프사이클 (Expiration Lifecycle)
+
+> **작성일:** 2026-03-28  
+> **근거:** AI 데이터 거버넌스 보안 강화 — 무기한 키 방지 정책
+
+#### 3.4.1 키 생성 시 만료일 지정
+
+```
+POST /api/security/keys
+{
+    "owner_id": "admin",
+    "name": "Agent Key",
+    "roles": ["writer"],
+    "allowed_scopes": ["personal", "tribal"],
+    "expires_in_days": 30       ← 필수(기본: 30일, 0=무제한, 최대: 3650일)
+}
+```
+
+**거버넌스 규칙:**
+- `expires_in_days` 음수 → `400 Bad Request` (즉시 거부)
+- `expires_in_days > 3650` → `400 Bad Request` (10년 초과 금지)
+- `expires_in_days = 0` → 무제한 (보안 감사 시 주의 필요)
+- 기본값: 30일 — 단기 키 사용을 권장
+
+#### 3.4.2 만료 검증 흐름
+
+```
+  validate_api_key(raw_key)
+       │
+       ▼
+  ┌────────────────────────────┐
+  │  SHA-256 해시 → 캐시 조회  │
+  └──────────┬─────────────────┘
+             │ 키 존재
+             ▼
+  ┌────────────────────────────┐
+  │  expires_at 확인            │
+  │  ├─ now > expires_at       │ → 즉시 거부 (None 반환)
+  │  │   • usage_count 미증가   │   ← 거버넌스 핵심: 만료 키 사용량 불산입
+  │  │   • 로그: 🚨 ACCESS DENIED│
+  │  │                          │
+  │  ├─ days_left ≤ 0          │ → ⚠️ [URGENT] 당일 만료 경고
+  │  ├─ days_left ≤ 1          │ → ⚠️ [CRITICAL] 1일 이내 만료
+  │  ├─ days_left ≤ 5          │ → ⚠️ [WARNING] 5일 이내 만료
+  │  ├─ days_left ≤ 10         │ → ℹ️ [NOTICE] 10일 이내 만료
+  │  └─ otherwise              │ → 정상 통과
+  └──────────┬─────────────────┘
+             │ 유효
+             ▼
+  ┌────────────────────────────┐
+  │  usage_count +1            │
+  │  last_used = now           │
+  │  principal 정보 반환        │
+  └────────────────────────────┘
+```
+
+#### 3.4.3 대시보드 시각화
+
+| 상태 | 배지 색상 | 표시 |
+|------|----------|------|
+| Valid (10일 초과) | 🟢 초록 | `Valid for N days` |
+| Notice (10일 이내) | 🟠 주황 + 점멸 | `⚠️ Expires in N days` |
+| Never Expires | 🟣 보라 | `Never Expires` |
+| Expired | 🔴 빨강 + 반투명 | `🚨 EXPIRED` |
+
+#### 3.4.4 시간대(TZ) 안전성
+
+- 모든 만료일은 **UTC(timezone.utc)** 기준으로 저장·비교
+- `fromisoformat()` 파싱 시 `tzinfo`가 None이면 UTC로 강제 보정
+- Neo4j 노드에 ISO 8601 문자열로 저장 (`2026-04-27T10:22:30+00:00`)
+
 ---
 
 ## 4. 테스트 전략

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mnemosyne — Memory Intelligence Dashboard</title>
+  <title>Mories — Memory Intelligence Dashboard</title>
   <meta name="description" content="MiroFish × Supermemory Hybrid Memory System Dashboard">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
@@ -134,7 +134,7 @@
     }
     .stat-card .value {
       font-size: 32px; font-weight: 700; letter-spacing: -1px;
-      background: var(--gradient-primary); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background: var(--gradient-primary); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
     }
     .stat-card .change {
       font-size: 11px; color: var(--accent-green); margin-top: 4px;
@@ -321,7 +321,7 @@
       <div class="topbar-brand">
         <div class="logo">M</div>
         <div>
-          <h1>Mnemosyne</h1>
+          <h1>Mories</h1>
         </div>
         <span>v0.4.0</span>
       </div>
@@ -347,6 +347,8 @@
       <div class="tabs">
         <button class="tab active" data-tab="overview">Overview</button>
         <button class="tab" data-tab="agents">Agent Profiles</button>
+        <button class="tab" data-tab="projects">Projects & Scopes</button>
+        <button class="tab" data-tab="access">Access Keys</button>
         <button class="tab" data-tab="settings">Settings</button>
       </div>
 
@@ -442,6 +444,48 @@
       <div class="tab-content" id="tab-agents">
         <div class="agents-grid" id="agents-grid">
           <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- PROJECTS TAB -->
+      <div class="tab-content" id="tab-projects">
+        <div class="settings-grid">
+          <div class="setting-group" style="grid-column:1/-1">
+            <h3 style="display:flex;justify-content:space-between;align-items:center;">
+              Memory Projects (Graphs)
+              <button onclick="loadGraphs()" style="padding:4px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-primary);cursor:pointer;font-size:12px;transition:background 0.2s" onmouseover="this.style.background='var(--bg-card)'" onmouseout="this.style.background='var(--bg-secondary)'">🔄 Refresh</button>
+            </h3>
+            <div id="projects-list" style="margin-top:16px;">
+              <div style="padding:20px;text-align:center;color:var(--text-muted)">Loading projects...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ACCESS KEYS TAB -->
+      <div class="tab-content" id="tab-access">
+        <div class="settings-grid">
+          <div class="setting-group" style="grid-column:1/-1">
+            <h3 style="display:flex;justify-content:space-between;align-items:center;">
+              API Tokens (Access Control)
+              <button onclick="loadApiKeys()" style="padding:4px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-primary);cursor:pointer;font-size:12px;transition:background 0.2s" onmouseover="this.style.background='var(--bg-card)'" onmouseout="this.style.background='var(--bg-secondary)'">🔄 Refresh</button>
+            </h3>
+            <div style="display:flex;gap:12px;margin:16px 0;padding:16px;background:var(--bg-secondary);border-radius:8px;border:1px solid var(--border)">
+              <input type="text" id="new-key-name" placeholder="Key Name (e.g., Cursor Agent)" class="setting-input" style="flex:1;background:var(--bg-card);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:8px 12px;outline:none;font-family:'JetBrains Mono',monospace;font-size:13px">
+              <input type="text" id="new-key-scopes" placeholder="Scopes (comma separated, e.g. project_a, public)" class="setting-input" style="flex:2;background:var(--bg-card);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:8px 12px;outline:none;font-family:'JetBrains Mono',monospace;font-size:13px">
+              <select id="new-key-expires" class="setting-select" style="width:120px;background:var(--bg-card);color:var(--text-primary);border-radius:6px;border:1px solid var(--border);">
+                <option value="7">7 Days</option>
+                <option value="30" selected>30 Days</option>
+                <option value="90">90 Days</option>
+                <option value="365">1 Year</option>
+                <option value="0">Never</option>
+              </select>
+              <button onclick="createApiKey()" style="padding:8px 16px;border-radius:6px;border:none;background:var(--accent-blue);color:white;cursor:pointer;font-weight:600;transition:transform 0.2s" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">Generate Key</button>
+            </div>
+            <div id="keys-list">
+              <div style="padding:20px;text-align:center;color:var(--text-muted)">Loading access keys...</div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -803,6 +847,8 @@
     renderAgents();
     updateStats();
     updateSystemStatus();
+    loadGraphs();
+    loadApiKeys();
 
     // ========== LIVE API POLLING ==========
     // Auto-detect API base: same origin (Flask serves dashboard) or fallback
@@ -1017,6 +1063,172 @@
       }
       btn.textContent = '🧬 Test Embedding';
       setTimeout(() => resultDiv.style.display = 'none', 8000);
+    }
+
+    // ========== PROJECT (GRAPH) MANAGEMENT ==========
+    async function loadGraphs() {
+      const container = document.getElementById('projects-list');
+      try {
+        container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted)">Loading...</div>';
+        const res = await fetchAPI('graphs');
+        if (!res || !res.graphs) {
+          container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--accent-red)">Failed to load graphs</div>';
+          return;
+        }
+        
+        if (res.graphs.length === 0) {
+          container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted)">No projects found</div>';
+          return;
+        }
+        
+        container.innerHTML = res.graphs.sort((a,b) => b.count - a.count).map(g => `
+          <div class="setting-row" style="padding:16px;background:var(--bg-secondary);border-radius:8px;margin-bottom:12px;border:1px solid var(--border)">
+            <div>
+              <div style="font-weight:600;font-size:14px;color:var(--text-primary);display:flex;align-items:center;gap:8px">
+                📁 ${g.graph_id}
+                <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:var(--bg-card);color:var(--text-muted);border:1px solid var(--border)">${g.count} nodes</span>
+              </div>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:4px;font-family:'JetBrains Mono',monospace">Scope access required if private</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px">
+              <span style="font-size:12px;color:${g.is_public ? 'var(--accent-green)' : 'var(--accent-orange)'};font-family:'JetBrains Mono',monospace">
+                ${g.is_public ? '🌍 Public Access' : '🔒 Private (Token Required)'}
+              </span>
+              <label class="toggle">
+                <input type="checkbox" ${g.is_public ? 'checked' : ''} onchange="toggleGraphVisibility('${g.graph_id}', this.checked)">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+        `).join('');
+      } catch (e) {
+        container.innerHTML = `<div style="padding:20px;color:var(--accent-red)">Error: ${e.message}</div>`;
+      }
+    }
+
+    async function toggleGraphVisibility(graphId, isPublic) {
+      try {
+        await fetch(`${API_BASE}/graphs/${encodeURIComponent(graphId)}/visibility`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ is_public: isPublic })
+        });
+        loadGraphs();
+      } catch(e) {
+        alert("Failed to change visibility: " + e.message);
+      }
+    }
+
+    // ========== ACCESS KEY MANAGEMENT ==========
+    async function loadApiKeys() {
+      const container = document.getElementById('keys-list');
+      try {
+        container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted)">Loading...</div>';
+        const res = await fetchAPI('security/keys');
+        if (!res || !res.keys) {
+          container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--accent-red)">Failed to load keys (Check backend API)</div>';
+          return;
+        }
+        
+        if (res.keys.length === 0) {
+          container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted)">No API Keys generated yet.</div>';
+          return;
+        }
+        
+        const keysHtml = res.keys.map(keyObj => {
+          let expireBadge = '';
+          const hash = keyObj.key_hash || '';
+          if (keyObj.expires_at) {
+            const expDate = new Date(keyObj.expires_at);
+            const now = new Date();
+            const daysLeft = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24));
+            
+            if (daysLeft <= 0) {
+              expireBadge = `<span style="padding:2px 8px;border-radius:4px;background:rgba(239,68,68,0.2);color:var(--accent-red);border:1px solid rgba(239,68,68,0.5);font-size:10px;font-weight:bold;margin-left:8px;">🚨 EXPIRED</span>`;
+            } else if (daysLeft <= 10) {
+              expireBadge = `<span style="padding:2px 8px;border-radius:4px;background:rgba(249,115,22,0.2);color:var(--accent-orange);border:1px solid rgba(249,115,22,0.5);font-size:10px;font-weight:bold;margin-left:8px;animation:pulse-dot 2s infinite">⚠️ Expires in ${daysLeft} days</span>`;
+            } else {
+              expireBadge = `<span style="padding:2px 8px;border-radius:4px;background:rgba(34,197,94,0.1);color:var(--accent-green);border:1px solid rgba(34,197,94,0.3);font-size:10px;margin-left:8px;">Valid for ${daysLeft} days</span>`;
+            }
+          } else {
+             expireBadge = `<span style="padding:2px 8px;border-radius:4px;background:rgba(139,92,246,0.1);color:var(--accent-purple);border:1px solid rgba(139,92,246,0.3);font-size:10px;margin-left:8px;">Never Expires</span>`;
+          }
+
+          return `
+          <div class="setting-row" style="padding:16px;background:var(--bg-secondary);border-radius:8px;margin-bottom:12px;border:1px solid var(--border); ${expireBadge.includes('EXPIRED') ? 'opacity:0.6;' : ''}">
+            <div>
+              <div style="font-weight:600;font-size:14px;color:var(--text-primary)">
+                🔑 ${keyObj.name || 'Unnamed Key'} ${expireBadge}
+              </div>
+              <div style="font-size:12px;margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+                ${(keyObj.allowed_scopes || []).map(s => `<span style="padding:2px 6px;border-radius:4px;background:rgba(139,92,246,0.1);color:var(--accent-purple);border:1px solid rgba(139,92,246,0.2)">${s}</span>`).join('')}
+              </div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:6px;font-family:'JetBrains Mono',monospace">
+                Hash: ${hash.substring(0, 12)}... | Roles: ${(keyObj.roles || []).join(', ')} | Used: ${keyObj.usage_count || 0} times
+              </div>
+            </div>
+            <button onclick="revokeApiKey('${hash}')" style="padding:6px 12px;border-radius:6px;border:1px solid rgba(239,68,68,0.3);background:transparent;color:var(--accent-red);cursor:pointer;font-size:12px;transition:all 0.2s;font-weight:600" onmouseover="this.style.background='rgba(239,68,68,0.1)'" onmouseout="this.style.background='transparent'">
+              Revoke
+            </button>
+          </div>
+          `;
+        }).join('');
+        
+        container.innerHTML = keysHtml;
+      } catch (e) {
+        container.innerHTML = `<div style="padding:20px;color:var(--accent-red)">Error: ${e.message}</div>`;
+      }
+    }
+
+    async function createApiKey() {
+      const name = document.getElementById('new-key-name').value || 'New Key';
+      const rawScopes = document.getElementById('new-key-scopes').value;
+      const scopes = rawScopes ? rawScopes.split(',').map(s => s.trim()) : ['personal', 'global'];
+      const expires = document.getElementById('new-key-expires').value;
+      
+      try {
+        const res = await fetch(`${API_BASE}/security/keys`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            owner_id: 'admin',
+            name: name,
+            roles: ['agent'],
+            allowed_scopes: scopes,
+            expires_in_days: parseInt(expires, 10)
+          })
+        });
+        
+        const data = await res.json();
+        if (res.ok && data.api_key) {
+          alert(`KEY CREATED SUCCESSFULLY!\\n\\nPlease copy this immediately, it will not be shown again:\\n\\n${data.api_key}`);
+          document.getElementById('new-key-name').value = '';
+          document.getElementById('new-key-scopes').value = '';
+          loadApiKeys();
+        } else {
+          alert("Failed to create key: " + (data.error || "Unknown error"));
+        }
+      } catch (e) {
+        alert("Error: " + e.message);
+      }
+    }
+
+    async function revokeApiKey(hash) {
+      if (!confirm("Are you sure you want to revoke this key?\\nAgents using it will lose access immediately.")) return;
+      
+      try {
+        const res = await fetch(`${API_BASE}/security/keys/${hash}`, {
+          method: 'DELETE'
+        });
+        const data = await res.json();
+        if (res.ok) {
+          loadApiKeys();
+        } else {
+          alert("Failed to revoke key: " + (data.error || "Unknown error"));
+        }
+      } catch(e) {
+        alert("Error: " + e.message);
+      }
     }
 
     // Load settings on page load

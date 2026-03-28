@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mories API Explorer</title>
+<meta name="description" content="Interactive API documentation and testing console for Mories Memory System">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0e1a;
+  --bg-card: #111827;
+  --bg-surface: #1a2236;
+  --bg-hover: #1f2b42;
+  --border: #2a3550;
+  --border-bright: #3b4f73;
+  --text: #e2e8f0;
+  --text-dim: #94a3b8;
+  --text-muted: #64748b;
+  --accent: #6366f1;
+  --accent-glow: rgba(99,102,241,.15);
+  --green: #22c55e;
+  --green-dim: rgba(34,197,94,.12);
+  --yellow: #f59e0b;
+  --yellow-dim: rgba(245,158,11,.12);
+  --red: #ef4444;
+  --red-dim: rgba(239,68,68,.12);
+  --blue: #3b82f6;
+  --blue-dim: rgba(59,130,246,.12);
+  --orange: #f97316;
+  --cyan: #06b6d4;
+  --radius: 10px;
+  --font: 'Inter', -apple-system, sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; }
+a { color: var(--accent); text-decoration: none; }
+
+/* Layout */
+.layout { display: flex; min-height: 100vh; }
+.sidebar { width: 320px; border-right: 1px solid var(--border); display: flex; flex-direction: column; background: var(--bg-card); flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow: hidden; }
+.main { flex: 1; padding: 32px; max-width: calc(100% - 320px); overflow-y: auto; }
+
+/* Sidebar header */
+.sidebar-header { padding: 20px; border-bottom: 1px solid var(--border); }
+.sidebar-header h1 { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.sidebar-header h1 span { background: linear-gradient(135deg, var(--accent), var(--cyan)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.sidebar-header p { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+/* Search */
+.search-box { padding: 12px 20px; border-bottom: 1px solid var(--border); }
+.search-box input { width: 100%; padding: 8px 12px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 13px; outline: none; transition: border-color .2s; }
+.search-box input:focus { border-color: var(--accent); }
+.search-box input::placeholder { color: var(--text-muted); }
+
+/* Category list */
+.category-list { flex: 1; overflow-y: auto; padding: 8px 0; }
+.category-list::-webkit-scrollbar { width: 4px; }
+.category-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.cat-group { margin-bottom: 2px; }
+.cat-header { padding: 8px 20px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .8px; color: var(--text-muted); cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; }
+.cat-header:hover { color: var(--text-dim); }
+.cat-header .count { font-size: 10px; background: var(--bg-surface); padding: 1px 6px; border-radius: 8px; }
+.cat-header .arrow { transition: transform .2s; font-size: 10px; }
+.cat-group.collapsed .arrow { transform: rotate(-90deg); }
+.cat-group.collapsed .cat-items { display: none; }
+
+/* cat-items: no additional styles needed */
+.endpoint-item { padding: 6px 20px 6px 28px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background .15s; font-size: 13px; }
+.endpoint-item:hover { background: var(--bg-hover); }
+.endpoint-item.active { background: var(--accent-glow); border-right: 2px solid var(--accent); }
+.method-badge { font-family: var(--mono); font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; min-width: 38px; text-align: center; flex-shrink: 0; }
+.method-GET { background: var(--green-dim); color: var(--green); }
+.method-POST { background: var(--blue-dim); color: var(--blue); }
+.method-PUT { background: var(--yellow-dim); color: var(--yellow); }
+.method-DELETE { background: var(--red-dim); color: var(--red); }
+.endpoint-path { font-family: var(--mono); font-size: 12px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Stats bar */
+.stats-bar { padding: 12px 20px; border-top: 1px solid var(--border); display: flex; gap: 12px; font-size: 11px; color: var(--text-muted); }
+.stat-item { display: flex; align-items: center; gap: 4px; }
+.stat-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+/* Main content */
+.welcome { text-align: center; padding: 80px 40px; }
+.welcome h2 { font-size: 28px; margin-bottom: 12px; }
+.welcome h2 span { background: linear-gradient(135deg, var(--accent), var(--cyan)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.welcome p { color: var(--text-dim); font-size: 15px; line-height: 1.6; max-width: 500px; margin: 0 auto 32px; }
+.quick-start { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; max-width: 680px; margin: 0 auto; }
+.qs-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; cursor: pointer; transition: all .2s; text-align: left; }
+.qs-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,.3); }
+.qs-card .icon { font-size: 24px; margin-bottom: 8px; }
+.qs-card h4 { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.qs-card p { font-size: 11px; color: var(--text-muted); }
+
+/* Endpoint detail */
+.endpoint-detail { display: none; }
+.endpoint-detail.visible { display: block; }
+.ep-header { margin-bottom: 24px; }
+.ep-title { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.ep-title .method-badge { font-size: 13px; padding: 4px 10px; }
+.ep-title h2 { font-size: 20px; font-weight: 600; }
+.ep-path { font-family: var(--mono); font-size: 15px; color: var(--text-dim); background: var(--bg-surface); padding: 10px 16px; border-radius: 8px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.ep-path button { background: none; border: 1px solid var(--border); color: var(--text-dim); padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; transition: all .15s; }
+.ep-path button:hover { border-color: var(--accent); color: var(--accent); }
+.ep-desc { margin-top: 12px; color: var(--text-dim); font-size: 14px; line-height: 1.6; }
+
+/* Sections */
+.section { margin-bottom: 24px; }
+.section-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: var(--text-muted); margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+
+/* Params table */
+.params-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.params-table th { text-align: left; padding: 8px 12px; background: var(--bg-surface); color: var(--text-muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+.params-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.params-table tr:hover td { background: var(--bg-hover); }
+.param-name { font-family: var(--mono); color: var(--cyan); font-size: 13px; }
+.param-type { font-family: var(--mono); color: var(--text-muted); font-size: 11px; }
+.param-required { color: var(--red); font-size: 10px; font-weight: 600; }
+.param-optional { color: var(--text-muted); font-size: 10px; }
+
+/* Try it panel */
+.try-panel { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.try-header { padding: 12px 16px; background: var(--bg-card); display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+.try-header h3 { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.try-body { padding: 16px; }
+.try-row { margin-bottom: 12px; }
+.try-row label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500; }
+.try-row input, .try-row select { width: 100%; padding: 8px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 13px; font-family: var(--mono); outline: none; }
+.try-row input:focus, .try-row select:focus { border-color: var(--accent); }
+.try-row textarea { width: 100%; min-height: 120px; padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 12px; font-family: var(--mono); resize: vertical; outline: none; line-height: 1.5; }
+.try-row textarea:focus { border-color: var(--accent); }
+
+.btn-send { background: linear-gradient(135deg, var(--accent), #818cf8); color: #fff; border: none; padding: 10px 24px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .2s; display: flex; align-items: center; gap: 6px; }
+.btn-send:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(99,102,241,.35); }
+.btn-send:active { transform: translateY(0); }
+.btn-send.loading { opacity: .7; pointer-events: none; }
+
+/* Response */
+.response-panel { margin-top: 16px; display: none; }
+.response-panel.visible { display: block; }
+.response-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.response-status { font-family: var(--mono); font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.status-2xx { background: var(--green-dim); color: var(--green); }
+.status-4xx { background: var(--yellow-dim); color: var(--yellow); }
+.status-5xx { background: var(--red-dim); color: var(--red); }
+.response-time { font-size: 12px; color: var(--text-muted); }
+.response-body { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; overflow: auto; max-height: 500px; }
+.response-body pre { font-family: var(--mono); font-size: 12px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; }
+
+/* MCP Tools section */
+.mcp-section { background: linear-gradient(135deg, rgba(6,182,212,.08), rgba(99,102,241,.08)); border: 1px solid rgba(6,182,212,.2); border-radius: var(--radius); padding: 20px; margin-bottom: 24px; }
+.mcp-section h3 { font-size: 14px; font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+.mcp-tool { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; margin-bottom: 8px; }
+.mcp-tool h4 { font-family: var(--mono); font-size: 13px; color: var(--cyan); margin-bottom: 4px; }
+.mcp-tool p { font-size: 12px; color: var(--text-dim); }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-bright); }
+
+/* Copy animation */
+.copied { animation: pulse .4s; }
+@keyframes pulse { 50% { opacity: .5; } }
+
+/* Loading spinner */
+.spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Connection indicator */
+.conn-status { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 8px 20px; border-top: 1px solid var(--border); }
+.conn-dot { width: 8px; height: 8px; border-radius: 50%; }
+.conn-dot.online { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.conn-dot.offline { background: var(--red); }
+
+@media (max-width: 900px) {
+  .layout { flex-direction: column; }
+  .sidebar { width: 100%; height: auto; max-height: 50vh; position: relative; }
+  .main { max-width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<div class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1>🧠 <span>Mories</span> API</h1>
+      <p>Interactive API Explorer & Testing Console</p>
+    </div>
+
+    <div class="search-box">
+      <input type="text" id="searchInput" placeholder="Search endpoints... (⌘K)" autocomplete="off">
+    </div>
+
+    <div class="category-list" id="categoryList">
+      <!-- Generated by JS -->
+    </div>
+
+    <div class="conn-status" id="connStatus">
+      <div class="conn-dot offline" id="connDot"></div>
+      <span id="connLabel">Checking connection...</span>
+    </div>
+
+    <div class="stats-bar">
+      <div class="stat-item"><div class="stat-dot" style="background:var(--green)"></div> <span id="statEndpoints">0</span> endpoints</div>
+      <div class="stat-item"><div class="stat-dot" style="background:var(--cyan)"></div> <span id="statMcp">4</span> MCP tools</div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <!-- Welcome -->
+    <div class="welcome" id="welcomeView">
+      <h2>Welcome to <span>Mories API Explorer</span></h2>
+      <p>Browse, test, and understand every endpoint and MCP tool in the Mories Memory System. Select an endpoint from the sidebar or pick a quick start below.</p>
+
+      <div class="quick-start">
+        <div class="qs-card" onclick="selectEndpoint('health')">
+          <div class="icon">💚</div>
+          <h4>Health Check</h4>
+          <p>Check system status</p>
+        </div>
+        <div class="qs-card" onclick="selectEndpoint('memory_overview')">
+          <div class="icon">🧠</div>
+          <h4>Memory Overview</h4>
+          <p>View cognitive state</p>
+        </div>
+        <div class="qs-card" onclick="selectEndpoint('search')">
+          <div class="icon">🔍</div>
+          <h4>Search Memories</h4>
+          <p>Query knowledge graph</p>
+        </div>
+        <div class="qs-card" onclick="selectEndpoint('data_catalog')">
+          <div class="icon">📦</div>
+          <h4>Data Products</h4>
+          <p>AI-Ready exports</p>
+        </div>
+        <div class="qs-card" onclick="selectEndpoint('stm_add')">
+          <div class="icon">✨</div>
+          <h4>Create Memory</h4>
+          <p>Add to STM buffer</p>
+        </div>
+        <div class="qs-card" onclick="selectEndpoint('mcp_tools')">
+          <div class="icon">🔧</div>
+          <h4>MCP Tools</h4>
+          <p>Agent-callable tools</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Endpoint detail -->
+    <div class="endpoint-detail" id="detailView">
+      <div class="ep-header">
+        <div class="ep-title">
+          <span class="method-badge" id="epMethod">GET</span>
+          <h2 id="epName"></h2>
+        </div>
+        <div class="ep-path">
+          <span id="epUrl"></span>
+          <button onclick="copyUrl()">📋 Copy</button>
+        </div>
+        <div class="ep-desc" id="epDesc"></div>
+      </div>
+
+      <!-- Parameters -->
+      <div class="section" id="paramsSection" style="display:none">
+        <div class="section-title">Parameters</div>
+        <table class="params-table">
+          <thead><tr><th>Name</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+          <tbody id="paramsBody"></tbody>
+        </table>
+      </div>
+
+      <!-- Try It -->
+      <div class="section">
+        <div class="try-panel">
+          <div class="try-header">
+            <h3>⚡ Try It</h3>
+            <button class="btn-send" id="btnSend" onclick="sendRequest()">
+              <span id="btnLabel">Send Request</span>
+            </button>
+          </div>
+          <div class="try-body">
+            <div class="try-row" id="urlRow">
+              <label>Request URL</label>
+              <input type="text" id="tryUrl" placeholder="http://localhost:5001/api/...">
+            </div>
+            <div class="try-row" id="queryRow" style="display:none">
+              <label>Query Parameters</label>
+              <input type="text" id="tryQuery" placeholder="key=value&key2=value2">
+            </div>
+            <div class="try-row" id="bodyRow" style="display:none">
+              <label>Request Body (JSON)</label>
+              <textarea id="tryBody" placeholder='{"key": "value"}'></textarea>
+            </div>
+          </div>
+
+          <!-- Response -->
+          <div class="response-panel" id="responsePanel">
+            <div style="padding: 0 16px 16px;">
+              <div class="response-header">
+                <span class="response-status" id="respStatus">200 OK</span>
+                <span class="response-time" id="respTime">0ms</span>
+              </div>
+              <div class="response-body">
+                <pre id="respBody"></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Example Response -->
+      <div class="section" id="exampleSection" style="display:none">
+        <div class="section-title">Example Response</div>
+        <div class="response-body">
+          <pre id="exampleBody"></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- MCP Tools View -->
+    <div class="endpoint-detail" id="mcpView">
+      <div class="ep-header">
+        <div class="ep-title">
+          <span class="method-badge method-POST">MCP</span>
+          <h2>MCP Tools for Agents</h2>
+        </div>
+        <div class="ep-desc">
+          MCP (Model Context Protocol) 도구는 AI 에이전트가 Mories의 기억을 직접 조작할 수 있게 해주는 JSON-RPC 인터페이스입니다.<br>
+          <strong>엔드포인트:</strong> <code>POST /api/mcp</code> | 프로토콜: JSON-RPC 2.0
+        </div>
+      </div>
+
+      <div class="mcp-section">
+        <h3>🔧 Available MCP Tools</h3>
+
+        <div class="mcp-tool">
+          <h4>mories_search</h4>
+          <p>지식 그래프에서 벡터 유사도 + 키워드 기반으로 기억을 검색합니다. 검색된 기억은 자동으로 Retrieval Boost됩니다.</p>
+          <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">
+            <strong>Params:</strong> query (string), graph_id (string), limit (int, default: 10)
+          </div>
+        </div>
+
+        <div class="mcp-tool">
+          <h4>mories_ingest</h4>
+          <p>텍스트/문서를 지식 그래프에 인제스트합니다. 엔티티 추출 → 관계 구축 → STM 승격 파이프라인을 자동 실행합니다.</p>
+          <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">
+            <strong>Params:</strong> content (string), source (string), graph_id (string), auto_relate (bool)
+          </div>
+        </div>
+
+        <div class="mcp-tool">
+          <h4>mories_profile</h4>
+          <p>특정 주제에 대한 종합 프로필을 구축합니다. 관련 엔티티, 관계, 사실을 수집하여 구조화된 프로필을 반환합니다.</p>
+          <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">
+            <strong>Params:</strong> subject (string), graph_id (string), depth (int, default: 2)
+          </div>
+        </div>
+
+        <div class="mcp-tool">
+          <h4>mories_graph_query</h4>
+          <p>Cypher 쿼리를 직접 실행합니다 (읽기 전용). Neo4j 그래프 데이터를 직접 탐색할 수 있습니다.</p>
+          <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">
+            <strong>Params:</strong> cypher (string), params (dict), limit (int, default: 50)
+          </div>
+        </div>
+
+        <div class="mcp-tool">
+          <h4>mories_stream</h4>
+          <p>스트리밍 데이터 소스를 등록하거나 관리합니다. 실시간 데이터를 지속적으로 지식 그래프에 인제스트할 수 있습니다.</p>
+          <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">
+            <strong>Params:</strong> action (create|stop|list), stream_id (string), query (string)
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="try-panel">
+          <div class="try-header">
+            <h3>⚡ Test MCP Call</h3>
+            <button class="btn-send" id="btnMcpSend" onclick="sendMcpRequest()">
+              <span>Send MCP Request</span>
+            </button>
+          </div>
+          <div class="try-body">
+            <div class="try-row">
+              <label>MCP Endpoint</label>
+              <input type="text" id="mcpUrl" value="http://localhost:5001/api/mcp">
+            </div>
+            <div class="try-row">
+              <label>JSON-RPC Body</label>
+              <textarea id="mcpBody" style="min-height:160px">{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "mories_search",
+    "arguments": {
+      "query": "TurboQuant quantization",
+      "limit": 5
+    }
+  }
+}</textarea>
+            </div>
+          </div>
+          <div class="response-panel" id="mcpResponsePanel">
+            <div style="padding: 0 16px 16px;">
+              <div class="response-header">
+                <span class="response-status" id="mcpRespStatus">200 OK</span>
+                <span class="response-time" id="mcpRespTime">0ms</span>
+              </div>
+              <div class="response-body">
+                <pre id="mcpRespBody"></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ──────────────────────────────────────────
+// API Registry — All Mories Endpoints
+// ──────────────────────────────────────────
+const BASE = 'http://localhost:5001';
+
+const API_REGISTRY = {
+  "System": [
+    { id:"health", method:"GET", path:"/api/health", name:"Health Check", desc:"시스템 상태, Neo4j 연결, LLM 설정, 컴포넌트 상태를 확인합니다." },
+    { id:"settings_get", method:"GET", path:"/api/settings", name:"Get Settings", desc:"현재 LLM/Embedding 프로바이더 설정을 조회합니다." },
+    { id:"settings_put", method:"PUT", path:"/api/settings", name:"Update Settings", desc:"LLM/Embedding 프로바이더 설정을 런타임에 변경합니다.",
+      body: '{"LLM_PROVIDER":"ollama","LLM_BASE_URL":"http://localhost:11434"}',
+      params:[{name:"keys",type:"string",required:true,desc:"변경할 설정 키 (.env 변수명)"}] },
+    { id:"settings_test_llm", method:"POST", path:"/api/settings/test/llm", name:"Test LLM Connection", desc:"LLM 프로바이더 연결을 테스트합니다." },
+    { id:"settings_test_embed", method:"POST", path:"/api/settings/test/embedding", name:"Test Embedding", desc:"Embedding 프로바이더 연결을 테스트합니다." },
+  ],
+
+  "Cognitive Memory": [
+    { id:"memory_overview", method:"GET", path:"/api/memory/overview", name:"Memory Overview", desc:"STM/LTM 개요, 평균 salience, 감쇠 상태를 반환합니다." },
+    { id:"memory_top", method:"GET", path:"/api/memory/top", name:"Top Memories", desc:"salience가 높은 상위 기억을 조회합니다.",
+      query:[{name:"limit",type:"int",desc:"조회 개수 (기본: 20)"}] },
+    { id:"memory_weakest", method:"GET", path:"/api/memory/weakest", name:"Weakest Memories", desc:"감쇠 위험이 있는 약한 기억을 조회합니다." },
+    { id:"memory_get", method:"GET", path:"/api/memory/{uuid}", name:"Get Memory", desc:"특정 UUID의 기억 상세 정보를 조회합니다.",
+      params:[{name:"uuid",type:"uuid",required:true,desc:"기억 UUID"}] },
+    { id:"stm_add", method:"POST", path:"/api/memory/stm/add", name:"STM Add", desc:"단기 기억(STM) 버퍼에 새 정보를 추가합니다.",
+      body: '{"content":"새로운 기억 내용","source":"manual","salience":0.6}' },
+    { id:"stm_list", method:"GET", path:"/api/memory/stm/list", name:"STM List", desc:"현재 STM 버퍼의 모든 항목을 조회합니다." },
+    { id:"stm_evaluate", method:"POST", path:"/api/memory/stm/evaluate", name:"STM Evaluate", desc:"STM 항목의 salience를 재평가합니다.",
+      body: '{"uuid":"stm-item-uuid"}' },
+    { id:"stm_promote", method:"POST", path:"/api/memory/stm/promote", name:"STM Promote", desc:"STM 항목을 LTM으로 승격합니다.",
+      body: '{"uuid":"stm-item-uuid"}' },
+    { id:"stm_discard", method:"POST", path:"/api/memory/stm/discard", name:"STM Discard", desc:"STM 항목을 폐기합니다.",
+      body: '{"uuid":"stm-item-uuid"}' },
+    { id:"memory_boost", method:"POST", path:"/api/memory/boost", name:"Retrieval Boost", desc:"기억의 salience를 수동으로 강화합니다.",
+      body: '{"uuids":["uuid-1","uuid-2"]}' },
+    { id:"memory_decay", method:"POST", path:"/api/memory/decay", name:"Run Decay", desc:"에빙하우스 감쇠 사이클을 수동 실행합니다." },
+    { id:"memory_config", method:"GET", path:"/api/memory/config", name:"Memory Config", desc:"기억 매니저 설정 (감쇠율, TTL 등)을 조회합니다." },
+  ],
+
+  "Memory Scopes": [
+    { id:"scopes_summary", method:"GET", path:"/api/memory/scopes/summary", name:"Scope Summary", desc:"각 scope(personal/tribal/social/global)별 기억 개수와 통계를 반환합니다." },
+    { id:"scopes_list", method:"GET", path:"/api/memory/scopes/list/{scope}", name:"List by Scope", desc:"특정 scope의 기억 목록을 조회합니다.",
+      params:[{name:"scope",type:"string",required:true,desc:"personal|tribal|social|global"}] },
+    { id:"scopes_candidates", method:"GET", path:"/api/memory/scopes/candidates", name:"Promotion Candidates", desc:"scope 승격 후보 기억을 조회합니다." },
+    { id:"scopes_promote", method:"POST", path:"/api/memory/scopes/promote", name:"Promote Scope", desc:"기억의 scope를 상위로 승격합니다.",
+      body: '{"uuid":"memory-uuid","target_scope":"tribal"}' },
+    { id:"scopes_source_type", method:"POST", path:"/api/memory/scopes/source-type", name:"Set Source Type", desc:"기억의 source_type을 변경합니다.",
+      body: '{"uuid":"memory-uuid","source_type":"code"}' },
+  ],
+
+  "Permanent Memory": [
+    { id:"pm_imprint", method:"POST", path:"/api/memory/permanent/imprint", name:"Create Imprint", desc:"불변의 각인(Imprint)을 생성합니다. Admin 전용.",
+      body: '{"name":"핵심 규칙","summary":"이 시스템은...","scope":"global","created_by":"admin"}' },
+    { id:"pm_imprints", method:"GET", path:"/api/memory/permanent/imprints", name:"List Imprints", desc:"모든 각인(Imprint) 목록을 조회합니다." },
+    { id:"pm_freeze", method:"POST", path:"/api/memory/permanent/freeze", name:"Freeze Memory", desc:"LTM 기억을 동결하여 감쇠로부터 보호합니다.",
+      body: '{"uuid":"memory-uuid","frozen_by":"admin"}' },
+    { id:"pm_unfreeze", method:"POST", path:"/api/memory/permanent/unfreeze", name:"Unfreeze Memory", desc:"동결된 기억을 해제합니다.",
+      body: '{"uuid":"memory-uuid"}' },
+    { id:"pm_frozen", method:"GET", path:"/api/memory/permanent/frozen", name:"List Frozen", desc:"동결된 기억 목록을 조회합니다." },
+    { id:"pm_inherit", method:"POST", path:"/api/memory/permanent/inherit", name:"Inherit PM", desc:"에이전트에게 영구 기억을 상속합니다.",
+      body: '{"agent_id":"agent-1","scope":"global"}' },
+    { id:"pm_chain", method:"GET", path:"/api/memory/permanent/chain/{agent_id}", name:"Inheritance Chain", desc:"에이전트의 영구 기억 상속 체인을 조회합니다." },
+    { id:"pm_priority", method:"GET", path:"/api/memory/permanent/priority/{agent_id}", name:"Priority Resolution", desc:"에이전트의 기억 우선순위를 해결합니다." },
+    { id:"pm_alerts", method:"GET", path:"/api/memory/permanent/alerts", name:"Priority Alerts", desc:"현재 scope 위반 경고를 조회합니다." },
+  ],
+
+  "Synaptic Bridge": [
+    { id:"synaptic_register", method:"POST", path:"/api/memory/synaptic/register", name:"Register Agent", desc:"에이전트를 Synaptic Bridge에 등록합니다.",
+      body: '{"agent_id":"agent-1","name":"Research Agent","role":"analyst","subscribed_scopes":["personal","tribal"]}' },
+    { id:"synaptic_share", method:"POST", path:"/api/memory/synaptic/share", name:"Share Memory", desc:"기억을 다른 에이전트에게 공유합니다.",
+      body: '{"uuid":"memory-uuid","scope":"tribal","shared_by":"agent-1"}' },
+    { id:"synaptic_empathy", method:"POST", path:"/api/memory/synaptic/empathy", name:"Empathy Boost", desc:"공유받은 기억을 확인(boost)합니다.",
+      body: '{"uuid":"memory-uuid","boosted_by":"agent-2","boost_amount":0.1}' },
+    { id:"synaptic_events", method:"GET", path:"/api/memory/synaptic/events", name:"Synaptic Events", desc:"최근 공유/부스트 이벤트를 조회합니다." },
+    { id:"synaptic_agents", method:"GET", path:"/api/memory/synaptic/agents", name:"List Agents", desc:"등록된 에이전트 목록을 조회합니다." },
+    { id:"synaptic_feed", method:"GET", path:"/api/memory/synaptic/feed/{agent_id}", name:"Agent Feed", desc:"특정 에이전트의 구독 피드를 조회합니다." },
+  ],
+
+  "Audit Trail": [
+    { id:"audit_history", method:"GET", path:"/api/memory/audit/history/{memory_uuid}", name:"Memory History", desc:"특정 기억의 전체 변경 이력을 조회합니다." },
+    { id:"audit_activity", method:"GET", path:"/api/memory/audit/activity", name:"Recent Activity", desc:"시스템 전체의 최근 활동 로그를 조회합니다.",
+      query:[{name:"limit",type:"int",desc:"조회 개수"},{name:"change_type",type:"string",desc:"필터: update|decay|freeze|..."}] },
+    { id:"audit_stats", method:"GET", path:"/api/memory/audit/stats", name:"Audit Stats", desc:"감사 추적 통계를 집계합니다." },
+    { id:"audit_decay_cycles", method:"GET", path:"/api/memory/audit/decay-cycles", name:"Decay Cycles", desc:"과거 감쇠 사이클 기록을 조회합니다." },
+    { id:"audit_rollback", method:"POST", path:"/api/memory/audit/rollback", name:"Rollback", desc:"기억을 특정 리비전으로 롤백합니다.",
+      body: '{"memory_uuid":"...","revision_id":"..."}' },
+  ],
+
+  "Data Products": [
+    { id:"data_catalog", method:"GET", path:"/api/memory/data/catalog", name:"Product Catalog", desc:"사용 가능한 모든 데이터 프로덕트와 Import/Export 기능을 나열합니다." },
+    { id:"data_rag", method:"GET", path:"/api/memory/data/rag", name:"RAG Corpus", desc:"RAG 파이프라인용 임베딩-레디 코퍼스를 JSON으로 반환합니다.",
+      query:[{name:"scope",type:"string",desc:"필터 scope"},{name:"min_salience",type:"float",desc:"최소 salience (기본: 0.3)"}] },
+    { id:"data_rag_dl", method:"GET", path:"/api/memory/data/rag/download", name:"RAG Download", desc:"RAG 코퍼스를 JSONL 파일로 다운로드합니다." },
+    { id:"data_snapshot", method:"GET", path:"/api/memory/data/snapshot", name:"Knowledge Snapshot", desc:"전체 지식 그래프 스냅샷 (노드, 엣지, 에이전트)을 반환합니다." },
+    { id:"data_training", method:"GET", path:"/api/memory/data/training", name:"Training Dataset", desc:"LLM 파인튜닝용 Q&A 데이터셋을 생성합니다." },
+    { id:"data_training_dl", method:"GET", path:"/api/memory/data/training/download", name:"Training Download", desc:"Training 데이터셋을 JSONL 파일로 다운로드합니다." },
+    { id:"data_manifest", method:"POST", path:"/api/memory/data/manifest", name:"Create Manifest", desc:"버전닝된 지식 패키지(Manifest)를 생성합니다.",
+      body: '{"name":"My Knowledge Package","description":"...", "scope":"tribal"}' },
+    { id:"data_manifest_list", method:"GET", path:"/api/memory/data/manifest/list", name:"List Manifests", desc:"생성된 Manifest 목록을 조회합니다." },
+    { id:"data_csv", method:"GET", path:"/api/memory/data/analytics/csv", name:"Analytics CSV", desc:"대시보드/스프레드시트용 분석 CSV를 다운로드합니다." },
+    { id:"data_manifest_import", method:"POST", path:"/api/memory/data/manifest/import", name:"Import Manifest", desc:"Manifest JSON을 Neo4j에 가져옵니다. merge(upsert) 또는 create(신규) 전략 선택 가능.",
+      query:[{name:"strategy",type:"string",desc:"merge|create"},{name:"graph_id",type:"string",desc:"타겟 graph_id"}],
+      body: '{"manifest_id":"...","entities":[...],"relations":[...],"agents":[...]}' },
+    { id:"data_rag_import", method:"POST", path:"/api/memory/data/rag/import", name:"Import RAG Corpus", desc:"JSONL RAG 코퍼스를 Entity 노드로 가져옵니다.",
+      query:[{name:"graph_id",type:"string",desc:"타겟 graph_id"},{name:"scope",type:"string",desc:"기본 scope"}],
+      body: '{"content":"{\\"id\\":\\"1\\",\\"text\\":\\"...\\",...}\\n{\\"id\\":\\"2\\",\\"text\\":\\"...\\",...}"}' },
+    { id:"data_imports", method:"GET", path:"/api/memory/data/imports", name:"Import History", desc:"과거 Import 작업 이력과 통계를 조회합니다." },
+  ],
+
+  "Data Ingestion": [
+    { id:"ingest_post", method:"POST", path:"/api/ingest", name:"Ingest Text", desc:"텍스트/문서를 지식 그래프에 인제스트합니다.",
+      body: '{"content":"분석할 텍스트...","source":"manual","graph_id":"project-1"}' },
+    { id:"ingest_batch", method:"POST", path:"/api/ingest/batch", name:"Batch Ingest", desc:"여러 문서를 일괄 인제스트합니다." },
+    { id:"ingest_streams", method:"GET", path:"/api/ingest/streams", name:"List Streams", desc:"활성 스트리밍 인제스트 목록을 조회합니다." },
+  ],
+
+  "External Gateway": [
+    { id:"gw_webhook", method:"POST", path:"/api/gateway/webhook", name:"Webhook / n8n", desc:"n8n, Zapier 등 외부 워크플로우에서 데이터를 수신합니다." },
+    { id:"gw_nifi", method:"POST", path:"/api/gateway/nifi", name:"NiFi Ingest", desc:"Apache NiFi에서 데이터를 수신합니다." },
+    { id:"gw_spark", method:"POST", path:"/api/gateway/spark", name:"Spark Ingest", desc:"Apache Spark에서 배치 데이터를 수신합니다." },
+    { id:"gw_batch", method:"POST", path:"/api/gateway/batch", name:"Batch Gateway", desc:"범용 배치 인제스트 게이트웨이." },
+    { id:"gw_status", method:"GET", path:"/api/gateway/status", name:"Gateway Status", desc:"게이트웨이 상태와 통계를 조회합니다." },
+  ],
+
+  "Knowledge Graph": [
+    { id:"graph_project_list", method:"GET", path:"/api/graph/project/list", name:"List Projects", desc:"모든 지식 그래프 프로젝트를 나열합니다." },
+    { id:"graph_data", method:"GET", path:"/api/graph/data/{graph_id}", name:"Graph Data", desc:"특정 그래프의 노드/관계 데이터를 조회합니다." },
+    { id:"graph_build", method:"POST", path:"/api/graph/build", name:"Build Graph", desc:"텍스트에서 지식 그래프를 구축합니다." },
+    { id:"graph_ontology", method:"POST", path:"/api/graph/ontology/generate", name:"Generate Ontology", desc:"텍스트에서 온톨로지를 자동 생성합니다." },
+  ],
+
+  "Maturity": [
+    { id:"maturity_overview", method:"GET", path:"/api/memory/maturity/overview", name:"Maturity Overview", desc:"지식 성숙도 대시보드 — draft/validated/mature/verified 분포." },
+    { id:"maturity_check", method:"POST", path:"/api/memory/maturity/check-promotions", name:"Check Promotions", desc:"성숙도 승격을 자동 확인합니다." },
+    { id:"maturity_rules", method:"GET", path:"/api/memory/maturity/rules", name:"Maturity Rules", desc:"성숙도 승격 규칙을 조회합니다." },
+  ],
+
+  "Search & Query": [
+    { id:"search", method:"POST", path:"/api/search", name:"Search Memories", desc:"지식 그래프에서 기억을 검색합니다. 검색된 기억은 자동으로 Retrieval Boost됩니다.",
+      body: '{"query":"TurboQuant quantization","limit":10}' },
+    { id:"cypher_query", method:"POST", path:"/api/query", name:"Cypher Query", desc:"Neo4j Cypher 쿼리를 직접 실행합니다 (읽기 전용).",
+      body: '{"cypher":"MATCH (e:Entity) WHERE e.salience > 0.8 RETURN e.name, e.salience ORDER BY e.salience DESC LIMIT 10"}' },
+    { id:"mcp_endpoint", method:"POST", path:"/api/mcp", name:"MCP JSON-RPC", desc:"MCP JSON-RPC 프록시 엔드포인트. AI 에이전트가 도구를 호출합니다.",
+      body: '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"mories_search","arguments":{"query":"test"}}}' },
+  ],
+
+  "Security & Governance": [
+    { id:"sec_principals_create", method:"POST", path:"/api/security/principals", name:"Register Principal", desc:"새 주체(사용자/에이전트/팀)를 RBAC 시스템에 등록합니다.",
+      body: '{"principal_id":"agent:cursor","name":"Cursor Agent","type":"agent","roles":["writer"],"team_id":"dev-team"}',
+      params:[{name:"principal_id",type:"string",required:true,desc:"주체 ID (예: user:john, agent:cursor)"},{name:"name",type:"string",required:true,desc:"표시 이름"},{name:"type",type:"string",required:false,desc:"user|agent|team (기본: user)"},{name:"roles",type:"array",required:false,desc:"reader|writer|sharer|admin"},{name:"team_id",type:"string",required:false,desc:"소속 팀 ID"}] },
+    { id:"sec_principals_list", method:"GET", path:"/api/security/principals", name:"List Principals", desc:"등록된 모든 주체 목록을 조회합니다.",
+      query:[{name:"type",type:"string",desc:"필터: user|agent|team"}] },
+    { id:"sec_check", method:"POST", path:"/api/security/check", name:"Check Permission", desc:"주체의 특정 액션/스코프 권한을 확인합니다.",
+      body: '{"principal_id":"agent:cursor","action":"store","scope":"tribal","owner":"user:admin"}',
+      params:[{name:"principal_id",type:"string",required:true,desc:"주체 ID"},{name:"action",type:"string",required:true,desc:"search|store|share|decay|config 등"},{name:"scope",type:"string",required:false,desc:"personal|tribal|social|global"},{name:"owner",type:"string",required:false,desc:"메모리 소유자 ID"}] },
+    { id:"sec_roles", method:"GET", path:"/api/security/roles", name:"Role Matrix", desc:"역할별 허용 액션 매트릭스를 조회합니다." },
+    { id:"sec_keys_create", method:"POST", path:"/api/security/keys", name:"Generate API Key", desc:"새 API 액세스 키를 생성합니다. 키는 생성 시 1회만 노출됩니다. 만료일 지정 필수(기본 30일, 0=무제한, 최대 3650일).",
+      body: '{"owner_id":"admin","name":"Cursor Agent Key","roles":["writer"],"allowed_scopes":["personal","tribal"],"expires_in_days":30}',
+      params:[{name:"owner_id",type:"string",required:true,desc:"키 소유자 ID"},{name:"name",type:"string",required:true,desc:"키 이름"},{name:"roles",type:"array",required:false,desc:"reader|writer|sharer|admin"},{name:"allowed_scopes",type:"array",required:false,desc:"접근 가능 scope 목록"},{name:"expires_in_days",type:"int",required:false,desc:"만료일 (0=무제한, 기본:30, 최대:3650)"},{name:"rate_limit",type:"int",required:false,desc:"분당 요청 제한 (기본: 100)"}] },
+    { id:"sec_keys_list", method:"GET", path:"/api/security/keys", name:"List API Keys", desc:"활성 API 키 목록을 조회합니다 (해시만, 원본 키 미노출). 만료일, 사용량 포함.",
+      query:[{name:"owner_id",type:"string",desc:"소유자별 필터"}] },
+    { id:"sec_keys_verify", method:"POST", path:"/api/security/keys/verify", name:"Verify API Key", desc:"API 키를 검증하고 메타데이터(스코프, 역할, 만료 상태)를 반환합니다. 만료된 키는 401 반환.",
+      body: '{"api_key":"mnem_xxxxxxxxxx"}',
+      params:[{name:"api_key",type:"string",required:true,desc:"검증할 API 키 원문"}] },
+    { id:"sec_keys_revoke", method:"DELETE", path:"/api/security/keys/{key_hash}", name:"Revoke API Key", desc:"API 키를 해시로 즉시 폐기합니다.",
+      params:[{name:"key_hash",type:"string",required:true,desc:"키 SHA-256 해시"}] },
+    { id:"sec_encrypt", method:"POST", path:"/api/security/encrypt", name:"Encrypt Memory", desc:"특정 기억을 필드 레벨에서 암호화합니다.",
+      body: '{"uuid":"memory-uuid","fields":null,"encrypted_by":"admin"}' },
+    { id:"sec_decrypt", method:"POST", path:"/api/security/decrypt", name:"Decrypt Memory", desc:"암호화된 기억을 복호화하여 반환합니다 (DB 미변경).",
+      body: '{"uuid":"memory-uuid","principal":"admin"}' },
+    { id:"sec_encrypt_status", method:"GET", path:"/api/security/encrypt/status", name:"Encryption Status", desc:"전체 암호화 통계를 조회합니다." },
+  ],
+};
+
+// ──────────────────────────────────────────
+// Render sidebar
+// ──────────────────────────────────────────
+
+let allEndpoints = [];
+let currentEndpoint = null;
+
+function renderSidebar(filter = '') {
+  const list = document.getElementById('categoryList');
+  list.innerHTML = '';
+  allEndpoints = [];
+  let totalCount = 0;
+
+  for (const [cat, endpoints] of Object.entries(API_REGISTRY)) {
+    const filtered = filter
+      ? endpoints.filter(ep =>
+          ep.name.toLowerCase().includes(filter) ||
+          ep.path.toLowerCase().includes(filter) ||
+          ep.desc.toLowerCase().includes(filter))
+      : endpoints;
+
+    if (filtered.length === 0) continue;
+    totalCount += filtered.length;
+
+    const group = document.createElement('div');
+    group.className = 'cat-group';
+    group.innerHTML = `
+      <div class="cat-header" onclick="this.parentElement.classList.toggle('collapsed')">
+        <span>${cat}</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span class="count">${filtered.length}</span>
+          <span class="arrow">▼</span>
+        </div>
+      </div>
+      <div class="cat-items">${filtered.map(ep => `
+        <div class="endpoint-item" id="item-${ep.id}" onclick="selectEndpoint('${ep.id}')">
+          <span class="method-badge method-${ep.method}">${ep.method}</span>
+          <span class="endpoint-path">${ep.path.replace('/api/memory/', '/…/').replace('/api/', '/')}</span>
+        </div>
+      `).join('')}</div>
+    `;
+    list.appendChild(group);
+
+    allEndpoints.push(...filtered);
+  }
+
+  document.getElementById('statEndpoints').textContent = totalCount;
+}
+
+// ──────────────────────────────────────────
+// Select endpoint
+// ──────────────────────────────────────────
+
+function selectEndpoint(id) {
+  if (id === 'mcp_tools') {
+    document.getElementById('welcomeView').style.display = 'none';
+    document.getElementById('detailView').classList.remove('visible');
+    document.getElementById('mcpView').classList.add('visible');
+    return;
+  }
+
+  const ep = allEndpoints.find(e => e.id === id);
+  if (!ep) return;
+  currentEndpoint = ep;
+
+  // Activate sidebar item
+  document.querySelectorAll('.endpoint-item').forEach(el => el.classList.remove('active'));
+  const item = document.getElementById(`item-${id}`);
+  if (item) item.classList.add('active');
+
+  // Show detail view
+  document.getElementById('welcomeView').style.display = 'none';
+  document.getElementById('mcpView').classList.remove('visible');
+  document.getElementById('detailView').classList.add('visible');
+
+  // Fill header
+  const methodEl = document.getElementById('epMethod');
+  methodEl.textContent = ep.method;
+  methodEl.className = `method-badge method-${ep.method}`;
+  document.getElementById('epName').textContent = ep.name;
+  document.getElementById('epUrl').textContent = BASE + ep.path;
+  document.getElementById('epDesc').textContent = ep.desc;
+
+  // Fill params
+  const allParams = [...(ep.params || []), ...(ep.query || [])];
+  const paramsSection = document.getElementById('paramsSection');
+  if (allParams.length > 0) {
+    paramsSection.style.display = '';
+    document.getElementById('paramsBody').innerHTML = allParams.map(p => `
+      <tr>
+        <td><span class="param-name">${p.name}</span></td>
+        <td><span class="param-type">${p.type}</span></td>
+        <td><span class="${p.required ? 'param-required' : 'param-optional'}">${p.required ? 'Required' : 'Optional'}</span></td>
+        <td>${p.desc}</td>
+      </tr>
+    `).join('');
+  } else {
+    paramsSection.style.display = 'none';
+  }
+
+  // Fill try-it
+  document.getElementById('tryUrl').value = BASE + ep.path;
+
+  const queryRow = document.getElementById('queryRow');
+  if (ep.query && ep.query.length > 0) {
+    queryRow.style.display = '';
+    document.getElementById('tryQuery').value = ep.query.map(q => `${q.name}=`).join('&');
+  } else {
+    queryRow.style.display = 'none';
+  }
+
+  const bodyRow = document.getElementById('bodyRow');
+  if (ep.method === 'POST' || ep.method === 'PUT') {
+    bodyRow.style.display = '';
+    document.getElementById('tryBody').value = ep.body || '{}';
+  } else {
+    bodyRow.style.display = 'none';
+  }
+
+  // Reset response
+  document.getElementById('responsePanel').classList.remove('visible');
+}
+
+// ──────────────────────────────────────────
+// Send request
+// ──────────────────────────────────────────
+
+async function sendRequest() {
+  const btn = document.getElementById('btnSend');
+  const label = document.getElementById('btnLabel');
+  btn.classList.add('loading');
+  label.innerHTML = '<span class="spinner"></span> Loading';
+
+  let url = document.getElementById('tryUrl').value;
+  const query = document.getElementById('tryQuery').value;
+  if (query) url += '?' + query;
+
+  const method = currentEndpoint?.method || 'GET';
+  const body = document.getElementById('tryBody').value;
+
+  const options = {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+  };
+  if ((method === 'POST' || method === 'PUT') && body) {
+    options.body = body;
+  }
+
+  const start = performance.now();
+  try {
+    const resp = await fetch(url, options);
+    const elapsed = Math.round(performance.now() - start);
+    const text = await resp.text();
+
+    let formatted;
+    try { formatted = JSON.stringify(JSON.parse(text), null, 2); }
+    catch { formatted = text; }
+
+    showResponse(resp.status, elapsed, formatted);
+  } catch (err) {
+    showResponse(0, 0, `Connection failed: ${err.message}\n\nMake sure the server is running at ${BASE}`);
+  }
+
+  btn.classList.remove('loading');
+  label.textContent = 'Send Request';
+}
+
+async function sendMcpRequest() {
+  const url = document.getElementById('mcpUrl').value;
+  const body = document.getElementById('mcpBody').value;
+
+  const start = performance.now();
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    });
+    const elapsed = Math.round(performance.now() - start);
+    const text = await resp.text();
+
+    let formatted;
+    try { formatted = JSON.stringify(JSON.parse(text), null, 2); }
+    catch { formatted = text; }
+
+    const panel = document.getElementById('mcpResponsePanel');
+    panel.classList.add('visible');
+    document.getElementById('mcpRespStatus').textContent = `${resp.status} ${resp.statusText}`;
+    document.getElementById('mcpRespStatus').className = `response-status status-${Math.floor(resp.status/100)}xx`;
+    document.getElementById('mcpRespTime').textContent = `${elapsed}ms`;
+    document.getElementById('mcpRespBody').textContent = formatted;
+  } catch (err) {
+    const panel = document.getElementById('mcpResponsePanel');
+    panel.classList.add('visible');
+    document.getElementById('mcpRespStatus').textContent = 'Error';
+    document.getElementById('mcpRespStatus').className = 'response-status status-5xx';
+    document.getElementById('mcpRespBody').textContent = `Connection failed: ${err.message}`;
+  }
+}
+
+function showResponse(status, elapsed, body) {
+  const panel = document.getElementById('responsePanel');
+  panel.classList.add('visible');
+  document.getElementById('respStatus').textContent = `${status} ${status >= 200 && status < 300 ? 'OK' : status >= 400 ? 'Error' : ''}`;
+  document.getElementById('respStatus').className = `response-status status-${Math.floor(status/100)}xx`;
+  document.getElementById('respTime').textContent = `${elapsed}ms`;
+  document.getElementById('respBody').textContent = body;
+}
+
+function copyUrl() {
+  const url = document.getElementById('epUrl').textContent;
+  navigator.clipboard.writeText(url);
+  const btn = event.target;
+  btn.textContent = '✅ Copied!';
+  btn.classList.add('copied');
+  setTimeout(() => { btn.textContent = '📋 Copy'; btn.classList.remove('copied'); }, 1500);
+}
+
+// ──────────────────────────────────────────
+// Health check
+// ──────────────────────────────────────────
+
+async function checkConnection() {
+  try {
+    const resp = await fetch(BASE + '/api/health', { signal: AbortSignal.timeout(3000) });
+    const data = await resp.json();
+    document.getElementById('connDot').className = 'conn-dot online';
+    document.getElementById('connLabel').textContent = `Connected — Neo4j: ${data.neo4j}, ${data.neo4j_nodes} nodes`;
+  } catch {
+    document.getElementById('connDot').className = 'conn-dot offline';
+    document.getElementById('connLabel').textContent = 'Disconnected — start server first';
+  }
+}
+
+// ──────────────────────────────────────────
+// Keyboard shortcut
+// ──────────────────────────────────────────
+
+document.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+    e.preventDefault();
+    document.getElementById('searchInput').focus();
+  }
+});
+
+document.getElementById('searchInput').addEventListener('input', (e) => {
+  renderSidebar(e.target.value.toLowerCase());
+});
+
+// ──────────────────────────────────────────
+// Init
+// ──────────────────────────────────────────
+
+renderSidebar();
+checkConnection();
+setInterval(checkConnection, 15000);
+</script>
+</body>
+</html>

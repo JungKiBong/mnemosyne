@@ -101,14 +101,18 @@ def generate_key():
     """Generate a new API key."""
     data = request.get_json(force=True)
     rbac = _get_rbac()
-    result = rbac.generate_api_key(
-        owner_id=data.get('owner_id', 'admin'),
-        name=data.get('name', 'New Key'),
-        roles=data.get('roles', ['writer']),
-        allowed_scopes=data.get('allowed_scopes', ['personal', 'tribal']),
-        rate_limit=data.get('rate_limit', 100),
-    )
-    return jsonify(result)
+    try:
+        result = rbac.generate_api_key(
+            owner_id=data.get('owner_id', 'admin'),
+            name=data.get('name', 'New Key'),
+            roles=data.get('roles', ['writer']),
+            allowed_scopes=data.get('allowed_scopes', ['personal', 'tribal']),
+            rate_limit=data.get('rate_limit', 100),
+            expires_in_days=int(data.get('expires_in_days', 30)),
+        )
+        return jsonify(result)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
 
 
 @security_bp.route('/keys', methods=['GET'])
@@ -117,6 +121,22 @@ def list_keys():
     rbac = _get_rbac()
     owner_id = request.args.get('owner_id')
     return jsonify({"keys": rbac.list_api_keys(owner_id)})
+
+
+@security_bp.route('/keys/verify', methods=['POST'])
+def verify_key():
+    """Verify an API key and return its metadata (scopes, roles, etc)."""
+    data = request.get_json(force=True)
+    raw_key = data.get('api_key', '')
+    if not raw_key:
+        return jsonify({"valid": False, "error": "api_key missing"}), 400
+    
+    rbac = _get_rbac()
+    principal = rbac.validate_api_key(raw_key)
+    if principal:
+        return jsonify({"valid": True, "principal": principal})
+    
+    return jsonify({"valid": False, "error": "Invalid or revoked API key"}), 401
 
 
 @security_bp.route('/keys/<key_hash>', methods=['DELETE'])
