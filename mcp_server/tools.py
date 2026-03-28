@@ -1,12 +1,12 @@
 """
-Mnemosyne MCP Tools — 5 core tools for external AI agents.
+Mories MCP Tools — 5 core tools for external AI agents.
 
 Tools:
-  1. mnemosyne_search     — Hybrid knowledge graph + semantic search
-  2. mnemosyne_ingest     — Data ingestion from file/URL/text
-  3. mnemosyne_profile    — Agent profile lookup
-  4. mnemosyne_graph_query — Read-only Cypher queries
-  5. mnemosyne_stream     — Stream ingestion control
+  1. mories_search     — Hybrid knowledge graph + semantic search
+  2. mories_ingest     — Data ingestion from file/URL/text
+  3. mories_profile    — Agent profile lookup
+  4. mories_graph_query — Read-only Cypher queries
+  5. mories_stream     — Stream ingestion control
 """
 
 import json
@@ -17,7 +17,7 @@ from neo4j import GraphDatabase
 
 from .config import MCPConfig
 
-logger = logging.getLogger("mnemosyne.mcp.tools")
+logger = logging.getLogger("mories.mcp.tools")
 
 # ---------------------------------------------------------------------------
 #  Shared helpers
@@ -62,18 +62,18 @@ def _rate_check():
 
 
 # ---------------------------------------------------------------------------
-#  Tool 1: mnemosyne_search
+#  Tool 1: mories_search
 # ---------------------------------------------------------------------------
 
 SEARCH_DESCRIPTION = (
-    "Search the Mnemosyne hybrid memory system. "
+    "Search the Mories hybrid memory system. "
     "Queries the Neo4j knowledge graph (entities, facts, episodes) "
     "and returns structured results. "
     "Supports keyword search, semantic vectors, and graph traversal."
 )
 
 
-def mnemosyne_search(query: str, graph_id: str = "", limit: int = 10) -> dict:
+def mories_search(query: str, graph_id: str = "", limit: int = 10, **kwargs) -> dict:
     """
     Search the knowledge graph + vector index.
 
@@ -86,6 +86,8 @@ def mnemosyne_search(query: str, graph_id: str = "", limit: int = 10) -> dict:
         dict with 'results' list and 'metadata'
     """
     _rate_check()
+    _allowed_scopes = kwargs.get("_allowed_scopes", ["*"])
+    is_admin = "*" in _allowed_scopes
 
     driver = _get_neo4j_driver()
     results = []
@@ -96,6 +98,12 @@ def mnemosyne_search(query: str, graph_id: str = "", limit: int = 10) -> dict:
         CALL db.index.fulltext.queryNodes('entity_fulltext', $q)
         YIELD node, score
         WHERE score > 0.3
+        OPTIONAL MATCH (g:Graph)-[:CONTAINS]->(node)
+        WITH node, score, collect(g.uuid) AS gids, collect(COALESCE(g.is_public, false)) AS pubs
+        WHERE $is_admin = true
+           OR any(p IN pubs WHERE p = true)
+           OR any(gid IN gids WHERE gid IN $allowed_scopes)
+           OR size(gids) = 0
         RETURN node.uuid AS uuid,
                node.name AS name,
                node.entity_type AS type,
@@ -106,7 +114,7 @@ def mnemosyne_search(query: str, graph_id: str = "", limit: int = 10) -> dict:
         """
         try:
             entity_results = session.run(
-                entity_cypher, q=query, lim=limit
+                entity_cypher, q=query, lim=limit, is_admin=is_admin, allowed_scopes=_allowed_scopes
             )
             for r in entity_results:
                 results.append({
@@ -124,6 +132,12 @@ def mnemosyne_search(query: str, graph_id: str = "", limit: int = 10) -> dict:
         CALL db.index.fulltext.queryNodes('fact_fulltext', $q)
         YIELD node, score
         WHERE score > 0.3
+        OPTIONAL MATCH (g:Graph)-[:CONTAINS]->(node)
+        WITH node, score, collect(g.uuid) AS gids, collect(COALESCE(g.is_public, false)) AS pubs
+        WHERE $is_admin = true
+           OR any(p IN pubs WHERE p = true)
+           OR any(gid IN gids WHERE gid IN $allowed_scopes)
+           OR size(gids) = 0
         RETURN node.uuid AS uuid,
                node.subject AS subject,
                node.predicate AS predicate,
@@ -133,7 +147,7 @@ def mnemosyne_search(query: str, graph_id: str = "", limit: int = 10) -> dict:
         LIMIT $lim
         """
         try:
-            fact_results = session.run(fact_cypher, q=query, lim=limit)
+            fact_results = session.run(fact_cypher, q=query, lim=limit, is_admin=is_admin, allowed_scopes=_allowed_scopes)
             for r in fact_results:
                 results.append({
                     "source": "fact_fulltext",
@@ -146,15 +160,22 @@ def mnemosyne_search(query: str, graph_id: str = "", limit: int = 10) -> dict:
 
         # 3) Graph-id scoped search (if provided)
         if graph_id:
+            # Security check for requested graph_id
+            if not is_admin and graph_id not in _allowed_scopes:
+                # To be fully secure, we should query Neo4j if graph_id is public. But for performance we trust the token scopes.
+                pass
+            
             graph_cypher = """
             MATCH (g:Graph {uuid: $graph_id})-[:CONTAINS]->(e:Entity)
-            WHERE e.name CONTAINS $query OR e.description CONTAINS $query
+            WHERE (e.name CONTAINS $query OR e.description CONTAINS $query)
+              AND ($is_admin = true OR g.is_public = true OR g.uuid IN $allowed_scopes)
             RETURN e.uuid AS uuid, e.name AS name, e.entity_type AS type
             LIMIT $limit
             """
             try:
                 graph_results = session.run(
-                    graph_cypher, graph_id=graph_id, query=query, limit=limit
+                    graph_cypher, graph_id=graph_id, query=query, limit=limit,
+                    is_admin=is_admin, allowed_scopes=_allowed_scopes
                 )
                 for r in graph_results:
                     results.append({
@@ -175,21 +196,22 @@ def mnemosyne_search(query: str, graph_id: str = "", limit: int = 10) -> dict:
 
 
 # ---------------------------------------------------------------------------
-#  Tool 2: mnemosyne_ingest
+#  Tool 2: mories_ingest
 # ---------------------------------------------------------------------------
 
 INGEST_DESCRIPTION = (
-    "Ingest data into Mnemosyne's knowledge graph. "
+    "Ingest data into Mories's knowledge graph. "
     "Supports files (PDF, CSV, JSON, MD, DOCX, etc.), "
     "text content, and batch processing via 11 data adapters."
 )
 
 
-def mnemosyne_ingest(
+def mories_ingest(
     graph_id: str,
     source_ref: str = "",
     text_content: str = "",
     source_type: str = "auto",
+    **kwargs
 ) -> dict:
     """
     Ingest data into the knowledge graph.
@@ -204,6 +226,9 @@ def mnemosyne_ingest(
         dict with ingestion result
     """
     _rate_check()
+    _allowed_scopes = kwargs.get("_allowed_scopes", ["*"])
+    if "*" not in _allowed_scopes and graph_id not in _allowed_scopes:
+        return {"error": f"Unauthorized. Missing permission to write to graph_id: '{graph_id}'."}
 
     client = _get_api_client()
 
@@ -233,20 +258,21 @@ def mnemosyne_ingest(
 
 
 # ---------------------------------------------------------------------------
-#  Tool 3: mnemosyne_profile
+#  Tool 3: mories_profile
 # ---------------------------------------------------------------------------
 
 PROFILE_DESCRIPTION = (
-    "Look up an agent's profile from the Mnemosyne memory system. "
+    "Look up an agent's profile from the Mories memory system. "
     "Returns the agent's traits, dynamic state, memory count, "
     "and recent interactions from the knowledge graph."
 )
 
 
-def mnemosyne_profile(
+def mories_profile(
     agent_name: str = "",
     agent_id: str = "",
     graph_id: str = "",
+    **kwargs
 ) -> dict:
     """
     Look up agent profile from Neo4j.
@@ -324,7 +350,7 @@ def mnemosyne_profile(
 
 
 # ---------------------------------------------------------------------------
-#  Tool 4: mnemosyne_graph_query
+#  Tool 4: mories_graph_query
 # ---------------------------------------------------------------------------
 
 GRAPH_QUERY_DESCRIPTION = (
@@ -340,10 +366,11 @@ _WRITE_KEYWORDS = {
 }
 
 
-def mnemosyne_graph_query(
+def mories_graph_query(
     cypher: str,
     params: dict | None = None,
     limit: int = 50,
+    **kwargs
 ) -> dict:
     """
     Execute a read-only Cypher query.
@@ -357,6 +384,9 @@ def mnemosyne_graph_query(
         dict with 'columns' and 'rows'
     """
     _rate_check()
+    _allowed_scopes = kwargs.get("_allowed_scopes", ["*"])
+    if "*" not in _allowed_scopes:
+        return {"error": "Unauthorized. `mories_graph_query` requires full admin scope (*)."}
 
     # Security: block write operations
     if MCPConfig.READ_ONLY_CYPHER:
@@ -403,7 +433,7 @@ def mnemosyne_graph_query(
 
 
 # ---------------------------------------------------------------------------
-#  Tool 5: mnemosyne_stream
+#  Tool 5: mories_stream
 # ---------------------------------------------------------------------------
 
 STREAM_DESCRIPTION = (
@@ -412,11 +442,12 @@ STREAM_DESCRIPTION = (
 )
 
 
-def mnemosyne_stream(
+def mories_stream(
     action: str,
     graph_id: str = "",
     source_ref: str = "",
     config: dict | None = None,
+    **kwargs
 ) -> dict:
     """
     Control stream ingestion.
@@ -431,6 +462,9 @@ def mnemosyne_stream(
         dict with stream status
     """
     _rate_check()
+    _allowed_scopes = kwargs.get("_allowed_scopes", ["*"])
+    if action in ["start"] and "*" not in _allowed_scopes and graph_id not in _allowed_scopes:
+        return {"error": f"Unauthorized. Missing permission for graph_id: '{graph_id}'."}
 
     client = _get_api_client()
 

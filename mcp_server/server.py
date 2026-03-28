@@ -1,5 +1,5 @@
 """
-Mnemosyne MCP Server — Main entry point.
+Mories MCP Server — Main entry point.
 
 Supports two transport modes:
   - stdio  (default): For Claude Desktop, Cursor, etc.
@@ -13,7 +13,7 @@ Usage:
   python -m mcp_server.server --transport sse --port 3100
 
 Configuration via .env or environment variables:
-  MNEMOSYNE_API_URL  = http://localhost:5001  (Flask API base)
+  MORIES_API_URL  = http://localhost:5001  (Flask API base)
   NEO4J_URI          = bolt://localhost:7687
   MCP_API_KEY        = (optional, for access control)
   MCP_READ_ONLY      = true
@@ -28,7 +28,7 @@ import asyncio
 from typing import Any
 
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(name)s: %(message)s")
-logger = logging.getLogger("mnemosyne.mcp")
+logger = logging.getLogger("mories.mcp")
 
 # ---------------------------------------------------------------------------
 #  Tool definitions for MCP protocol
@@ -36,9 +36,9 @@ logger = logging.getLogger("mnemosyne.mcp")
 
 TOOL_DEFINITIONS = [
     {
-        "name": "mnemosyne_search",
+        "name": "mories_search",
         "description": (
-            "Search the Mnemosyne hybrid memory system. "
+            "Search the Mories hybrid memory system. "
             "Queries Neo4j knowledge graph via fulltext and vector indexes. "
             "Returns entities, facts, and episodes matching the query."
         ),
@@ -64,9 +64,9 @@ TOOL_DEFINITIONS = [
         },
     },
     {
-        "name": "mnemosyne_ingest",
+        "name": "mories_ingest",
         "description": (
-            "Ingest data into Mnemosyne knowledge graph. "
+            "Ingest data into Mories knowledge graph. "
             "Supports 11 adapters: PDF, CSV, JSON, MD, DOCX, HTML, XLSX, "
             "Parquet, YAML, Webhook, and Kafka."
         ),
@@ -97,7 +97,7 @@ TOOL_DEFINITIONS = [
         },
     },
     {
-        "name": "mnemosyne_profile",
+        "name": "mories_profile",
         "description": (
             "Look up an agent's profile from the knowledge graph. "
             "Returns traits, dynamic state, relationships, and interaction count."
@@ -124,7 +124,7 @@ TOOL_DEFINITIONS = [
         },
     },
     {
-        "name": "mnemosyne_graph_query",
+        "name": "mories_graph_query",
         "description": (
             "Execute a read-only Cypher query on the Neo4j knowledge graph. "
             "Use for custom traversals, aggregations, and pattern matching. "
@@ -152,7 +152,7 @@ TOOL_DEFINITIONS = [
         },
     },
     {
-        "name": "mnemosyne_stream",
+        "name": "mories_stream",
         "description": (
             "Control stream ingestion adapters for real-time data. "
             "Actions: start, stop, list. "
@@ -191,27 +191,31 @@ TOOL_DEFINITIONS = [
 #  Tool dispatcher
 # ---------------------------------------------------------------------------
 
-def dispatch_tool(name: str, arguments: dict) -> Any:
+def dispatch_tool(name: str, arguments: dict, allowed_scopes: list[str] = None) -> Any:
     """Dispatch a tool call to the appropriate function."""
     from .tools import (
-        mnemosyne_search,
-        mnemosyne_ingest,
-        mnemosyne_profile,
-        mnemosyne_graph_query,
-        mnemosyne_stream,
+        mories_search,
+        mories_ingest,
+        mories_profile,
+        mories_graph_query,
+        mories_stream,
     )
 
     tool_map = {
-        "mnemosyne_search": mnemosyne_search,
-        "mnemosyne_ingest": mnemosyne_ingest,
-        "mnemosyne_profile": mnemosyne_profile,
-        "mnemosyne_graph_query": mnemosyne_graph_query,
-        "mnemosyne_stream": mnemosyne_stream,
+        "mories_search": mories_search,
+        "mories_ingest": mories_ingest,
+        "mories_profile": mories_profile,
+        "mories_graph_query": mories_graph_query,
+        "mories_stream": mories_stream,
     }
 
     func = tool_map.get(name)
     if func is None:
         return {"error": f"Unknown tool: {name}"}
+
+    # Inject allowed_scopes into arguments (tools.py will handle it if supported)
+    if allowed_scopes is not None:
+        arguments["_allowed_scopes"] = allowed_scopes
 
     try:
         return func(**arguments)
@@ -224,7 +228,7 @@ def dispatch_tool(name: str, arguments: dict) -> Any:
 #  JSON-RPC handler (MCP protocol core)
 # ---------------------------------------------------------------------------
 
-def handle_jsonrpc(message: dict) -> dict | None:
+def handle_jsonrpc(message: dict, allowed_scopes: list[str] = None) -> dict | None:
     """Process a single JSON-RPC 2.0 message (MCP protocol)."""
     method = message.get("method", "")
     msg_id = message.get("id")
@@ -241,7 +245,7 @@ def handle_jsonrpc(message: dict) -> dict | None:
                     "tools": {"listChanged": False},
                 },
                 "serverInfo": {
-                    "name": "mnemosyne-memory",
+                    "name": "mories-memory",
                     "version": "0.5.0",
                 },
             },
@@ -265,7 +269,7 @@ def handle_jsonrpc(message: dict) -> dict | None:
 
         logger.info("Tool call: %s(%s)", tool_name, json.dumps(arguments, ensure_ascii=False)[:200])
 
-        result = dispatch_tool(tool_name, arguments)
+        result = dispatch_tool(tool_name, arguments, allowed_scopes)
         result_text = json.dumps(result, ensure_ascii=False, indent=2)
 
         return {
@@ -302,12 +306,31 @@ def handle_jsonrpc(message: dict) -> dict | None:
 
 def run_stdio():
     """Run MCP server over stdio (for Claude Desktop, Cursor, etc.)."""
-    logger.info("Mnemosyne MCP Server starting (stdio mode)")
+    logger.info("Mories MCP Server starting (stdio mode)")
+    from .config import MCPConfig  # noqa: reimport for globals
+
     logger.info("API backend: %s", MCPConfig.API_BASE_URL)
     logger.info("Neo4j: %s", MCPConfig.NEO4J_URI)
     logger.info("Read-only: %s", MCPConfig.READ_ONLY_CYPHER)
 
-    from .config import MCPConfig  # noqa: reimport for globals
+    allowed_scopes = ['*']
+    if MCPConfig.MCP_API_KEY:
+        import httpx
+        try:
+            resp = httpx.post(
+                f"{MCPConfig.API_BASE_URL}/api/security/keys/verify",
+                json={"api_key": MCPConfig.MCP_API_KEY},
+                timeout=5.0
+            )
+            if resp.status_code == 200 and resp.json().get("valid"):
+                allowed_scopes = resp.json().get("principal", {}).get("allowed_scopes", [])
+                logger.info(f"Verified stdio MCP API Key. Scopes: {allowed_scopes}")
+            else:
+                logger.warning("MCP_API_KEY failed verification. Access denied.")
+                allowed_scopes = []
+        except Exception as e:
+            logger.error("Auth verification failed: %s", e)
+            allowed_scopes = []
 
     for line in sys.stdin:
         line = line.strip()
@@ -326,7 +349,7 @@ def run_stdio():
             sys.stdout.flush()
             continue
 
-        response = handle_jsonrpc(message)
+        response = handle_jsonrpc(message, allowed_scopes)
         if response is not None:
             sys.stdout.write(json.dumps(response, ensure_ascii=False) + "\n")
             sys.stdout.flush()
@@ -346,22 +369,42 @@ def run_sse(host: str = "0.0.0.0", port: int = 3100):
 
     from .config import MCPConfig
 
-    app = Flask("mnemosyne-mcp-sse")
+    app = Flask("mories-mcp-sse")
 
     @app.route("/mcp", methods=["POST"])
     def mcp_endpoint():
         """Handle MCP JSON-RPC over HTTP POST."""
-        # API key auth
-        if MCPConfig.MCP_API_KEY:
-            auth = request.headers.get("Authorization", "")
-            if auth != f"Bearer {MCPConfig.MCP_API_KEY}":
-                return jsonify({"error": "Unauthorized"}), 401
+        import httpx
+        from .config import MCPConfig
+        
+        allowed_scopes = ['*']  # Default if no auth required
+
+        # API key auth validation
+        token = request.headers.get("Authorization", "").replace("Bearer ", "").strip()
+        if MCPConfig.MCP_API_KEY and token == MCPConfig.MCP_API_KEY:
+            allowed_scopes = ['*']  # Admin bypass
+        elif token:
+            try:
+                resp = httpx.post(
+                    f"{MCPConfig.API_BASE_URL}/api/security/keys/verify",
+                    json={"api_key": token},
+                    timeout=5.0
+                )
+                if resp.status_code == 200 and resp.json().get("valid"):
+                    allowed_scopes = resp.json().get("principal", {}).get("allowed_scopes", [])
+                else:
+                    return jsonify({"error": "Unauthorized / Revoked key"}), 401
+            except Exception as e:
+                logger.error("Auth verification failed: %s", e)
+                return jsonify({"error": "Auth verification failed"}), 500
+        elif MCPConfig.MCP_API_KEY and not token:
+            return jsonify({"error": "Unauthorized: API Key required"}), 401
 
         message = request.get_json(silent=True)
         if not message:
             return jsonify({"error": "Invalid JSON"}), 400
 
-        response = handle_jsonrpc(message)
+        response = handle_jsonrpc(message, allowed_scopes)
         if response is None:
             return "", 204
         return jsonify(response)
@@ -370,7 +413,7 @@ def run_sse(host: str = "0.0.0.0", port: int = 3100):
     def health():
         return jsonify({
             "status": "ok",
-            "service": "mnemosyne-mcp-server",
+            "service": "mories-mcp-server",
             "version": "0.5.0",
             "tools": len(TOOL_DEFINITIONS),
             "read_only": MCPConfig.READ_ONLY_CYPHER,
@@ -381,7 +424,7 @@ def run_sse(host: str = "0.0.0.0", port: int = 3100):
         """List available tools (convenience endpoint)."""
         return jsonify({"tools": TOOL_DEFINITIONS})
 
-    logger.info("Mnemosyne MCP Server starting (SSE/HTTP mode)")
+    logger.info("Mories MCP Server starting (SSE/HTTP mode)")
     logger.info("Listening on http://%s:%d/mcp", host, port)
     logger.info("Tools endpoint: http://%s:%d/tools", host, port)
     app.run(host=host, port=port, debug=False)
@@ -392,7 +435,7 @@ def run_sse(host: str = "0.0.0.0", port: int = 3100):
 # ---------------------------------------------------------------------------
 
 def main():
-    parser = argparse.ArgumentParser(description="Mnemosyne MCP Server")
+    parser = argparse.ArgumentParser(description="Mories MCP Server")
     parser.add_argument(
         "--transport",
         choices=["stdio", "sse"],

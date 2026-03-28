@@ -14,7 +14,7 @@ class MCPConfig:
     """MCP Server configuration."""
 
     # Flask API backend
-    API_BASE_URL = os.environ.get('MNEMOSYNE_API_URL', 'http://localhost:5001')
+    API_BASE_URL = os.environ.get('MORIES_API_URL', 'http://localhost:5001')
 
     # Neo4j (direct access for graph_query tool)
     NEO4J_URI = os.environ.get('NEO4J_URI', 'bolt://localhost:7687')
