@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mnemosyne — Synaptic Network & Data Products</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+:root {
+  --bg-0: #0a0e1a;
+  --bg-1: #111827;
+  --bg-2: #1e293b;
+  --bg-3: #334155;
+  --accent-blue: #3b82f6;
+  --accent-purple: #8b5cf6;
+  --accent-green: #10b981;
+  --accent-amber: #f59e0b;
+  --accent-rose: #f43f5e;
+  --accent-cyan: #06b6d4;
+  --text-0: #f8fafc;
+  --text-1: #cbd5e1;
+  --text-2: #94a3b8;
+  --radius: 12px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Inter',system-ui,sans-serif; background:var(--bg-0); color:var(--text-0); min-height:100vh; }
+a { color:var(--accent-cyan); text-decoration:none; }
+a:hover { text-decoration:underline; }
+
+/* Header */
+.header { padding:20px 28px; display:flex; align-items:center; gap:16px; border-bottom:1px solid rgba(255,255,255,.06); }
+.header h1 { font-size:1.4rem; background:linear-gradient(135deg,var(--accent-purple),var(--accent-cyan)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.badge { padding:3px 10px; border-radius:999px; font-size:.7rem; font-weight:600; letter-spacing:.5px; }
+.badge-9 { background:rgba(139,92,246,.2); color:#a78bfa; }
+.badge-11 { background:rgba(6,182,212,.2); color:#22d3ee; }
+.nav-links { margin-left:auto; display:flex; gap:14px; font-size:.85rem; }
+.nav-links a { color:var(--text-2); transition:color .2s; }
+.nav-links a:hover { color:var(--text-0); text-decoration:none; }
+
+/* Tabs */
+.tabs { display:flex; gap:2px; padding:16px 28px 0; }
+.tab { padding:10px 24px; border-radius:var(--radius) var(--radius) 0 0; background:var(--bg-1); color:var(--text-2); cursor:pointer; font-size:.85rem; font-weight:500; transition:.2s; border:1px solid transparent; border-bottom:none; }
+.tab:hover { color:var(--text-0); background:var(--bg-2); }
+.tab.active { background:var(--bg-2); color:var(--text-0); border-color:rgba(255,255,255,.08); }
+
+/* Tab Content */
+.tab-content { display:none; }
+.tab-content.active { display:block; }
+.panel { padding:24px 28px; }
+
+/* Cards */
+.stat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; margin-bottom:24px; }
+.stat-card { background:var(--bg-2); border-radius:var(--radius); padding:20px; border:1px solid rgba(255,255,255,.06); }
+.stat-card .label { font-size:.75rem; color:var(--text-2); margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+.stat-card .value { font-size:1.8rem; font-weight:700; }
+.stat-card .sub { font-size:.75rem; color:var(--text-2); margin-top:4px; }
+
+/* Scope Hierarchy */
+.scope-ladder { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:24px; }
+.scope-tier { flex:1; min-width:200px; background:var(--bg-2); border-radius:var(--radius); padding:16px; border-left:4px solid; position:relative; }
+.scope-tier.personal { border-left-color:var(--accent-blue); }
+.scope-tier.tribal { border-left-color:var(--accent-purple); }
+.scope-tier.social { border-left-color:var(--accent-green); }
+.scope-tier.global { border-left-color:var(--accent-amber); }
+.scope-tier h4 { font-size:.85rem; margin-bottom:8px; }
+.scope-meta { font-size:.75rem; color:var(--text-2); }
+
+/* Agent List */
+.agent-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:14px; margin-bottom:24px; }
+.agent-card { background:var(--bg-2); border-radius:var(--radius); padding:16px; border:1px solid rgba(255,255,255,.06); }
+.agent-card .agent-name { font-weight:600; font-size:1rem; display:flex; align-items:center; gap:8px; }
+.agent-card .agent-role { font-size:.7rem; padding:2px 8px; border-radius:999px; background:rgba(139,92,246,.2); color:#a78bfa; }
+.agent-card .agent-stats { display:flex; gap:16px; margin-top:10px; font-size:.8rem; color:var(--text-2); }
+
+/* Event Timeline */
+.event-feed { max-height:500px; overflow-y:auto; }
+.event-item { display:flex; gap:12px; padding:12px 0; border-bottom:1px solid rgba(255,255,255,.04); }
+.event-icon { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.1rem; flex-shrink:0; }
+.event-icon.share { background:rgba(59,130,246,.15); }
+.event-icon.empathy_boost { background:rgba(16,185,129,.15); }
+.event-body { flex:1; }
+.event-body .event-title { font-size:.85rem; font-weight:500; }
+.event-body .event-meta { font-size:.75rem; color:var(--text-2); margin-top:3px; }
+
+/* Data Products */
+.product-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:16px; }
+.product-card { background:var(--bg-2); border-radius:var(--radius); padding:20px; border:1px solid rgba(255,255,255,.06); transition:transform .2s,border-color .2s; }
+.product-card:hover { transform:translateY(-2px); border-color:rgba(139,92,246,.3); }
+.product-card h3 { font-size:1rem; margin-bottom:8px; display:flex; align-items:center; gap:8px; }
+.product-card p { font-size:.8rem; color:var(--text-2); margin-bottom:14px; line-height:1.4; }
+.product-card .product-actions { display:flex; gap:8px; }
+.btn { padding:8px 16px; border-radius:8px; border:none; cursor:pointer; font-size:.8rem; font-weight:500; transition:.2s; }
+.btn-primary { background:linear-gradient(135deg,var(--accent-purple),var(--accent-blue)); color:#fff; }
+.btn-primary:hover { opacity:.85; }
+.btn-secondary { background:var(--bg-3); color:var(--text-1); }
+.btn-secondary:hover { background:#475569; }
+.btn-small { padding:5px 12px; font-size:.75rem; }
+
+/* Manifest List */
+.manifest-list { margin-top:20px; }
+.manifest-item { background:var(--bg-1); border-radius:var(--radius); padding:16px; border:1px solid rgba(255,255,255,.06); margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; }
+.manifest-item .manifest-name { font-weight:600; }
+.manifest-item .manifest-meta { font-size:.75rem; color:var(--text-2); }
+
+/* Charts */
+.chart-container { background:var(--bg-2); border-radius:var(--radius); padding:20px; border:1px solid rgba(255,255,255,.06); }
+.chart-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; }
+@media(max-width:768px) { .chart-row { grid-template-columns:1fr; } }
+
+/* Loading */
+.loading { text-align:center; padding:40px; color:var(--text-2); }
+.loading .spinner { display:inline-block; width:24px; height:24px; border:3px solid var(--bg-3); border-top-color:var(--accent-purple); border-radius:50%; animation:spin 1s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🧠 Mnemosyne Synaptic Network</h1>
+  <span class="badge badge-9">Phase 9</span>
+  <span class="badge badge-11">Phase 11</span>
+  <div class="nav-links">
+    <a href="/memory">← Cognitive Memory</a>
+    <a href="/memory/history">📋 Audit Trail</a>
+    <a href="/">🏠 Dashboard</a>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" data-tab="network">🌐 Synaptic Network</div>
+  <div class="tab" data-tab="scopes">🏗️ Memory Scopes</div>
+  <div class="tab" data-tab="data">📦 Data Products</div>
+</div>
+
+<!-- ═══════════════════════════════════════ -->
+<!-- TAB 1: Synaptic Network                -->
+<!-- ═══════════════════════════════════════ -->
+<div id="tab-network" class="tab-content active">
+<div class="panel">
+  <div class="stat-grid" id="network-stats">
+    <div class="stat-card"><div class="label">🤖 전체 에이전트</div><div class="value" id="ns-agents">-</div></div>
+    <div class="stat-card"><div class="label">📡 전체 이벤트</div><div class="value" id="ns-events">-</div></div>
+    <div class="stat-card"><div class="label">🔗 공유 횟수</div><div class="value" id="ns-shares">-</div></div>
+    <div class="stat-card"><div class="label">💚 공감 강화</div><div class="value" id="ns-boosts">-</div></div>
+  </div>
+
+  <h3 style="margin-bottom:14px;">🤖 등록된 에이전트</h3>
+  <div class="agent-list" id="agent-list"></div>
+
+  <h3 style="margin:20px 0 14px;">📡 이벤트 피드</h3>
+  <div class="event-feed" id="event-feed">
+    <div class="loading"><span class="spinner"></span> 로딩 중...</div>
+  </div>
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════ -->
+<!-- TAB 2: Memory Scopes                   -->
+<!-- ═══════════════════════════════════════ -->
+<div id="tab-scopes" class="tab-content">
+<div class="panel">
+  <h3 style="margin-bottom:14px;">🏗️ 4-Tier 기억 계층</h3>
+  <div class="scope-ladder" id="scope-ladder"></div>
+
+  <div class="chart-row">
+    <div class="chart-container">
+      <h4 style="margin-bottom:12px;font-size:.9rem;">스코프 분포</h4>
+      <canvas id="scope-chart" height="200"></canvas>
+    </div>
+    <div class="chart-container">
+      <h4 style="margin-bottom:12px;font-size:.9rem;">소스 타입 분포</h4>
+      <canvas id="source-chart" height="200"></canvas>
+    </div>
+  </div>
+
+  <h3 style="margin:20px 0 14px;">⬆️ 승격 후보 <span style="font-size:.75rem;color:var(--text-2);">(salience ≥ 0.8)</span></h3>
+  <div id="candidates-list"></div>
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════ -->
+<!-- TAB 3: Data Products                   -->
+<!-- ═══════════════════════════════════════ -->
+<div id="tab-data" class="tab-content">
+<div class="panel">
+  <h3 style="margin-bottom:14px;">📦 AI-Ready Data Products</h3>
+  <div class="product-grid" id="product-grid"></div>
+
+  <h3 style="margin:24px 0 14px;">📋 생성된 Manifests</h3>
+  <div class="manifest-list" id="manifest-list">
+    <div class="loading"><span class="spinner"></span> 로딩 중...</div>
+  </div>
+</div>
+</div>
+
+<script>
+const API = '';
+
+// ═══════════════════════════════════════
+// Tab Navigation
+// ═══════════════════════════════════════
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+  });
+});
+
+// ═══════════════════════════════════════
+// Tab 1: Synaptic Network
+// ═══════════════════════════════════════
+async function loadNetworkStats() {
+  const data = await fetch(API + '/api/memory/synaptic/stats').then(r => r.json());
+  document.getElementById('ns-agents').textContent = data.total_agents;
+  document.getElementById('ns-events').textContent = data.total_events;
+  document.getElementById('ns-shares').textContent = data.total_shares;
+  document.getElementById('ns-boosts').textContent = data.total_empathy_boosts;
+}
+
+async function loadAgents() {
+  const agents = await fetch(API + '/api/memory/synaptic/agents').then(r => r.json());
+  const el = document.getElementById('agent-list');
+  if (!agents.length) { el.innerHTML = '<p style="color:var(--text-2);font-size:.85rem;">등록된 에이전트 없음</p>'; return; }
+  el.innerHTML = agents.map(a => `
+    <div class="agent-card">
+      <div class="agent-name">
+        ${a.role === 'observer' ? '👁️' : a.role === 'analyst' ? '🔬' : '🛡️'} ${a.name}
+        <span class="agent-role">${a.role}</span>
+      </div>
+      <div class="agent-stats">
+        <span>📤 공유: ${a.shared_count || 0}</span>
+        <span>📥 수신: ${a.received_count || 0}</span>
+        <span>🔖 구독: ${(a.subscribed_scopes || []).join(', ')}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function loadEvents() {
+  const events = await fetch(API + '/api/memory/synaptic/events?limit=30').then(r => r.json());
+  const el = document.getElementById('event-feed');
+  if (!events.length) { el.innerHTML = '<p style="color:var(--text-2);font-size:.85rem;">이벤트 없음</p>'; return; }
+  el.innerHTML = events.map(e => {
+    const icon = e.event_type === 'share' ? '🔗' : '💚';
+    const ago = timeAgo(e.created_at);
+    return `
+      <div class="event-item">
+        <div class="event-icon ${e.event_type}">${icon}</div>
+        <div class="event-body">
+          <div class="event-title">${e.memory_name || e.memory_uuid?.slice(0,8)}</div>
+          <div class="event-meta">
+            ${e.event_type} · ${e.agent_name || e.from_agent?.slice(0,8)} · ${ago}
+            ${e.boost_amount ? ` · +${e.boost_amount}` : ''}
+            ${e.message ? ` · "${e.message}"` : ''}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ═══════════════════════════════════════
+// Tab 2: Memory Scopes
+// ═══════════════════════════════════════
+const SCOPE_COLORS = {personal:'#3b82f6', tribal:'#8b5cf6', social:'#10b981', global:'#f59e0b'};
+const SCOPE_ICONS = {personal:'🧑', tribal:'👥', social:'🏛️', global:'🌍'};
+const SCOPE_LABELS = {personal:'Personal',tribal:'Tribal',social:'Social',global:'Global'};
+const SCOPE_DECAY = {personal:0.95,tribal:0.98,social:0.99,global:1.0};
+
+async function loadScopes() {
+  const data = await fetch(API + '/api/memory/scopes/summary').then(r => r.json());
+
+  // Ladder
+  const ladder = document.getElementById('scope-ladder');
+  ladder.innerHTML = ['personal','tribal','social','global'].map(s => {
+    const info = data.scopes[s] || {count:0,avg_salience:0,total_accesses:0};
+    return `
+      <div class="scope-tier ${s}">
+        <h4>${SCOPE_ICONS[s]} ${SCOPE_LABELS[s]}</h4>
+        <div style="font-size:1.6rem;font-weight:700;">${info.count}</div>
+        <div class="scope-meta">
+          Avg Salience: ${(info.avg_salience || 0).toFixed(3)}<br>
+          Decay Rate: ${SCOPE_DECAY[s]}<br>
+          Accesses: ${info.total_accesses || 0}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Charts
+  const scopes = Object.keys(data.scopes);
+  const counts = scopes.map(s => data.scopes[s].count);
+  new Chart(document.getElementById('scope-chart'), {
+    type: 'doughnut',
+    data: {
+      labels: scopes.map(s => SCOPE_LABELS[s] || s),
+      datasets: [{data:counts, backgroundColor:scopes.map(s=>SCOPE_COLORS[s]||'#64748b'), borderWidth:0}]
+    },
+    options: {plugins:{legend:{labels:{color:'#cbd5e1'}}}}
+  });
+
+  const stypes = Object.keys(data.source_types || {});
+  const scnts = stypes.map(s => data.source_types[s]);
+  new Chart(document.getElementById('source-chart'), {
+    type: 'bar',
+    data: {
+      labels: stypes,
+      datasets: [{label:'Count',data:scnts,backgroundColor:'rgba(139,92,246,.5)',borderRadius:4}]
+    },
+    options: {indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'#cbd5e1'},grid:{display:false}}}}
+  });
+
+  // Candidates
+  const candidates = await fetch(API + '/api/memory/scopes/candidates?scope=personal').then(r => r.json());
+  const cEl = document.getElementById('candidates-list');
+  if (!candidates.length) { cEl.innerHTML = '<p style="color:var(--text-2);font-size:.85rem;">현재 승격 후보 없음</p>'; return; }
+  cEl.innerHTML = candidates.map(c => `
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg-2);border-radius:8px;margin-bottom:6px;">
+      <span style="font-weight:600;flex:1;">${c.name}</span>
+      <span style="font-size:.8rem;color:var(--accent-green);">salience: ${c.salience?.toFixed(3)}</span>
+      <button class="btn btn-primary btn-small" onclick="promoteMemory('${c.uuid}','tribal')">→ Tribal 승격</button>
+    </div>
+  `).join('');
+}
+
+async function promoteMemory(uuid, target) {
+  const res = await fetch(API + '/api/memory/scopes/promote', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({uuid,target_scope:target,reason:'Admin promoted from dashboard'})
+  }).then(r=>r.json());
+  if(res.status==='promoted') { alert(`✅ ${res.name}: ${res.old_scope} → ${res.new_scope}`); location.reload(); }
+  else { alert('❌ ' + (res.error||'Unknown error')); }
+}
+
+// ═══════════════════════════════════════
+// Tab 3: Data Products
+// ═══════════════════════════════════════
+async function loadDataProducts() {
+  const catalog = await fetch(API + '/api/memory/data/catalog').then(r => r.json());
+  const grid = document.getElementById('product-grid');
+  const icons = {rag_corpus:'📄',knowledge_snapshot:'🕸️',training_dataset:'🎓',memory_manifest:'📦',analytics_csv:'📊'};
+
+  grid.innerHTML = catalog.products.map(p => `
+    <div class="product-card">
+      <h3>${icons[p.id]||'📦'} ${p.name}</h3>
+      <p>${p.description}</p>
+      <div class="product-actions">
+        ${p.download ? `<a href="${p.download}" class="btn btn-primary btn-small" download>⬇️ 다운로드</a>` : ''}
+        <button class="btn btn-secondary btn-small" onclick="previewProduct('${p.endpoint}','${p.method||'GET'}')">👁️ 미리보기</button>
+      </div>
+    </div>
+  `).join('');
+
+  // Manifests
+  const manifests = await fetch(API + '/api/memory/data/manifest/list').then(r => r.json());
+  const ml = document.getElementById('manifest-list');
+  if (!manifests.length) { ml.innerHTML = '<p style="color:var(--text-2);font-size:.85rem;">아직 생성된 Manifest 없음</p>'; return; }
+  ml.innerHTML = manifests.map(m => `
+    <div class="manifest-item">
+      <div>
+        <div class="manifest-name">📦 ${m.name}</div>
+        <div class="manifest-meta">v${m.version} · ${m.node_count} nodes · ${m.edge_count} edges · ${timeAgo(m.created_at)}</div>
+      </div>
+      <span class="badge badge-11">${m.scope_filter || 'all'}</span>
+    </div>
+  `).join('');
+}
+
+function previewProduct(endpoint, method) {
+  if (method === 'POST') {
+    const name = prompt('Manifest 이름을 입력하세요:');
+    if (!name) return;
+    fetch(endpoint, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, description:'Created from dashboard'})})
+      .then(r=>r.json()).then(d => { alert(`✅ Manifest 생성: ${d.manifest_id?.slice(0,8)}`); loadDataProducts(); });
+  } else {
+    window.open(endpoint, '_blank');
+  }
+}
+
+// ═══════════════════════════════════════
+// Utils
+// ═══════════════════════════════════════
+function timeAgo(ts) {
+  if (!ts) return '';
+  const diff = (Date.now() - new Date(ts).getTime()) / 1000;
+  if (diff < 60) return Math.floor(diff) + '초 전';
+  if (diff < 3600) return Math.floor(diff/60) + '분 전';
+  if (diff < 86400) return Math.floor(diff/3600) + '시간 전';
+  return Math.floor(diff/86400) + '일 전';
+}
+
+// ═══════════════════════════════════════
+// Init
+// ═══════════════════════════════════════
+async function init() {
+  await Promise.all([loadNetworkStats(), loadAgents(), loadEvents()]);
+  loadScopes();
+  loadDataProducts();
+}
+init();
+</script>
+</body>
+</html>

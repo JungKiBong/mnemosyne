@@ -1,0 +1,76 @@
+{
+  "name": "Mnemosyne: 지식 그래프 검색",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger-1",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://192.168.35.86:3100/mcp",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"mnemosyne_search\",\n    \"arguments\": {\n      \"query\": \"{{ $json.query || 'Alice의 최근 행동' }}\",\n      \"limit\": 10\n    }\n  }\n}"
+      },
+      "id": "search-1",
+      "name": "Mnemosyne Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst content = JSON.parse(response.result.content[0].text);\nreturn [{\n  json: {\n    query: content.query,\n    total: content.total,\n    results: content.results\n  }\n}];"
+      },
+      "id": "parse-1",
+      "name": "Parse Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 300]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Mnemosyne Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mnemosyne Search": {
+      "main": [
+        [
+          {
+            "node": "Parse Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "mnemosyne-mcp"
+  }
+}

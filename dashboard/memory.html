@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mnemosyne — Cognitive Memory Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0a0e1a;
+            --bg-secondary: #111827;
+            --bg-card: #1a1f35;
+            --bg-card-hover: #222845;
+            --text-primary: #e8eaed;
+            --text-secondary: #9aa0b8;
+            --text-muted: #6b7394;
+            --accent-blue: #4f8cff;
+            --accent-purple: #8b5cf6;
+            --accent-green: #22c55e;
+            --accent-amber: #f59e0b;
+            --accent-red: #ef4444;
+            --accent-cyan: #06b6d4;
+            --border-color: #2d3452;
+            --gradient-1: linear-gradient(135deg, #4f8cff 0%, #8b5cf6 100%);
+            --gradient-2: linear-gradient(135deg, #22c55e 0%, #06b6d4 100%);
+            --gradient-3: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
+            --shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; }
+
+        /* Header */
+        .header {
+            background: linear-gradient(180deg, rgba(79, 140, 255, 0.08) 0%, transparent 100%);
+            border-bottom: 1px solid var(--border-color);
+            padding: 16px 32px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .header-left { display: flex; align-items: center; gap: 16px; }
+        .header-left h1 { font-size: 20px; font-weight: 700; }
+        .header-left h1 span { background: var(--gradient-1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .header-badge { padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; background: rgba(139,92,246,0.15); color: var(--accent-purple); border: 1px solid rgba(139,92,246,0.3); }
+        .header-actions { display: flex; gap: 8px; }
+        .btn { padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: all 0.2s; font-family: 'Inter', sans-serif; }
+        .btn-primary { background: var(--gradient-1); color: white; }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(79,140,255,0.4); }
+        .btn-danger { background: rgba(239,68,68,0.15); color: var(--accent-red); border: 1px solid rgba(239,68,68,0.3); }
+        .btn-danger:hover { background: rgba(239,68,68,0.3); }
+        .btn-outline { background: transparent; color: var(--text-secondary); border: 1px solid var(--border-color); }
+        .btn-outline:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+        .btn-sm { padding: 4px 10px; font-size: 11px; }
+
+        /* Layout */
+        .container { max-width: 1400px; margin: 0 auto; padding: 24px 32px; }
+
+        /* Stat Cards */
+        .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-bottom: 24px; }
+        .stat-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; position: relative; overflow: hidden; }
+        .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+        .stat-card.blue::before { background: var(--gradient-1); }
+        .stat-card.green::before { background: var(--gradient-2); }
+        .stat-card.amber::before { background: var(--gradient-3); }
+        .stat-card.purple::before { background: linear-gradient(135deg, #8b5cf6, #ec4899); }
+        .stat-card.cyan::before { background: linear-gradient(135deg, #06b6d4, #22c55e); }
+        .stat-label { font-size: 12px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+        .stat-value { font-size: 28px; font-weight: 800; }
+        .stat-sub { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+
+        /* Main Grid */
+        .main-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 24px; }
+        .panel { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; }
+        .panel-header { padding: 16px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .panel-header h2 { font-size: 15px; font-weight: 600; }
+        .panel-body { padding: 20px; }
+
+        /* Memory Table */
+        .memory-table { width: 100%; border-collapse: collapse; }
+        .memory-table th { text-align: left; padding: 8px 12px; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border-color); }
+        .memory-table td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid rgba(45,52,82,0.5); vertical-align: middle; }
+        .memory-table tr:hover { background: var(--bg-card-hover); }
+
+        /* Salience Bar */
+        .salience-bar { width: 100px; height: 8px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden; position: relative; }
+        .salience-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+        .salience-fill.critical { background: var(--gradient-1); }
+        .salience-fill.strong { background: var(--accent-green); }
+        .salience-fill.moderate { background: var(--accent-amber); }
+        .salience-fill.fading { background: var(--accent-red); opacity: 0.7; }
+        .salience-fill.near_forgotten { background: var(--accent-red); opacity: 0.3; }
+        .salience-value { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+        /* STM Items */
+        .stm-item { background: rgba(245,158,11,0.06); border: 1px solid rgba(245,158,11,0.2); border-radius: 8px; padding: 12px; margin-bottom: 8px; transition: all 0.2s; }
+        .stm-item:hover { background: rgba(245,158,11,0.12); transform: translateX(2px); }
+        .stm-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .stm-item-content { font-size: 13px; color: var(--text-primary); line-height: 1.5; max-height: 60px; overflow: hidden; text-overflow: ellipsis; }
+        .stm-ttl { font-size: 11px; color: var(--accent-amber); font-weight: 500; }
+        .stm-actions { display: flex; gap: 4px; margin-top: 8px; }
+
+        /* Charts */
+        .chart-container { position: relative; height: 220px; }
+
+        /* Config Panel */
+        .config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .config-item { background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; }
+        .config-item label { display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+        .config-item input[type="range"] { width: 100%; accent-color: var(--accent-blue); }
+        .config-item .config-value { font-size: 18px; font-weight: 700; color: var(--accent-blue); }
+
+        /* Tabs */
+        .tabs { display: flex; gap: 4px; margin-bottom: 16px; }
+        .tab { padding: 8px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; background: transparent; color: var(--text-secondary); border: 1px solid transparent; transition: all 0.2s; font-family: 'Inter', sans-serif; }
+        .tab.active { background: rgba(79,140,255,0.1); color: var(--accent-blue); border-color: rgba(79,140,255,0.3); }
+        .tab:hover:not(.active) { background: var(--bg-card-hover); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Toast */
+        .toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 8px; font-size: 13px; color: white; z-index: 999; transform: translateY(100px); opacity: 0; transition: all 0.3s; }
+        .toast.show { transform: translateY(0); opacity: 1; }
+        .toast.success { background: var(--accent-green); }
+        .toast.error { background: var(--accent-red); }
+        .toast.info { background: var(--accent-blue); }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .stats-grid { grid-template-columns: repeat(3, 1fr); }
+            .main-grid { grid-template-columns: 1fr; }
+        }
+
+        /* Animations */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .fade-in { animation: fadeIn 0.3s ease-out; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .pulse { animation: pulse 1.5s infinite; }
+
+        /* Back link */
+        .back-link { color: var(--text-muted); text-decoration: none; font-size: 13px; }
+        .back-link:hover { color: var(--accent-blue); }
+
+        /* Full width panel */
+        .full-width { grid-column: 1 / -1; }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <a href="/" class="back-link">← Dashboard</a>
+            <h1>🧠 <span>Cognitive Memory</span> Manager</h1>
+            <span class="header-badge">Phase 7</span>
+        </div>
+        <div class="header-actions">
+            <a href="/memory/synaptic" class="btn btn-outline" style="text-decoration:none">🌐 시냅스 네트워크</a>
+            <a href="/memory/history" class="btn btn-outline" style="text-decoration:none">📜 변경이력</a>
+            <button class="btn btn-outline" onclick="refreshAll()">🔄 새로고침</button>
+            <button class="btn btn-danger" onclick="runDecay(false)">⏳ 망각 실행</button>
+            <button class="btn btn-primary" onclick="runDecay(true)">🔍 망각 시뮬레이션</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Stat Cards -->
+        <section class="stats-grid fade-in" id="statsGrid">
+            <div class="stat-card blue">
+                <div class="stat-label">단기 기억 (STM)</div>
+                <div class="stat-value" id="stmCount">–</div>
+                <div class="stat-sub" id="stmSub">버퍼 대기 중</div>
+            </div>
+            <div class="stat-card green">
+                <div class="stat-label">장기 기억 (LTM)</div>
+                <div class="stat-value" id="ltmCount">–</div>
+                <div class="stat-sub" id="ltmSub">엔티티 + 관계</div>
+            </div>
+            <div class="stat-card amber">
+                <div class="stat-label">평균 Salience</div>
+                <div class="stat-value" id="avgSalience">–</div>
+                <div class="stat-sub" id="avgSub">기억 건강도</div>
+            </div>
+            <div class="stat-card purple">
+                <div class="stat-label">아카이브 (망각됨)</div>
+                <div class="stat-value" id="archivedCount">–</div>
+                <div class="stat-sub">임계치 이하로 소멸</div>
+            </div>
+            <div class="stat-card cyan">
+                <div class="stat-label">총 인출 횟수</div>
+                <div class="stat-value" id="totalAccesses">–</div>
+                <div class="stat-sub">강화 기여</div>
+            </div>
+        </section>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" data-tab="overview">📊 메모리 분포</button>
+            <button class="tab" data-tab="stm">📋 단기 기억(STM)</button>
+            <button class="tab" data-tab="memories">🧠 기억 목록</button>
+            <button class="tab" data-tab="config">⚙️ 파라미터 설정</button>
+        </div>
+
+        <!-- Tab: Overview -->
+        <div class="tab-content active" id="tab-overview">
+            <div class="main-grid">
+                <!-- Salience Distribution -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>📊 Salience 분포도</h2>
+                        <span style="color:var(--text-muted);font-size:12px">기억 강도 분포</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="chart-container">
+                            <canvas id="distributionChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- At-Risk Memories -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>⚠️ 위험 기억 (곧 망각)</h2>
+                    </div>
+                    <div class="panel-body" id="atRiskList">
+                        <p style="color:var(--text-muted);font-size:13px" class="pulse">로딩 중...</p>
+                    </div>
+                </div>
+
+                <!-- Decay Curve Visualization -->
+                <div class="panel full-width">
+                    <div class="panel-header">
+                        <h2>📉 Ebbinghaus 망각 곡선 시뮬레이션</h2>
+                        <span style="color:var(--text-muted);font-size:12px">현재 decay_rate: <strong id="currentDecayRate">0.95</strong></span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="chart-container" style="height:260px">
+                            <canvas id="decayCurveChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: STM -->
+        <div class="tab-content" id="tab-stm">
+            <div class="main-grid">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>📋 단기 기억 버퍼</h2>
+                        <button class="btn btn-primary btn-sm" onclick="showAddSTMModal()">+ 새 기억 추가</button>
+                    </div>
+                    <div class="panel-body" id="stmList">
+                        <p style="color:var(--text-muted);font-size:13px">비어 있음</p>
+                    </div>
+                </div>
+                <div class="panel">
+                    <div class="panel-header"><h2>단기 기억 추가</h2></div>
+                    <div class="panel-body">
+                        <div style="margin-bottom:12px">
+                            <label style="display:block;font-size:11px;color:var(--text-muted);margin-bottom:4px">내용</label>
+                            <textarea id="stmContentInput" rows="3" style="width:100%;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);padding:10px;font-family:'Inter',sans-serif;font-size:13px;resize:vertical" placeholder="기억할 내용을 입력하세요..."></textarea>
+                        </div>
+                        <div style="margin-bottom:12px">
+                            <label style="display:block;font-size:11px;color:var(--text-muted);margin-bottom:4px">출처</label>
+                            <input type="text" id="stmSourceInput" value="manual" style="width:100%;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);padding:8px 10px;font-size:13px">
+                        </div>
+                        <div style="margin-bottom:12px">
+                            <label style="display:block;font-size:11px;color:var(--text-muted);margin-bottom:4px">TTL (초)</label>
+                            <input type="number" id="stmTTLInput" value="86400" style="width:100%;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);padding:8px 10px;font-size:13px">
+                        </div>
+                        <button class="btn btn-primary" onclick="addToSTM()" style="width:100%">단기 기억에 추가</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Memories -->
+        <div class="tab-content" id="tab-memories">
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>🧠 장기 기억 (LTM) — Salience 순</h2>
+                    <div style="display:flex;gap:8px">
+                        <button class="btn btn-outline btn-sm" onclick="loadMemories('salience')">Salience 순</button>
+                        <button class="btn btn-outline btn-sm" onclick="loadMemories('access')">접근 순</button>
+                        <button class="btn btn-outline btn-sm" onclick="loadWeakest()">가장 약한 기억</button>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <table class="memory-table">
+                        <thead>
+                            <tr>
+                                <th>이름</th>
+                                <th>Salience</th>
+                                <th>접근횟수</th>
+                                <th>마지막 접근</th>
+                                <th>생성일</th>
+                                <th>조작</th>
+                            </tr>
+                        </thead>
+                        <tbody id="memoriesTableBody">
+                            <tr><td colspan="6" style="text-align:center;color:var(--text-muted)">로딩 중...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Config -->
+        <div class="tab-content" id="tab-config">
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>⚙️ 인지 기억 파라미터</h2>
+                    <button class="btn btn-primary btn-sm" onclick="saveConfig()">💾 설정 저장</button>
+                </div>
+                <div class="panel-body">
+                    <div class="config-grid" id="configGrid">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        const API_BASE = window.location.origin + '/api/memory';
+        let distributionChart = null;
+        let decayCurveChart = null;
+
+        // ──── Tabs ────
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+            });
+        });
+
+        // ──── Toast ────
+        function showToast(msg, type = 'info') {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = `toast ${type} show`;
+            setTimeout(() => t.classList.remove('show'), 3000);
+        }
+
+        // ──── API Helpers ────
+        async function apiGet(path) {
+            const res = await fetch(API_BASE + path);
+            return res.json();
+        }
+        async function apiPost(path, body = {}) {
+            const res = await fetch(API_BASE + path, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            return res.json();
+        }
+
+        // ──── Load Overview ────
+        async function loadOverview() {
+            try {
+                const data = await apiGet('/overview');
+
+                // Stats
+                document.getElementById('stmCount').textContent = data.stm.count;
+                document.getElementById('stmSub').textContent = `최대 ${data.stm.max_items}개`;
+                document.getElementById('ltmCount').textContent =
+                    (data.ltm.entity_count + data.ltm.relation_count).toLocaleString();
+                document.getElementById('ltmSub').textContent =
+                    `엔티티 ${data.ltm.entity_count} + 관계 ${data.ltm.relation_count}`;
+                document.getElementById('avgSalience').textContent = data.ltm.avg_salience.toFixed(3);
+                document.getElementById('avgSub').textContent =
+                    `범위: ${data.ltm.min_salience.toFixed(2)} ~ ${data.ltm.max_salience.toFixed(2)}`;
+                document.getElementById('archivedCount').textContent = data.archived_count;
+                document.getElementById('totalAccesses').textContent = (data.ltm.total_accesses || 0).toLocaleString();
+
+                // Distribution Chart
+                renderDistribution(data.distribution);
+
+                // At-Risk
+                renderAtRisk(data.at_risk);
+
+                // Config
+                renderConfig(data.config);
+                document.getElementById('currentDecayRate').textContent = data.config.decay_rate;
+
+                // Decay curve
+                renderDecayCurve(data.config.decay_rate);
+
+                // STM
+                renderSTMList(data.stm.items);
+
+            } catch (e) {
+                console.error('Failed to load overview:', e);
+                showToast('데이터 로딩 실패: ' + e.message, 'error');
+            }
+        }
+
+        // ──── Distribution Chart ────
+        function renderDistribution(dist) {
+            const ctx = document.getElementById('distributionChart').getContext('2d');
+            if (distributionChart) distributionChart.destroy();
+
+            const labels = ['Critical (0.9+)', 'Strong (0.7-0.9)', 'Moderate (0.5-0.7)', 'Fading (0.2-0.5)', 'Near Forgotten (<0.2)'];
+            const keys = ['critical', 'strong', 'moderate', 'fading', 'near_forgotten'];
+            const colors = ['#4f8cff', '#22c55e', '#f59e0b', '#ef4444bb', '#ef444455'];
+            const values = keys.map(k => dist[k] || 0);
+
+            distributionChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: colors,
+                        borderWidth: 0,
+                        hoverOffset: 8,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: { color: '#9aa0b8', font: { size: 12, family: 'Inter' }, padding: 12 }
+                        }
+                    },
+                    cutout: '60%',
+                }
+            });
+        }
+
+        // ──── Decay Curve ────
+        function renderDecayCurve(rate) {
+            const ctx = document.getElementById('decayCurveChart').getContext('2d');
+            if (decayCurveChart) decayCurveChart.destroy();
+
+            const days = Array.from({length: 61}, (_, i) => i);
+            const curves = [
+                { rate: 0.90, label: 'Aggressive (0.90)', color: '#ef4444', dash: [5, 5] },
+                { rate: rate, label: `Current (${rate})`, color: '#4f8cff', dash: [] },
+                { rate: 0.98, label: 'Gentle (0.98)', color: '#22c55e', dash: [5, 5] },
+            ];
+
+            const datasets = curves.map(c => ({
+                label: c.label,
+                data: days.map(d => Math.pow(c.rate, d)),
+                borderColor: c.color,
+                borderDash: c.dash,
+                borderWidth: c.label.includes('Current') ? 3 : 1.5,
+                pointRadius: 0,
+                tension: 0.4,
+                fill: c.label.includes('Current'),
+                backgroundColor: c.label.includes('Current') ? 'rgba(79,140,255,0.08)' : 'transparent',
+            }));
+
+            // Add threshold lines
+            datasets.push({
+                label: 'Archive Threshold (0.05)',
+                data: days.map(() => 0.05),
+                borderColor: '#ef444466',
+                borderDash: [3, 3],
+                borderWidth: 1,
+                pointRadius: 0,
+            });
+            datasets.push({
+                label: 'Warn Threshold (0.20)',
+                data: days.map(() => 0.20),
+                borderColor: '#f59e0b66',
+                borderDash: [3, 3],
+                borderWidth: 1,
+                pointRadius: 0,
+            });
+
+            decayCurveChart = new Chart(ctx, {
+                type: 'line',
+                data: { labels: days.map(d => `${d}일`), datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255,255,255,0.04)' },
+                            ticks: { color: '#6b7394', font: { size: 10 }, maxTicksLimit: 12 },
+                            title: { display: true, text: '마지막 접근 후 경과일', color: '#9aa0b8' },
+                        },
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.04)' },
+                            ticks: { color: '#6b7394', font: { size: 10 } },
+                            title: { display: true, text: 'Salience (기억 강도)', color: '#9aa0b8' },
+                            min: 0, max: 1,
+                        }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#9aa0b8', font: { size: 11, family: 'Inter' } } },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(3)}`
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // ──── At-Risk Memories ────
+        function renderAtRisk(items) {
+            const container = document.getElementById('atRiskList');
+            if (!items || items.length === 0) {
+                container.innerHTML = '<p style="color:var(--text-muted);font-size:13px">위험 상태의 기억이 없습니다 ✨</p>';
+                return;
+            }
+            container.innerHTML = items.map(m => `
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border-color)">
+                    <div>
+                        <div style="font-size:13px;font-weight:500">${escapeHtml(m.name || '(unnamed)')}</div>
+                        <div style="font-size:11px;color:var(--text-muted)">접근: ${m.access_count}회</div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px">
+                        ${renderSalienceBar(m.salience)}
+                        <button class="btn btn-primary btn-sm" onclick="boostMemory('${m.uuid}', 0.2)">💪 강화</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderSalienceBar(val) {
+            const pct = Math.round(val * 100);
+            let cls = 'near_forgotten';
+            if (val >= 0.9) cls = 'critical';
+            else if (val >= 0.7) cls = 'strong';
+            else if (val >= 0.5) cls = 'moderate';
+            else if (val >= 0.2) cls = 'fading';
+            return `
+                <div>
+                    <div class="salience-bar"><div class="salience-fill ${cls}" style="width:${pct}%"></div></div>
+                    <div class="salience-value">${val.toFixed(3)}</div>
+                </div>
+            `;
+        }
+
+        // ──── STM List ────
+        function renderSTMList(items) {
+            const container = document.getElementById('stmList');
+            if (!items || items.length === 0) {
+                container.innerHTML = '<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:32px">단기 기억 버퍼가 비어 있습니다. 새 기억을 추가해보세요.</p>';
+                return;
+            }
+            container.innerHTML = items.map(item => `
+                <div class="stm-item">
+                    <div class="stm-item-header">
+                        <span style="font-size:11px;color:var(--text-muted)">📌 ${escapeHtml(item.source)}</span>
+                        <span class="stm-ttl">⏱ ${item.age_human} / TTL ${Math.round(item.ttl/3600)}h</span>
+                    </div>
+                    <div class="stm-item-content">${escapeHtml(item.content)}</div>
+                    <div class="stm-actions">
+                        <button class="btn btn-primary btn-sm" onclick="promoteSTM('${item.id}')">✅ LTM 승격</button>
+                        <button class="btn btn-danger btn-sm" onclick="discardSTM('${item.id}')">🗑️ 폐기</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // ──── Memories Table ────
+        async function loadMemories(sortBy = 'salience') {
+            try {
+                const data = await apiGet(`/top?limit=30&sort=${sortBy}`);
+                renderMemoriesTable(data);
+            } catch (e) {
+                showToast('기억 로딩 실패', 'error');
+            }
+        }
+
+        async function loadWeakest() {
+            try {
+                const data = await apiGet('/weakest?limit=30');
+                renderMemoriesTable(data);
+            } catch (e) {
+                showToast('기억 로딩 실패', 'error');
+            }
+        }
+
+        function renderMemoriesTable(data) {
+            const tbody = document.getElementById('memoriesTableBody');
+            if (!data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">기억이 없습니다</td></tr>';
+                return;
+            }
+            tbody.innerHTML = data.map(m => `
+                <tr>
+                    <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(m.name || '')}">${escapeHtml(m.name || '(unnamed)')}</td>
+                    <td>${renderSalienceBar(m.salience || 0)}</td>
+                    <td style="text-align:center">${m.access_count || 0}</td>
+                    <td style="font-size:11px;color:var(--text-muted)">${formatDate(m.last_accessed)}</td>
+                    <td style="font-size:11px;color:var(--text-muted)">${formatDate(m.created_at)}</td>
+                    <td>
+                        <div style="display:flex;gap:4px">
+                            <button class="btn btn-primary btn-sm" onclick="boostMemory('${m.uuid}', 0.1)" title="강화">💪</button>
+                            <button class="btn btn-danger btn-sm" onclick="boostMemory('${m.uuid}', -0.3)" title="약화">📉</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // ──── Config Panel ────
+        const CONFIG_LABELS = {
+            decay_rate: { label: '일일 감쇠율', min: 0.8, max: 1.0, step: 0.01, icon: '📉' },
+            decay_archive_threshold: { label: '아카이브 임계치', min: 0, max: 0.3, step: 0.01, icon: '🗄️' },
+            decay_warn_threshold: { label: '경고 임계치', min: 0.1, max: 0.5, step: 0.01, icon: '⚠️' },
+            retrieval_boost: { label: '인출 보상량', min: 0.01, max: 0.3, step: 0.01, icon: '💪' },
+            auto_promote_threshold: { label: '자동 승격 임계치', min: 0.5, max: 1.0, step: 0.05, icon: '⬆️' },
+            auto_discard_threshold: { label: '자동 폐기 임계치', min: 0.0, max: 0.5, step: 0.05, icon: '⬇️' },
+            stm_default_ttl: { label: 'STM 기본 TTL (초)', min: 3600, max: 604800, step: 3600, icon: '⏱' },
+            stm_max_items: { label: 'STM 최대 항목수', min: 10, max: 500, step: 10, icon: '📋' },
+        };
+
+        function renderConfig(config) {
+            const grid = document.getElementById('configGrid');
+            grid.innerHTML = Object.entries(CONFIG_LABELS).map(([key, meta]) => {
+                const val = config[key] !== undefined ? config[key] : 0;
+                return `
+                    <div class="config-item">
+                        <label>${meta.icon} ${meta.label}</label>
+                        <div class="config-value" id="configVal_${key}">${val}</div>
+                        <input type="range" id="configRange_${key}"
+                               min="${meta.min}" max="${meta.max}" step="${meta.step}" value="${val}"
+                               oninput="document.getElementById('configVal_${key}').textContent = this.value">
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ──── Actions ────
+        async function addToSTM() {
+            const content = document.getElementById('stmContentInput').value.trim();
+            const source = document.getElementById('stmSourceInput').value.trim();
+            const ttl = parseInt(document.getElementById('stmTTLInput').value);
+            if (!content) return showToast('내용을 입력해주세요', 'error');
+
+            const result = await apiPost('/stm/add', { content, source, ttl });
+            showToast(`STM에 추가됨 (ID: ${result.id?.substring(0, 8)}...)`, 'success');
+            document.getElementById('stmContentInput').value = '';
+            loadOverview();
+        }
+
+        async function promoteSTM(id) {
+            const result = await apiPost('/stm/promote', { id });
+            if (result.error) return showToast(result.error, 'error');
+            showToast(`LTM으로 승격됨! (salience: ${result.salience})`, 'success');
+            loadOverview();
+        }
+
+        async function discardSTM(id) {
+            const result = await apiPost('/stm/discard', { id });
+            showToast('단기 기억 폐기됨', 'info');
+            loadOverview();
+        }
+
+        async function boostMemory(uuid, amount) {
+            const result = await apiPost('/boost', { uuid, amount });
+            if (result.error) return showToast(result.error, 'error');
+            showToast(`${result.name}: salience → ${result.salience?.toFixed(3)}`, 'success');
+            loadOverview();
+            loadMemories();
+        }
+
+        async function runDecay(dryRun) {
+            showToast(dryRun ? '망각 시뮬레이션 중...' : '🧹 망각 실행 중...', 'info');
+            const result = await apiPost('/decay', { dry_run: dryRun });
+            const msg = `처리: ${result.total_processed} | 감쇠: ${result.decayed} | 아카이브: ${result.archived} | 경고: ${result.warned}`;
+            showToast(dryRun ? `[시뮬레이션] ${msg}` : msg, dryRun ? 'info' : 'success');
+            if (!dryRun) loadOverview();
+        }
+
+        async function saveConfig() {
+            const updates = {};
+            for (const key of Object.keys(CONFIG_LABELS)) {
+                const el = document.getElementById(`configRange_${key}`);
+                if (el) updates[key] = parseFloat(el.value);
+            }
+            const result = await apiPost('/config', updates);
+            showToast('설정이 저장되었습니다!', 'success');
+            renderDecayCurve(result.decay_rate);
+        }
+
+        // ──── Helpers ────
+        function escapeHtml(str) {
+            if (!str) return '';
+            const d = document.createElement('div');
+            d.textContent = str;
+            return d.innerHTML;
+        }
+
+        function formatDate(d) {
+            if (!d) return '–';
+            try {
+                return new Date(d).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            } catch { return d; }
+        }
+
+        function refreshAll() {
+            loadOverview();
+            loadMemories();
+            showToast('새로고침 완료', 'info');
+        }
+
+        // ──── Init ────
+        loadOverview();
+        loadMemories();
+    </script>
+</body>
+</html>

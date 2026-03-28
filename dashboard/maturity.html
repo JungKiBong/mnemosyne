@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mnemosyne — Knowledge Maturity & Security</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0a0e1a;
+            --bg-secondary: #111827;
+            --bg-card: #1a1f35;
+            --bg-card-hover: #222845;
+            --text-primary: #e8eaed;
+            --text-secondary: #9aa0b8;
+            --text-muted: #6b7394;
+            --accent-blue: #4f8cff;
+            --accent-purple: #8b5cf6;
+            --accent-green: #22c55e;
+            --accent-amber: #f59e0b;
+            --accent-red: #ef4444;
+            --accent-cyan: #06b6d4;
+            --accent-pink: #ec4899;
+            --border-color: #2d3452;
+            --gradient-1: linear-gradient(135deg, #4f8cff 0%, #8b5cf6 100%);
+            --gradient-2: linear-gradient(135deg, #22c55e 0%, #06b6d4 100%);
+            --gradient-3: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
+            --shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; }
+
+        /* Header */
+        .header {
+            background: linear-gradient(180deg, rgba(79, 140, 255, 0.08) 0%, transparent 100%);
+            border-bottom: 1px solid var(--border-color);
+            padding: 16px 32px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .header-left { display: flex; align-items: center; gap: 16px; }
+        .header-left h1 { font-size: 20px; font-weight: 700; }
+        .header-left h1 span { background: var(--gradient-1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .header-badge { padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+        .badge-maturity { background: rgba(236,72,153,0.15); color: var(--accent-pink); border: 1px solid rgba(236,72,153,0.3); }
+        .header-nav { display: flex; gap: 8px; }
+        .header-nav a { padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 500; color: var(--text-secondary); text-decoration: none; border: 1px solid var(--border-color); transition: all 0.2s; }
+        .header-nav a:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+        .btn { padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: all 0.2s; font-family: 'Inter', sans-serif; }
+        .btn-primary { background: var(--gradient-1); color: white; }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(79,140,255,0.4); }
+        .btn-outline { background: transparent; color: var(--text-secondary); border: 1px solid var(--border-color); }
+        .btn-outline:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+        .btn-sm { padding: 4px 10px; font-size: 11px; }
+        .btn-danger { background: rgba(239,68,68,0.15); color: var(--accent-red); border: 1px solid rgba(239,68,68,0.3); }
+        .btn-success { background: rgba(34,197,94,0.15); color: var(--accent-green); border: 1px solid rgba(34,197,94,0.3); }
+
+        .container { max-width: 1440px; margin: 0 auto; padding: 24px 32px; }
+
+        /* Stat Cards */
+        .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-bottom: 24px; }
+        .stat-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; position: relative; overflow: hidden; }
+        .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+        .stat-card.learning::before { background: var(--accent-cyan); }
+        .stat-card.unstable::before { background: var(--accent-amber); }
+        .stat-card.mature::before { background: var(--accent-green); }
+        .stat-card.secret::before { background: var(--accent-red); }
+        .stat-card.total::before { background: var(--gradient-1); }
+        .stat-emoji { font-size: 28px; margin-bottom: 8px; }
+        .stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .stat-value { font-size: 32px; font-weight: 800; }
+        .stat-sub { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+
+        /* Charts Row */
+        .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+        .chart-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; }
+        .chart-title { font-size: 14px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+
+        /* Matrix Table */
+        .matrix-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-bottom: 24px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border-color); font-size: 13px; }
+        th { color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+        td { color: var(--text-secondary); }
+        tr:hover td { background: rgba(79,140,255,0.03); }
+
+        /* Memory List */
+        .memory-list { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; margin-bottom: 24px; overflow: hidden; }
+        .list-header { padding: 16px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .list-title { font-size: 14px; font-weight: 600; }
+
+        /* Tabs */
+        .tabs { display: flex; gap: 4px; margin-bottom: 24px; }
+        .tab { padding: 8px 20px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid var(--border-color); background: transparent; color: var(--text-secondary); transition: all 0.2s; font-family: 'Inter', sans-serif; }
+        .tab.active { background: var(--gradient-1); color: white; border-color: transparent; }
+        .tab:hover:not(.active) { background: var(--bg-card-hover); }
+
+        /* Maturity Badge */
+        .mat-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+        .mat-badge.learning { background: rgba(6,182,212,0.15); color: var(--accent-cyan); }
+        .mat-badge.unstable { background: rgba(245,158,11,0.15); color: var(--accent-amber); }
+        .mat-badge.mature { background: rgba(34,197,94,0.15); color: var(--accent-green); }
+        .mat-badge.secret { background: rgba(239,68,68,0.15); color: var(--accent-red); }
+
+        /* Salience bar */
+        .sal-bar { width: 60px; height: 6px; border-radius: 3px; background: var(--bg-secondary); overflow: hidden; display: inline-block; vertical-align: middle; }
+        .sal-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+
+        /* Access Rule Cards */
+        .rules-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+        .rule-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; text-align: center; }
+        .rule-emoji { font-size: 36px; margin-bottom: 8px; }
+        .rule-level { font-size: 14px; font-weight: 700; text-transform: capitalize; margin-bottom: 8px; }
+        .rule-item { font-size: 11px; color: var(--text-secondary); padding: 3px 0; }
+        .rule-yes { color: var(--accent-green); }
+        .rule-no { color: var(--accent-red); }
+
+        /* Toast */
+        .toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 24px; border-radius: 8px; font-size: 13px; font-weight: 500; background: var(--accent-green); color: white; box-shadow: var(--shadow); opacity: 0; transform: translateY(20px); transition: all 0.3s; z-index: 100; }
+        .toast.show { opacity: 1; transform: translateY(0); }
+
+        /* Modal */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); display: none; z-index: 50; justify-content: center; align-items: center; }
+        .modal-overlay.show { display: flex; }
+        .modal { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 24px; max-width: 480px; width: 90%; }
+        .modal h3 { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+        .modal label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; margin-top: 12px; }
+        .modal select, .modal input, .modal textarea { width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary); font-family: 'Inter', sans-serif; font-size: 13px; }
+        .modal-actions { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
+
+        @media (max-width: 1200px) { .stats-grid { grid-template-columns: repeat(3, 1fr); } .rules-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 768px) { .stats-grid { grid-template-columns: 1fr 1fr; } .charts-row { grid-template-columns: 1fr; } .rules-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+    <div class="header-left">
+        <h1>🧠 <span>Mnemosyne</span></h1>
+        <span class="header-badge badge-maturity">Knowledge Maturity</span>
+    </div>
+    <div class="header-nav">
+        <a href="/dashboard">📊 Overview</a>
+        <a href="/dashboard/memory.html">🧬 Memory</a>
+        <a href="/dashboard/synaptic.html">🔗 Synaptic</a>
+        <a href="/dashboard/maturity.html" style="background:var(--accent-pink);color:white;border-color:transparent;">🌱 Maturity</a>
+    </div>
+</div>
+
+<div class="container">
+
+    <!-- Stat Cards -->
+    <div class="stats-grid" id="stats-grid">
+        <div class="stat-card total">
+            <div class="stat-emoji">📊</div>
+            <div class="stat-label">Total Memories</div>
+            <div class="stat-value" id="stat-total">—</div>
+        </div>
+        <div class="stat-card learning">
+            <div class="stat-emoji">🌱</div>
+            <div class="stat-label">Learning</div>
+            <div class="stat-value" id="stat-learning">—</div>
+            <div class="stat-sub">개인 전용 · 접근 차단</div>
+        </div>
+        <div class="stat-card unstable">
+            <div class="stat-emoji">⚡</div>
+            <div class="stat-label">Unstable</div>
+            <div class="stat-value" id="stat-unstable">—</div>
+            <div class="stat-sub">검증 대기 · 팀 읽기만</div>
+        </div>
+        <div class="stat-card mature">
+            <div class="stat-emoji">✅</div>
+            <div class="stat-label">Mature</div>
+            <div class="stat-value" id="stat-mature">—</div>
+            <div class="stat-sub">공유 가능 · 집단 지성</div>
+        </div>
+        <div class="stat-card secret">
+            <div class="stat-emoji">🔒</div>
+            <div class="stat-label">Secret</div>
+            <div class="stat-value" id="stat-secret">—</div>
+            <div class="stat-sub">암호화 · Admin만 접근</div>
+        </div>
+    </div>
+
+    <!-- Access Rules -->
+    <div class="rules-grid" id="rules-grid">
+        <div class="rule-card">
+            <div class="rule-emoji">🌱</div>
+            <div class="rule-level">Learning</div>
+            <div class="rule-item">👤 <span class="rule-yes">Owner만 접근</span></div>
+            <div class="rule-item">🔍 <span class="rule-no">검색 불가</span></div>
+            <div class="rule-item">📤 <span class="rule-no">공유 불가</span></div>
+            <div class="rule-item">🔐 <span class="rule-no">암호화 없음</span></div>
+        </div>
+        <div class="rule-card">
+            <div class="rule-emoji">⚡</div>
+            <div class="rule-level">Unstable</div>
+            <div class="rule-item">👥 <span class="rule-yes">팀원 읽기 가능</span></div>
+            <div class="rule-item">🔍 <span class="rule-no">검색 제외</span></div>
+            <div class="rule-item">📤 <span class="rule-no">공유 불가</span></div>
+            <div class="rule-item">🔐 <span class="rule-no">암호화 없음</span></div>
+        </div>
+        <div class="rule-card">
+            <div class="rule-emoji">✅</div>
+            <div class="rule-level">Mature</div>
+            <div class="rule-item">🌐 <span class="rule-yes">전체 접근 가능</span></div>
+            <div class="rule-item">🔍 <span class="rule-yes">검색 포함</span></div>
+            <div class="rule-item">📤 <span class="rule-yes">공유 가능</span></div>
+            <div class="rule-item">🔐 <span class="rule-no">암호화 선택</span></div>
+        </div>
+        <div class="rule-card">
+            <div class="rule-emoji">🔒</div>
+            <div class="rule-level">Secret</div>
+            <div class="rule-item">🛡️ <span class="rule-yes">Admin만 접근</span></div>
+            <div class="rule-item">🔍 <span class="rule-no">검색 제외</span></div>
+            <div class="rule-item">📤 <span class="rule-no">공유 불가</span></div>
+            <div class="rule-item">🔐 <span class="rule-yes">자동 암호화</span></div>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-row">
+        <div class="chart-card">
+            <div class="chart-title">📊 성숙도 분포</div>
+            <canvas id="maturityChart" height="200"></canvas>
+        </div>
+        <div class="chart-card">
+            <div class="chart-title">🗂️ 스코프 × 성숙도 매트릭스</div>
+            <canvas id="matrixChart" height="200"></canvas>
+        </div>
+    </div>
+
+    <!-- Tabs + Memory List -->
+    <div class="tabs">
+        <button class="tab active" data-level="all" onclick="switchTab('all',this)">전체</button>
+        <button class="tab" data-level="learning" onclick="switchTab('learning',this)">🌱 Learning</button>
+        <button class="tab" data-level="unstable" onclick="switchTab('unstable',this)">⚡ Unstable</button>
+        <button class="tab" data-level="mature" onclick="switchTab('mature',this)">✅ Mature</button>
+        <button class="tab" data-level="secret" onclick="switchTab('secret',this)">🔒 Secret</button>
+    </div>
+
+    <div class="memory-list">
+        <div class="list-header">
+            <span class="list-title" id="list-title">전체 기억</span>
+            <div style="display:flex;gap:8px;">
+                <button class="btn btn-success btn-sm" onclick="runPromotions()">⬆️ 자동 승격 실행</button>
+                <button class="btn btn-outline btn-sm" onclick="openSetModal()">✏️ 성숙도 변경</button>
+            </div>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>성숙도</th>
+                    <th>이름</th>
+                    <th>Salience</th>
+                    <th>스코프</th>
+                    <th>접근 수</th>
+                    <th>암호화</th>
+                    <th>작업</th>
+                </tr>
+            </thead>
+            <tbody id="memory-tbody"></tbody>
+        </table>
+    </div>
+
+    <!-- Recent Changes -->
+    <div class="matrix-card">
+        <div class="chart-title">📜 최근 성숙도 변경 이력</div>
+        <table>
+            <thead>
+                <tr><th>이름</th><th>성숙도</th><th>스코프</th><th>Salience</th><th>변경자</th><th>시간</th></tr>
+            </thead>
+            <tbody id="changes-tbody"></tbody>
+        </table>
+    </div>
+
+    <!-- Scope Matrix Table -->
+    <div class="matrix-card">
+        <div class="chart-title">🗂️ 스코프 × 성숙도 상세 매트릭스</div>
+        <table id="scope-matrix-table">
+            <thead>
+                <tr><th>Scope</th><th>🌱 Learning</th><th>⚡ Unstable</th><th>✅ Mature</th><th>🔒 Secret</th><th>Total</th></tr>
+            </thead>
+            <tbody id="matrix-tbody"></tbody>
+        </table>
+    </div>
+
+</div><!-- container -->
+
+<!-- Set Maturity Modal -->
+<div class="modal-overlay" id="setModal">
+    <div class="modal">
+        <h3>✏️ 기억 성숙도 변경</h3>
+        <label>기억 UUID</label>
+        <input id="modal-uuid" placeholder="UUID 입력..." />
+        <label>새 성숙도</label>
+        <select id="modal-level">
+            <option value="learning">🌱 Learning — 학습 중 (접근 차단)</option>
+            <option value="unstable">⚡ Unstable — 검증 대기</option>
+            <option value="mature">✅ Mature — 공유 가능</option>
+            <option value="secret">🔒 Secret — 비밀 (자동 암호화)</option>
+        </select>
+        <label>변경 사유</label>
+        <textarea id="modal-reason" rows="2" placeholder="사유 입력..."></textarea>
+        <div class="modal-actions">
+            <button class="btn btn-outline" onclick="closeSetModal()">취소</button>
+            <button class="btn btn-primary" onclick="submitSetMaturity()">변경</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '';
+let overviewData = null;
+let maturityChart = null;
+let matrixChart = null;
+
+async function fetchJSON(url, opts) {
+    const res = await fetch(url, opts);
+    return res.json();
+}
+
+function showToast(msg, isError) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.background = isError ? 'var(--accent-red)' : 'var(--accent-green)';
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ── Load Overview ──
+async function loadOverview() {
+    overviewData = await fetchJSON(`${API}/api/maturity/overview`);
+    const m = overviewData.maturity || {};
+
+    let total = 0;
+    ['learning','unstable','mature','secret'].forEach(lv => {
+        const cnt = m[lv]?.count || 0;
+        document.getElementById(`stat-${lv}`).textContent = cnt;
+        total += cnt;
+    });
+    document.getElementById('stat-total').textContent = total;
+
+    renderMaturityChart(m);
+    renderMatrixChart(overviewData.scope_matrix);
+    renderChanges(overviewData.recent_changes);
+    renderScopeMatrix(overviewData.scope_matrix);
+}
+
+// ── Charts ──
+function renderMaturityChart(m) {
+    const ctx = document.getElementById('maturityChart').getContext('2d');
+    if (maturityChart) maturityChart.destroy();
+
+    const labels = ['Learning', 'Unstable', 'Mature', 'Secret'];
+    const data = [m.learning?.count||0, m.unstable?.count||0, m.mature?.count||0, m.secret?.count||0];
+    const colors = ['#06b6d4', '#f59e0b', '#22c55e', '#ef4444'];
+
+    maturityChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 0 }] },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'bottom', labels: { color: '#9aa0b8', font: { family: 'Inter', size: 12 } } }
+            },
+            cutout: '65%',
+        }
+    });
+}
+
+function renderMatrixChart(matrix) {
+    const ctx = document.getElementById('matrixChart').getContext('2d');
+    if (matrixChart) matrixChart.destroy();
+
+    const scopes = Object.keys(matrix);
+    const levels = ['learning', 'unstable', 'mature', 'secret'];
+    const colors = { learning: '#06b6d4', unstable: '#f59e0b', mature: '#22c55e', secret: '#ef4444' };
+
+    const datasets = levels.map(lv => ({
+        label: lv.charAt(0).toUpperCase() + lv.slice(1),
+        data: scopes.map(s => matrix[s]?.[lv] || 0),
+        backgroundColor: colors[lv],
+        borderRadius: 4,
+    }));
+
+    matrixChart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: scopes.map(s => s.charAt(0).toUpperCase() + s.slice(1)), datasets },
+        options: {
+            responsive: true,
+            scales: {
+                x: { stacked: true, ticks: { color: '#9aa0b8' }, grid: { display: false } },
+                y: { stacked: true, ticks: { color: '#9aa0b8' }, grid: { color: 'rgba(45,52,82,0.4)' } }
+            },
+            plugins: {
+                legend: { position: 'bottom', labels: { color: '#9aa0b8', font: { family: 'Inter', size: 11 } } }
+            },
+        }
+    });
+}
+
+// ── Scope Matrix Table ──
+function renderScopeMatrix(matrix) {
+    const tbody = document.getElementById('matrix-tbody');
+    const levels = ['learning', 'unstable', 'mature', 'secret'];
+    tbody.innerHTML = '';
+    Object.keys(matrix).forEach(scope => {
+        let total = 0;
+        let row = `<tr><td style="font-weight:600;text-transform:capitalize">${scope}</td>`;
+        levels.forEach(lv => {
+            const cnt = matrix[scope]?.[lv] || 0;
+            total += cnt;
+            row += `<td>${cnt || '<span style="color:#6b7394">-</span>'}</td>`;
+        });
+        row += `<td style="font-weight:700">${total}</td></tr>`;
+        tbody.innerHTML += row;
+    });
+}
+
+// ── Recent Changes ──
+function renderChanges(changes) {
+    const tbody = document.getElementById('changes-tbody');
+    tbody.innerHTML = '';
+    (changes || []).forEach(c => {
+        const emoji = {learning:'🌱',unstable:'⚡',mature:'✅',secret:'🔒'}[c.maturity] || '❓';
+        const time = c.changed_at ? new Date(c.changed_at).toLocaleString('ko-KR') : '-';
+        tbody.innerHTML += `<tr>
+            <td title="${c.uuid}">${(c.name||'').substring(0,40)}</td>
+            <td><span class="mat-badge ${c.maturity}">${emoji} ${c.maturity}</span></td>
+            <td>${c.scope}</td>
+            <td>${(c.salience||0).toFixed(3)}</td>
+            <td>${c.changed_by || 'system'}</td>
+            <td style="font-size:11px;color:var(--text-muted)">${time}</td>
+        </tr>`;
+    });
+    if (!changes?.length) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">변경 이력 없음</td></tr>';
+}
+
+// ── Memory List ──
+let currentLevel = 'all';
+
+async function switchTab(level, btn) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    currentLevel = level;
+
+    const titles = { all:'전체 기억', learning:'🌱 Learning 기억', unstable:'⚡ Unstable 기억', mature:'✅ Mature 기억', secret:'🔒 Secret 기억' };
+    document.getElementById('list-title').textContent = titles[level] || level;
+
+    await loadMemoryList(level);
+}
+
+async function loadMemoryList(level) {
+    let memories = [];
+    if (level === 'all') {
+        // Load all levels
+        for (const lv of ['learning','unstable','mature','secret']) {
+            try {
+                const data = await fetchJSON(`${API}/api/maturity/list/${lv}?limit=20`);
+                memories = memories.concat(data.memories || []);
+            } catch(e) {}
+        }
+        memories.sort((a,b) => (b.salience||0)-(a.salience||0));
+    } else {
+        const data = await fetchJSON(`${API}/api/maturity/list/${level}?limit=50`);
+        memories = data.memories || [];
+    }
+
+    const tbody = document.getElementById('memory-tbody');
+    tbody.innerHTML = '';
+
+    memories.forEach(mem => {
+        const mat = mem.maturity || (level !== 'all' ? level : 'learning');
+        const emoji = {learning:'🌱',unstable:'⚡',mature:'✅',secret:'🔒'}[mat] || '❓';
+        const sal = mem.salience || 0;
+        const salColor = sal >= 0.7 ? 'var(--accent-green)' : sal >= 0.4 ? 'var(--accent-amber)' : 'var(--accent-red)';
+        const encrypted = mem.encrypted ? '🔐' : '—';
+
+        tbody.innerHTML += `<tr>
+            <td><span class="mat-badge ${mat}">${emoji} ${mat}</span></td>
+            <td title="${mem.uuid}" style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(mem.name||'').substring(0,50)}</td>
+            <td>
+                <span class="sal-bar"><span class="sal-fill" style="width:${sal*100}%;background:${salColor}"></span></span>
+                <span style="font-size:11px;margin-left:4px">${sal.toFixed(3)}</span>
+            </td>
+            <td><span class="mat-badge" style="background:rgba(139,92,246,0.1);color:var(--accent-purple)">${mem.scope}</span></td>
+            <td>${mem.access_count || 0}</td>
+            <td>${encrypted}</td>
+            <td>
+                <button class="btn btn-outline btn-sm" onclick="setMaturityQuick('${mem.uuid}','mature')" title="Mature로 승격">✅</button>
+                <button class="btn btn-danger btn-sm" onclick="setMaturityQuick('${mem.uuid}','secret')" title="Secret 지정">🔒</button>
+            </td>
+        </tr>`;
+    });
+
+    if (!memories.length) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted)">해당 성숙도의 기억이 없습니다</td></tr>';
+    }
+}
+
+// ── Actions ──
+async function setMaturityQuick(uuid, level) {
+    const result = await fetchJSON(`${API}/api/maturity/set`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ uuid, level, changed_by: 'dashboard-admin' }),
+    });
+
+    if (result.status === 'updated') {
+        showToast(`${result.name?.substring(0,30)} → ${level}`);
+        await loadOverview();
+        await loadMemoryList(currentLevel);
+    } else {
+        showToast(result.error || 'Failed', true);
+    }
+}
+
+async function runPromotions() {
+    const result = await fetchJSON(`${API}/api/maturity/check-promotions`, {
+        method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}',
+    });
+    showToast(`자동 승격: ${result.promoted}건 처리됨`);
+    await loadOverview();
+    await loadMemoryList(currentLevel);
+}
+
+function openSetModal() { document.getElementById('setModal').classList.add('show'); }
+function closeSetModal() { document.getElementById('setModal').classList.remove('show'); }
+
+async function submitSetMaturity() {
+    const uuid = document.getElementById('modal-uuid').value.trim();
+    const level = document.getElementById('modal-level').value;
+    const reason = document.getElementById('modal-reason').value.trim();
+
+    if (!uuid) return showToast('UUID를 입력해주세요', true);
+
+    const result = await fetchJSON(`${API}/api/maturity/set`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ uuid, level, changed_by: 'dashboard-admin', reason }),
+    });
+
+    if (result.status === 'updated') {
+        showToast(`${result.name?.substring(0,30)} → ${level}`);
+        closeSetModal();
+        await loadOverview();
+        await loadMemoryList(currentLevel);
+    } else {
+        showToast(result.error || 'Failed', true);
+    }
+}
+
+// ── Init ──
+(async function init() {
+    await loadOverview();
+    await loadMemoryList('all');
+    // Auto refresh every 30s
+    setInterval(loadOverview, 30000);
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+*.whl
+
+# Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment
+.env
+!.env.example
+
+# Testing
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+*.cover
+
+# Neo4j local data (Docker volume)
+neo4j_data/
+neo4j_logs/
+
+# Byte-compiled
+*.pyc
+
+# Distribution
+*.tar.gz
+*.zip
+
+# Logs
+*.log
+logs/
+
+# Temporary
+tmp/
+temp/
+references/MiroFish-Offline/
+references/supermemory/

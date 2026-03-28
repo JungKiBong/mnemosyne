@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mnemosyne — Memory Intelligence Dashboard</title>
+  <meta name="description" content="MiroFish × Supermemory Hybrid Memory System Dashboard">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg-primary: #0a0a0f;
+      --bg-secondary: #12121a;
+      --bg-card: #16161f;
+      --bg-card-hover: #1c1c28;
+      --border: #2a2a3a;
+      --border-active: #4a4aff;
+      --text-primary: #e8e8f0;
+      --text-secondary: #8888a0;
+      --text-muted: #555568;
+      --accent-blue: #4a7dff;
+      --accent-purple: #8b5cf6;
+      --accent-cyan: #06b6d4;
+      --accent-orange: #f97316;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-pink: #ec4899;
+      --gradient-primary: linear-gradient(135deg, #4a7dff 0%, #8b5cf6 100%);
+      --gradient-warm: linear-gradient(135deg, #f97316 0%, #ec4899 100%);
+      --glass: rgba(22, 22, 31, 0.7);
+      --radius: 12px;
+      --radius-sm: 8px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.3);
+    }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ========== ANIMATED BG ========== */
+    .bg-grid {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background-image:
+        linear-gradient(rgba(74,125,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(74,125,255,0.03) 1px, transparent 1px);
+      background-size: 60px 60px;
+    }
+    .bg-glow {
+      position: fixed; top: -200px; right: -200px; width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(139,92,246,0.08) 0%, transparent 70%);
+      z-index: 0; pointer-events: none; animation: float 20s ease-in-out infinite;
+    }
+    @keyframes float { 0%,100% { transform: translate(0,0); } 50% { transform: translate(-80px, 80px); } }
+
+    /* ========== LAYOUT ========== */
+    .app { position: relative; z-index: 1; }
+
+    .topbar {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 16px 32px; border-bottom: 1px solid var(--border);
+      background: var(--glass); backdrop-filter: blur(20px);
+      position: sticky; top: 0; z-index: 100;
+    }
+    .topbar-brand {
+      display: flex; align-items: center; gap: 12px;
+    }
+    .topbar-brand .logo {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: var(--gradient-primary);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px;
+    }
+    .topbar-brand h1 {
+      font-size: 18px; font-weight: 700; letter-spacing: -0.3px;
+    }
+    .topbar-brand span {
+      font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;
+      background: var(--bg-card); padding: 2px 8px; border-radius: 4px;
+    }
+
+    .topbar-status {
+      display: flex; gap: 16px; align-items: center;
+    }
+    .status-pill {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 14px; border-radius: 20px; font-size: 12px;
+      font-family: 'JetBrains Mono', monospace; font-weight: 500;
+      background: var(--bg-card); border: 1px solid var(--border);
+    }
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+    .status-dot.green { background: var(--accent-green); }
+    .status-dot.yellow { background: var(--accent-orange); }
+    .status-dot.red { background: var(--accent-red); }
+    @keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+    .main-content { padding: 24px 32px; max-width: 1600px; margin: 0 auto; }
+
+    /* ========== TABS ========== */
+    .tabs {
+      display: flex; gap: 4px; margin-bottom: 24px;
+      background: var(--bg-secondary); padding: 4px; border-radius: 10px;
+      width: fit-content;
+    }
+    .tab {
+      padding: 8px 20px; border-radius: 8px; font-size: 13px; font-weight: 500;
+      cursor: pointer; transition: all 0.25s; color: var(--text-secondary);
+      border: none; background: none; font-family: inherit;
+    }
+    .tab.active {
+      background: var(--accent-blue); color: white; box-shadow: 0 2px 12px rgba(74,125,255,0.3);
+    }
+    .tab:not(.active):hover { color: var(--text-primary); background: var(--bg-card); }
+
+    /* ========== OVERVIEW TAB ========== */
+    .stats-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 20px 24px; transition: all 0.3s;
+    }
+    .stat-card:hover { border-color: var(--border-active); transform: translateY(-2px); box-shadow: var(--shadow); }
+    .stat-card .label {
+      font-size: 12px; color: var(--text-muted); text-transform: uppercase;
+      font-family: 'JetBrains Mono', monospace; letter-spacing: 0.5px; margin-bottom: 8px;
+    }
+    .stat-card .value {
+      font-size: 32px; font-weight: 700; letter-spacing: -1px;
+      background: var(--gradient-primary); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .stat-card .change {
+      font-size: 11px; color: var(--accent-green); margin-top: 4px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .dashboard-grid {
+      display: grid; grid-template-columns: 2fr 1fr; gap: 20px;
+    }
+
+    /* ========== PANELS ========== */
+    .panel {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden;
+    }
+    .panel-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+    }
+    .panel-title {
+      font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px;
+    }
+    .panel-title .icon {
+      width: 24px; height: 24px; border-radius: 6px;
+      display: flex; align-items: center; justify-content: center; font-size: 13px;
+    }
+    .panel-badge {
+      font-size: 10px; padding: 3px 8px; border-radius: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      background: rgba(74,125,255,0.15); color: var(--accent-blue);
+    }
+    .panel-body { padding: 16px 20px; }
+
+    /* ========== MEMORY TIMELINE ========== */
+    .timeline { display: flex; flex-direction: column; gap: 0; }
+    .timeline-item {
+      display: flex; gap: 16px; padding: 12px 0;
+      border-bottom: 1px solid rgba(42,42,58,0.5);
+      transition: background 0.2s; cursor: default;
+    }
+    .timeline-item:hover { background: var(--bg-card-hover); margin: 0 -20px; padding: 12px 20px; }
+    .timeline-item:last-child { border-bottom: none; }
+    .timeline-time {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      color: var(--text-muted); min-width: 56px; padding-top: 2px;
+    }
+    .timeline-dot-col { display: flex; flex-direction: column; align-items: center; }
+    .timeline-dot {
+      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+      border: 2px solid; margin-top: 4px;
+    }
+    .timeline-dot.personal { border-color: var(--accent-cyan); background: rgba(6,182,212,0.3); }
+    .timeline-dot.event { border-color: var(--accent-orange); background: rgba(249,115,22,0.3); }
+    .timeline-dot.social { border-color: var(--accent-pink); background: rgba(236,72,153,0.3); }
+    .timeline-content { flex: 1; }
+    .timeline-agent {
+      font-size: 12px; font-weight: 600; color: var(--accent-blue); margin-bottom: 2px;
+    }
+    .timeline-text { font-size: 13px; line-height: 1.5; color: var(--text-secondary); }
+    .timeline-tag {
+      display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace; margin-top: 4px;
+    }
+    .timeline-tag.personal { background: rgba(6,182,212,0.12); color: var(--accent-cyan); }
+    .timeline-tag.event { background: rgba(249,115,22,0.12); color: var(--accent-orange); }
+    .timeline-tag.social { background: rgba(236,72,153,0.12); color: var(--accent-pink); }
+
+    /* ========== AGENT CARDS ========== */
+    .agents-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;
+    }
+    .agent-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px; transition: all 0.3s;
+    }
+    .agent-card:hover { border-color: var(--accent-purple); transform: translateY(-2px); box-shadow: var(--shadow); }
+    .agent-card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .agent-avatar {
+      width: 40px; height: 40px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 16px; color: white;
+    }
+    .agent-name { font-weight: 600; font-size: 15px; }
+    .agent-id { font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+    .agent-traits { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .trait-tag {
+      font-size: 11px; padding: 3px 10px; border-radius: 12px;
+      background: rgba(139,92,246,0.1); color: var(--accent-purple);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .agent-dynamic {
+      font-size: 12px; color: var(--text-secondary); line-height: 1.6;
+      padding: 10px 12px; background: var(--bg-secondary); border-radius: var(--radius-sm);
+      border-left: 3px solid var(--accent-orange);
+    }
+    .agent-stats {
+      display: flex; gap: 16px; margin-top: 12px; padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+    .agent-stat {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted);
+    }
+    .agent-stat strong { color: var(--text-primary); font-size: 14px; display: block; }
+
+    /* ========== SYSTEM PANEL ========== */
+    .system-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 0; border-bottom: 1px solid rgba(42,42,58,0.4);
+    }
+    .system-item:last-child { border-bottom: none; }
+    .system-label { font-size: 12px; color: var(--text-secondary); }
+    .system-value {
+      font-size: 12px; font-family: 'JetBrains Mono', monospace; font-weight: 500;
+    }
+    .system-value.good { color: var(--accent-green); }
+    .system-value.warn { color: var(--accent-orange); }
+
+    /* ========== SETTINGS TAB ========== */
+    .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .setting-group {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 24px;
+    }
+    .setting-group h3 { font-size: 15px; font-weight: 600; margin-bottom: 16px; }
+    .setting-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 0; border-bottom: 1px solid rgba(42,42,58,0.3);
+    }
+    .setting-row:last-child { border-bottom: none; }
+    .setting-label { font-size: 13px; }
+    .setting-desc { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+    /* Toggle switch */
+    .toggle { position: relative; width: 44px; height: 24px; cursor: pointer; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle .slider {
+      position: absolute; inset: 0; background: var(--bg-secondary);
+      border-radius: 12px; border: 1px solid var(--border); transition: all 0.3s;
+    }
+    .toggle .slider::before {
+      content: ''; position: absolute; width: 18px; height: 18px;
+      left: 2px; bottom: 2px; background: var(--text-muted);
+      border-radius: 50%; transition: all 0.3s;
+    }
+    .toggle input:checked + .slider { background: var(--accent-blue); border-color: var(--accent-blue); }
+    .toggle input:checked + .slider::before { transform: translateX(20px); background: white; }
+
+    /* Select */
+    .setting-select {
+      background: var(--bg-secondary); color: var(--text-primary);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 6px 12px; font-size: 12px; font-family: 'JetBrains Mono', monospace;
+      outline: none; cursor: pointer;
+    }
+    .setting-select:focus { border-color: var(--accent-blue); }
+
+    /* ========== RESPONSIVE ========== */
+    @media (max-width: 1024px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .dashboard-grid { grid-template-columns: 1fr; }
+      .settings-grid { grid-template-columns: 1fr; }
+      .main-content { padding: 16px; }
+    }
+    @media (max-width: 640px) {
+      .stats-grid { grid-template-columns: 1fr; }
+      .topbar { padding: 12px 16px; }
+      .topbar-brand h1 { font-size: 15px; }
+      .agents-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Hidden tab content */
+    .tab-content { display: none; }
+    .tab-content.active { display: block; animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body>
+  <div class="bg-grid"></div>
+  <div class="bg-glow"></div>
+
+  <div class="app">
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <div class="topbar-brand">
+        <div class="logo">M</div>
+        <div>
+          <h1>Mnemosyne</h1>
+        </div>
+        <span>v0.4.0</span>
+      </div>
+      <div class="topbar-status">
+        <a href="/memory" style="padding:6px 14px;border-radius:8px;background:linear-gradient(135deg,#4f8cff,#8b5cf6);color:white;text-decoration:none;font-size:12px;font-weight:600;transition:transform 0.2s" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">🧠 Cognitive Memory</a>
+        <div class="status-pill">
+          <div class="status-dot green" id="neo4j-status"></div>
+          Neo4j
+        </div>
+        <div class="status-pill">
+          <div class="status-dot" id="sm-status"></div>
+          Supermemory
+        </div>
+        <div class="status-pill">
+          <div class="status-dot" id="observer-status"></div>
+          Observers
+        </div>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <!-- TABS -->
+      <div class="tabs">
+        <button class="tab active" data-tab="overview">Overview</button>
+        <button class="tab" data-tab="agents">Agent Profiles</button>
+        <button class="tab" data-tab="settings">Settings</button>
+      </div>
+
+      <!-- OVERVIEW TAB -->
+      <div class="tab-content active" id="tab-overview">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="label">Total Agents</div>
+            <div class="value" id="stat-agents">0</div>
+            <div class="change">Active in simulation</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Memories Stored</div>
+            <div class="value" id="stat-memories">0</div>
+            <div class="change" id="stat-memories-rate"></div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Graph Nodes</div>
+            <div class="value" id="stat-nodes">0</div>
+            <div class="change">entities + episodes</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Avg Search Latency</div>
+            <div class="value" id="stat-latency">—</div>
+            <div class="change">ASMR 3-way parallel</div>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <!-- Memory Timeline -->
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <div class="icon" style="background:rgba(139,92,246,0.15);">🧠</div>
+                Memory Timeline
+              </div>
+              <div class="panel-badge">LIVE</div>
+            </div>
+            <div class="panel-body">
+              <div class="timeline" id="timeline-list">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+          </div>
+
+          <!-- System Status -->
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <div class="icon" style="background:rgba(34,197,94,0.15);">⚡</div>
+                System Status
+              </div>
+            </div>
+            <div class="panel-body">
+              <div class="system-item">
+                <span class="system-label">Storage Backend</span>
+                <span class="system-value good" id="sys-backend">—</span>
+              </div>
+              <div class="system-item">
+                <span class="system-label">Neo4j Connection</span>
+                <span class="system-value good" id="sys-neo4j">—</span>
+              </div>
+              <div class="system-item">
+                <span class="system-label">Supermemory</span>
+                <span class="system-value" id="sys-sm">—</span>
+              </div>
+              <div class="system-item">
+                <span class="system-label">Circuit Breaker</span>
+                <span class="system-value good" id="sys-cb">—</span>
+              </div>
+              <div class="system-item">
+                <span class="system-label">Outbox Queue</span>
+                <span class="system-value" id="sys-outbox">—</span>
+              </div>
+              <div class="system-item">
+                <span class="system-label">Observer Agents</span>
+                <span class="system-value" id="sys-observers">—</span>
+              </div>
+              <div class="system-item">
+                <span class="system-label">LLM Provider</span>
+                <span class="system-value" id="sys-llm">—</span>
+              </div>
+              <div class="system-item">
+                <span class="system-label">Data Adapters</span>
+                <span class="system-value good" id="sys-adapters">11 registered</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AGENTS TAB -->
+      <div class="tab-content" id="tab-agents">
+        <div class="agents-grid" id="agents-grid">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- SETTINGS TAB -->
+      <div class="tab-content" id="tab-settings">
+        <div class="settings-grid">
+          <div class="setting-group">
+            <h3>Storage Backend</h3>
+            <div class="setting-row">
+              <div>
+                <div class="setting-label">Backend Mode</div>
+                <div class="setting-desc">Switch between Neo4j only or Hybrid mode</div>
+              </div>
+              <select class="setting-select" id="setting-backend">
+                <option value="neo4j">Neo4j Only</option>
+                <option value="hybrid" selected>Hybrid (Neo4j + SM)</option>
+              </select>
+            </div>
+            <div class="setting-row">
+              <div>
+                <div class="setting-label">CircuitBreaker Threshold</div>
+                <div class="setting-desc">Failures before opening circuit</div>
+              </div>
+              <select class="setting-select" id="setting-cb-threshold">
+                <option value="3">3 failures</option>
+                <option value="5" selected>5 failures</option>
+                <option value="10">10 failures</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="setting-group">
+            <h3>ASMR Agents</h3>
+            <div class="setting-row">
+              <div>
+                <div class="setting-label">Observer Agents</div>
+                <div class="setting-desc">Personal / Event / Social extraction</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" checked id="setting-observers">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="setting-row">
+              <div>
+                <div class="setting-label">Search Agents</div>
+                <div class="setting-desc">Fact / Context / Timeline retrieval</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" checked id="setting-search">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="setting-row">
+              <div>
+                <div class="setting-label">Profile Caching</div>
+                <div class="setting-desc">Cache agent profiles across rounds</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" checked id="setting-cache">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="setting-group">
+            <h3>Data Ingestion</h3>
+            <div class="setting-row">
+              <div>
+                <div class="setting-label">Stream Ingestion</div>
+                <div class="setting-desc">Kafka / Webhook real-time feeds</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="setting-stream">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="setting-row">
+              <div>
+                <div class="setting-label">CSV Row Limit</div>
+                <div class="setting-desc">Max rows per CSV import</div>
+              </div>
+              <select class="setting-select" id="setting-csv-limit">
+                <option value="1000">1,000</option>
+                <option value="10000" selected>10,000</option>
+                <option value="100000">100,000</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="setting-group">
+            <h3>LLM Configuration</h3>
+            <div class="setting-row">
+              <div>
+                <div class="setting-label">Provider</div>
+                <div class="setting-desc">LLM backend for NER and Observers</div>
+              </div>
+              <select class="setting-select" id="setting-llm-provider">
+                <option value="ollama" selected>Ollama (Local)</option>
+                <option value="openai">OpenAI API</option>
+                <option value="anthropic">Anthropic API</option>
+              </select>
+            </div>
+            <div class="setting-row">
+              <div>
+                <div class="setting-label">Observer Batch Size</div>
+                <div class="setting-desc">Activities per cognitive extraction batch</div>
+              </div>
+              <select class="setting-select" id="setting-batch-size">
+                <option value="3">3</option>
+                <option value="5" selected>5</option>
+                <option value="10">10</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // ========== TAB SWITCHING ==========
+    const tabs = document.querySelectorAll('.tab');
+    const tabContents = document.querySelectorAll('.tab-content');
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        tabs.forEach(t => t.classList.remove('active'));
+        tabContents.forEach(tc => tc.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(`tab-${tab.dataset.tab}`).classList.add('active');
+      });
+    });
+
+    // ========== DEMO DATA ==========
+    const AGENTS_DEMO = [
+      { name: 'Alice Chen', id: 'agent_001', color: '#4a7dff',
+        traits: ['tech-savvy', 'analytical', 'detail-oriented'],
+        dynamic: 'Currently frustrated with Bob\'s stance on climate policy. Leaning towards posting a rebuttal.',
+        memories: 47, interactions: 128 },
+      { name: 'Bob Park', id: 'agent_002', color: '#8b5cf6',
+        traits: ['outgoing', 'conservative', 'sports fan'],
+        dynamic: 'Enjoying a streak of popular posts. Considering following more tech influencers.',
+        memories: 35, interactions: 96 },
+      { name: 'Carol Kim', id: 'agent_003', color: '#ec4899',
+        traits: ['creative', 'empathetic', 'bookworm'],
+        dynamic: 'Mediating between Alice and Bob. Feeling exhausted from social conflicts.',
+        memories: 52, interactions: 142 },
+      { name: 'David Lee', id: 'agent_004', color: '#f97316',
+        traits: ['pragmatic', 'quiet', 'data-driven'],
+        dynamic: 'Observing the Alice-Bob debate from the sidelines. Collecting data for analysis.',
+        memories: 23, interactions: 58 },
+      { name: 'Eve Tanaka', id: 'agent_005', color: '#22c55e',
+        traits: ['extroverted', 'progressive', 'foodie'],
+        dynamic: 'Actively engaging with multiple threads. Planning a collaborative post with Carol.',
+        memories: 41, interactions: 115 },
+      { name: 'Frank Wu', id: 'agent_006', color: '#06b6d4',
+        traits: ['skeptical', 'methodical', 'gamer'],
+        dynamic: 'Recently muted two noisy accounts. Searching for niche interest communities.',
+        memories: 29, interactions: 72 },
+    ];
+
+    const TIMELINE_DEMO = [
+      { time: 'R12', type: 'social', agent: 'Carol Kim', text: 'Expressed concern about escalating tension between Alice and Bob. Sent private message to both.' },
+      { time: 'R12', type: 'event', agent: 'Alice Chen', text: 'Quote-posted Bob\'s climate article with a detailed 3-point rebuttal. Post received 24 likes.' },
+      { time: 'R11', type: 'personal', agent: 'Eve Tanaka', text: 'Shows consistent preference for food-related content. 73% of liked posts are food/recipe topics.' },
+      { time: 'R11', type: 'social', agent: 'Bob Park', text: 'Followed 3 new tech influencers after Alice\'s recommendation. Sentiment towards Alice shifted +0.2.' },
+      { time: 'R10', type: 'event', agent: 'David Lee', text: 'Performed 8 search queries in a single round — unusual spike. Topics: AI regulation, market data.' },
+      { time: 'R10', type: 'personal', agent: 'Frank Wu', text: 'Mute behavior pattern detected: mutes users after 3+ negative interactions. Threshold identified.' },
+      { time: 'R09', type: 'social', agent: 'Alice Chen', text: 'Strong alliance forming with Carol. 85% positive interaction rate over last 5 rounds.' },
+      { time: 'R09', type: 'event', agent: 'Eve Tanaka', text: 'Created a collaborative thread with Carol about weekend cooking. First cross-agent content creation.' },
+    ];
+
+    // ========== RENDER FUNCTIONS ==========
+    function renderTimeline() {
+      const container = document.getElementById('timeline-list');
+      container.innerHTML = TIMELINE_DEMO.map(item => `
+        <div class="timeline-item">
+          <div class="timeline-time">${item.time}</div>
+          <div class="timeline-dot-col">
+            <div class="timeline-dot ${item.type}"></div>
+          </div>
+          <div class="timeline-content">
+            <div class="timeline-agent">${item.agent}</div>
+            <div class="timeline-text">${item.text}</div>
+            <span class="timeline-tag ${item.type}">${item.type}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderAgents() {
+      const grid = document.getElementById('agents-grid');
+      grid.innerHTML = AGENTS_DEMO.map(agent => `
+        <div class="agent-card">
+          <div class="agent-card-header">
+            <div class="agent-avatar" style="background:${agent.color}">
+              ${agent.name.charAt(0)}
+            </div>
+            <div>
+              <div class="agent-name">${agent.name}</div>
+              <div class="agent-id">${agent.id}</div>
+            </div>
+          </div>
+          <div class="agent-traits">
+            ${agent.traits.map(t => `<span class="trait-tag">${t}</span>`).join('')}
+          </div>
+          <div class="agent-dynamic">${agent.dynamic}</div>
+          <div class="agent-stats">
+            <div class="agent-stat"><strong>${agent.memories}</strong>memories</div>
+            <div class="agent-stat"><strong>${agent.interactions}</strong>interactions</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function updateStats() {
+      document.getElementById('stat-agents').textContent = AGENTS_DEMO.length;
+      const totalMem = AGENTS_DEMO.reduce((s, a) => s + a.memories, 0);
+      document.getElementById('stat-memories').textContent = totalMem;
+      document.getElementById('stat-memories-rate').textContent = `+${Math.floor(totalMem / 12)}/round avg`;
+      document.getElementById('stat-nodes').textContent = '1,247';
+      document.getElementById('stat-latency').textContent = '48ms';
+    }
+
+    function updateSystemStatus() {
+      document.getElementById('sys-backend').textContent = 'Hybrid';
+      document.getElementById('sys-neo4j').textContent = 'Connected';
+      document.getElementById('sys-neo4j').className = 'system-value good';
+      document.getElementById('sys-sm').textContent = 'Ready';
+      document.getElementById('sys-sm').className = 'system-value good';
+      document.getElementById('sys-cb').textContent = 'CLOSED';
+      document.getElementById('sys-outbox').textContent = '0 pending';
+      document.getElementById('sys-outbox').className = 'system-value good';
+      document.getElementById('sys-observers').textContent = '3/3 active';
+      document.getElementById('sys-observers').className = 'system-value good';
+      document.getElementById('sys-llm').textContent = 'Ollama (local)';
+      document.getElementById('sys-llm').className = 'system-value good';
+
+      // Status dots
+      document.getElementById('neo4j-status').className = 'status-dot green';
+      document.getElementById('sm-status').className = 'status-dot green';
+      document.getElementById('observer-status').className = 'status-dot green';
+    }
+
+    // ========== INIT ==========
+    renderTimeline();
+    renderAgents();
+    updateStats();
+    updateSystemStatus();
+
+    // ========== LIVE API POLLING ==========
+    // Auto-detect API base: same origin (Flask serves dashboard) or fallback
+    const API_BASE = window.location.port === '5001'
+      ? `${window.location.origin}/api`
+      : 'http://localhost:5001/api';
+
+    async function fetchAPI(endpoint) {
+      try {
+        const res = await fetch(`${API_BASE}/${endpoint}`, { mode: 'cors' });
+        if (res.ok) return await res.json();
+      } catch(e) { /* backend not available */ }
+      return null;
+    }
+
+    async function pollStatus() {
+      const h = await fetchAPI('health');
+      if (!h) return;
+
+      // Status dots
+      const setDot = (id, ok) => {
+        document.getElementById(id).className = 'status-dot ' + (ok ? 'green' : 'red');
+      };
+      setDot('neo4j-status', h.neo4j === 'connected');
+      setDot('sm-status', h.supermemory === 'configured');
+      setDot('observer-status', h.observers > 0);
+
+      // System panel
+      const setVal = (id, text, ok) => {
+        const el = document.getElementById(id);
+        el.textContent = text;
+        el.className = 'system-value ' + (ok ? 'good' : 'warn');
+      };
+      setVal('sys-backend', h.backend, true);
+      setVal('sys-neo4j', h.neo4j === 'connected' ? `Connected (${h.neo4j_nodes} nodes)` : h.neo4j, h.neo4j === 'connected');
+      setVal('sys-sm', h.supermemory, h.supermemory === 'configured');
+      setVal('sys-cb', 'CLOSED', true);
+      setVal('sys-outbox', '0 pending', true);
+      setVal('sys-observers', `${h.observers}/3 active`, h.observers > 0);
+      setVal('sys-llm', `${h.llm.provider} (${h.llm.model})`, true);
+      setVal('sys-adapters', `${h.adapters} registered`, true);
+
+      // Update stats from real data
+      document.getElementById('stat-nodes').textContent = h.neo4j_nodes.toLocaleString();
+    }
+
+    // Poll every 5s
+    setInterval(pollStatus, 5000);
+    pollStatus();
+  </script>
+</body>
+</html>

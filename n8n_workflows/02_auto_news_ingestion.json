@@ -1,0 +1,77 @@
+{
+  "name": "Mnemosyne: 자동 데이터 수집 파이프라인",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "hours", "hoursInterval": 6 }] }
+      },
+      "id": "schedule-1",
+      "name": "Every 6 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://newsapi.org/v2/top-headlines",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "country", "value": "kr" },
+            { "name": "pageSize", "value": "5" },
+            { "name": "apiKey", "value": "={{ $env.NEWS_API_KEY }}" }
+          ]
+        }
+      },
+      "id": "fetch-news",
+      "name": "Fetch News",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const articles = $input.first().json.articles || [];\nreturn articles.map(a => ({\n  json: {\n    title: a.title,\n    description: a.description,\n    content: a.content,\n    source: a.source?.name || 'unknown',\n    url: a.url,\n    publishedAt: a.publishedAt\n  }\n}));"
+      },
+      "id": "transform-1",
+      "name": "Extract Articles",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://192.168.35.86:3100/mcp",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"id\": {{ $runIndex + 1 }},\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"mnemosyne_ingest\",\n    \"arguments\": {\n      \"graph_id\": \"news_feed\",\n      \"text_content\": \"[{{ $json.source }}] {{ $json.title }}\\n{{ $json.description }}\\n{{ $json.content }}\",\n      \"source_type\": \"auto\"\n    }\n  }\n}"
+      },
+      "id": "ingest-1",
+      "name": "Ingest to Mnemosyne",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [860, 300]
+    }
+  ],
+  "connections": {
+    "Every 6 Hours": {
+      "main": [[{ "node": "Fetch News", "type": "main", "index": 0 }]]
+    },
+    "Fetch News": {
+      "main": [[{ "node": "Extract Articles", "type": "main", "index": 0 }]]
+    },
+    "Extract Articles": {
+      "main": [[{ "node": "Ingest to Mnemosyne", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "mnemosyne-mcp" }
+}

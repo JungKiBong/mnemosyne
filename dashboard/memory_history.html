@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mnemosyne — Memory History & Audit Trail</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0a0a0f; --bg2: #12121a; --card: #16161f; --card-hover: #1c1c28;
+      --border: #2a2a3a; --text: #e8e8f0; --text2: #8888a0; --text3: #555568;
+      --blue: #4a7dff; --purple: #8b5cf6; --cyan: #06b6d4; --orange: #f97316;
+      --green: #22c55e; --red: #ef4444; --pink: #ec4899; --yellow: #eab308;
+      --grad: linear-gradient(135deg, #4a7dff 0%, #8b5cf6 100%);
+      --radius: 12px; --radius-sm: 8px;
+    }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* Background */
+    .bg-grid { position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background-image: linear-gradient(rgba(74,125,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(74,125,255,0.03) 1px, transparent 1px);
+      background-size: 60px 60px; }
+
+    /* Topbar */
+    .topbar { position: sticky; top: 0; z-index: 100; display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 24px; background: rgba(10,10,15,0.9); backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border); }
+    .topbar h1 { font-size: 18px; font-weight: 700; }
+    .topbar h1 span { background: var(--grad); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+    .topbar-nav { display: flex; gap: 8px; align-items: center; }
+    .topbar-nav a { color: var(--text2); text-decoration: none; font-size: 13px; padding: 6px 14px;
+      border-radius: var(--radius-sm); transition: all 0.2s; }
+    .topbar-nav a:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+    .badge { display: inline-flex; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+      background: rgba(139,92,246,0.15); color: var(--purple); }
+
+    /* Content */
+    .content { position: relative; z-index: 1; max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+    /* Stats Row */
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 20px; transition: border-color 0.3s; }
+    .stat-card:hover { border-color: var(--blue); }
+    .stat-card .label { font-size: 12px; color: var(--text2); margin-bottom: 4px; }
+    .stat-card .value { font-size: 28px; font-weight: 800; font-family: 'JetBrains Mono'; }
+    .stat-card .sub { font-size: 11px; color: var(--text3); margin-top: 4px; }
+
+    /* Main Layout */
+    .main-grid { display: grid; grid-template-columns: 1fr 400px; gap: 20px; }
+
+    /* Activity Feed */
+    .panel { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .panel-header { display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px; border-bottom: 1px solid var(--border); }
+    .panel-header h2 { font-size: 15px; font-weight: 600; }
+    .panel-body { padding: 0; max-height: 600px; overflow-y: auto; }
+
+    /* Timeline */
+    .timeline-item { display: flex; gap: 12px; padding: 14px 20px; border-bottom: 1px solid rgba(255,255,255,0.03);
+      transition: background 0.2s; cursor: pointer; }
+    .timeline-item:hover { background: var(--card-hover); }
+    .timeline-icon { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center;
+      justify-content: center; font-size: 14px; flex-shrink: 0; }
+    .timeline-icon.boost { background: rgba(34,197,94,0.15); }
+    .timeline-icon.decay { background: rgba(239,68,68,0.15); }
+    .timeline-icon.create { background: rgba(74,125,255,0.15); }
+    .timeline-icon.rollback { background: rgba(234,179,8,0.15); }
+    .timeline-icon.edit { background: rgba(6,182,212,0.15); }
+    .timeline-body { flex: 1; min-width: 0; }
+    .timeline-title { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .timeline-meta { font-size: 11px; color: var(--text3); margin-top: 3px; }
+    .timeline-diff { font-family: 'JetBrains Mono'; font-size: 12px; margin-top: 6px; padding: 6px 10px;
+      border-radius: 6px; background: rgba(0,0,0,0.3); display: flex; gap: 8px; align-items: center; }
+    .diff-old { color: var(--red); text-decoration: line-through; }
+    .diff-new { color: var(--green); }
+    .diff-arrow { color: var(--text3); }
+
+    /* Memory Detail Panel */
+    .detail-panel { position: sticky; top: 80px; }
+    .memory-name { font-size: 14px; font-weight: 600; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+
+    /* Salience Timeline Chart */
+    .chart-container { padding: 16px 20px; }
+
+    /* Rollback Button */
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: var(--radius-sm);
+      border: 1px solid var(--border); background: transparent; color: var(--text); font-size: 12px;
+      cursor: pointer; transition: all 0.2s; font-family: inherit; }
+    .btn:hover { border-color: var(--blue); background: rgba(74,125,255,0.1); }
+    .btn-danger { border-color: var(--red); color: var(--red); }
+    .btn-danger:hover { background: rgba(239,68,68,0.15); }
+    .btn-success { border-color: var(--green); color: var(--green); }
+    .btn-success:hover { background: rgba(34,197,94,0.15); }
+    .btn-warn { border-color: var(--yellow); color: var(--yellow); }
+    .btn-warn:hover { background: rgba(234,179,8,0.15); }
+    .btn-primary { background: var(--grad); color: white; border: none; font-weight: 600; }
+    .btn-primary:hover { opacity: 0.9; }
+
+    /* Rollback actions inside timeline */
+    .timeline-actions { margin-top: 8px; display: flex; gap: 8px; }
+
+    /* Search/Filter */
+    .filter-bar { display: flex; gap: 10px; padding: 12px 20px; border-bottom: 1px solid var(--border); align-items: center; }
+    .filter-bar select, .filter-bar input { background: var(--bg); border: 1px solid var(--border); color: var(--text);
+      padding: 6px 12px; border-radius: var(--radius-sm); font-family: inherit; font-size: 12px; outline: none; }
+    .filter-bar select:focus, .filter-bar input:focus { border-color: var(--blue); }
+
+    /* Rollback Modal */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 200;
+      display: none; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+    .modal-overlay.active { display: flex; }
+    .modal { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 24px; max-width: 480px; width: 90%; }
+    .modal h3 { font-size: 16px; margin-bottom: 16px; }
+    .modal p { font-size: 13px; color: var(--text2); line-height: 1.6; margin-bottom: 16px; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+    /* Empty State */
+    .empty { text-align: center; padding: 40px 20px; color: var(--text3); }
+    .empty-icon { font-size: 32px; margin-bottom: 8px; }
+
+    @media (max-width: 900px) {
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+      .main-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="bg-grid"></div>
+
+<!-- TOPBAR -->
+<header class="topbar">
+  <div style="display:flex;align-items:center;gap:12px">
+    <h1>📜 <span>Memory Audit Trail</span></h1>
+    <span class="badge">Phase 10</span>
+  </div>
+  <nav class="topbar-nav">
+    <a href="/">← Dashboard</a>
+    <a href="/memory">🧠 Cognitive Memory</a>
+    <button class="btn btn-primary" onclick="refreshAll()">🔄 새로고침</button>
+  </nav>
+</header>
+
+<div class="content">
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="label">📝 총 리비전</div>
+      <div class="value" id="stat-total">0</div>
+      <div class="sub">전체 변경 기록</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">💪 강화 (Boost)</div>
+      <div class="value" id="stat-boost" style="color:var(--green)">0</div>
+      <div class="sub">수동/자동 강화 횟수</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">📉 감쇠 (Decay)</div>
+      <div class="value" id="stat-decay" style="color:var(--red)">0</div>
+      <div class="sub">Ebbinghaus 감쇠 횟수</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">🔄 롤백 (Rollback)</div>
+      <div class="value" id="stat-rollback" style="color:var(--yellow)">0</div>
+      <div class="sub">상태 복원 횟수</div>
+    </div>
+  </div>
+
+  <!-- Main Grid -->
+  <div class="main-grid">
+    <!-- Activity Feed -->
+    <div class="panel">
+      <div class="panel-header">
+        <h2>📋 변경 이력 (Activity Feed)</h2>
+        <span id="activity-count" style="font-size:12px;color:var(--text3)">0건</span>
+      </div>
+      <div class="filter-bar">
+        <select id="filter-type" onchange="loadActivity()">
+          <option value="">전체 타입</option>
+          <option value="boost">💪 강화</option>
+          <option value="decay">📉 감쇠</option>
+          <option value="create">✨ 생성</option>
+          <option value="rollback">🔄 롤백</option>
+          <option value="edit">✏️ 수정</option>
+        </select>
+        <input type="text" id="filter-search" placeholder="기억 이름 검색..." oninput="filterActivity()">
+      </div>
+      <div class="panel-body" id="activity-feed">
+        <div class="empty">
+          <div class="empty-icon">📭</div>
+          <p>변경 이력이 없습니다</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detail Panel -->
+    <div class="detail-panel">
+      <div class="panel" id="detail-panel">
+        <div class="panel-header">
+          <h2>📊 기억 상세 이력</h2>
+        </div>
+        <div class="panel-body" id="detail-body">
+          <div class="empty">
+            <div class="empty-icon">👈</div>
+            <p>왼쪽에서 기억을 선택하세요</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Salience Chart -->
+      <div class="panel" style="margin-top:16px">
+        <div class="panel-header">
+          <h2>📈 Salience 변화 그래프</h2>
+        </div>
+        <div class="chart-container">
+          <canvas id="salience-chart" height="200"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Rollback Confirm Modal -->
+<div class="modal-overlay" id="rollback-modal">
+  <div class="modal">
+    <h3>⚠️ 롤백 확인</h3>
+    <p id="rollback-desc">이 리비전의 변경을 되돌리시겠습니까?</p>
+    <div style="padding:10px;background:rgba(0,0,0,0.3);border-radius:8px;margin-bottom:16px;font-family:'JetBrains Mono';font-size:12px">
+      <div><span style="color:var(--text3)">필드:</span> <span id="rb-field"></span></div>
+      <div><span style="color:var(--text3)">현재값:</span> <span id="rb-current" style="color:var(--red)"></span></div>
+      <div><span style="color:var(--text3)">복원값:</span> <span id="rb-restore" style="color:var(--green)"></span></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeRollbackModal()">취소</button>
+      <button class="btn btn-warn" onclick="executeRollback()">🔄 롤백 실행</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '/api/memory/audit';
+let allActivity = [];
+let selectedMemoryUuid = null;
+let pendingRollbackId = null;
+let salienceChart = null;
+
+// ── Init ──
+document.addEventListener('DOMContentLoaded', () => { refreshAll(); });
+
+async function refreshAll() {
+  await Promise.all([loadStats(), loadActivity()]);
+}
+
+// ── Stats ──
+async function loadStats() {
+  try {
+    const res = await fetch(`${API}/stats`);
+    const data = await res.json();
+    document.getElementById('stat-total').textContent = data.total_revisions || 0;
+    document.getElementById('stat-boost').textContent = data.by_type?.boost || 0;
+    document.getElementById('stat-decay').textContent = data.by_type?.decay || 0;
+    document.getElementById('stat-rollback').textContent = data.by_type?.rollback || 0;
+  } catch (e) { console.error('Stats failed:', e); }
+}
+
+// ── Activity Feed ──
+async function loadActivity() {
+  const typeFilter = document.getElementById('filter-type').value;
+  try {
+    const res = await fetch(`${API}/activity?limit=100`);
+    allActivity = await res.json();
+    renderActivity(allActivity, typeFilter);
+  } catch (e) {
+    console.error('Activity failed:', e);
+    document.getElementById('activity-feed').innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><p>로딩 실패</p></div>';
+  }
+}
+
+function filterActivity() {
+  const search = document.getElementById('filter-search').value.toLowerCase();
+  const typeFilter = document.getElementById('filter-type').value;
+  const filtered = allActivity.filter(a => {
+    const matchName = !search || (a.memory_name || '').toLowerCase().includes(search);
+    const matchType = !typeFilter || a.change_type === typeFilter;
+    return matchName && matchType;
+  });
+  renderActivity(filtered, '');
+}
+
+function renderActivity(items, typeFilter) {
+  const feed = document.getElementById('activity-feed');
+  if (typeFilter) items = items.filter(a => a.change_type === typeFilter);
+
+  document.getElementById('activity-count').textContent = `${items.length}건`;
+
+  if (!items.length) {
+    feed.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>변경 이력이 없습니다</p></div>';
+    return;
+  }
+
+  feed.innerHTML = items.map(item => {
+    const icon = getIcon(item.change_type);
+    const time = formatTime(item.changed_at);
+    const name = item.memory_name || item.memory_uuid?.substring(0, 8) || '?';
+    return `
+      <div class="timeline-item" onclick="selectMemory('${item.memory_uuid}')">
+        <div class="timeline-icon ${item.change_type}">${icon}</div>
+        <div class="timeline-body">
+          <div class="timeline-title">${name}</div>
+          <div class="timeline-meta">${item.change_type} · ${item.changed_by} · ${time}</div>
+          <div class="timeline-diff">
+            <span class="diff-old">${item.old_value}</span>
+            <span class="diff-arrow">→</span>
+            <span class="diff-new">${item.new_value}</span>
+          </div>
+          ${item.reason ? `<div style="font-size:11px;color:var(--text3);margin-top:4px">${item.reason}</div>` : ''}
+          <div class="timeline-actions">
+            <button class="btn btn-warn" onclick="event.stopPropagation();openRollbackModal('${item.revision_id}','${item.field}','${item.new_value}','${item.old_value}')">🔄 롤백</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ── Detail Panel ──
+async function selectMemory(uuid) {
+  selectedMemoryUuid = uuid;
+  try {
+    const res = await fetch(`${API}/history/${uuid}?limit=30`);
+    const history = await res.json();
+    renderDetail(history);
+    renderSalienceChart(history);
+  } catch (e) { console.error('History failed:', e); }
+}
+
+function renderDetail(history) {
+  const body = document.getElementById('detail-body');
+  if (!history.length) {
+    body.innerHTML = '<div class="empty"><p>이 기억의 이력이 없습니다</p></div>';
+    return;
+  }
+
+  body.innerHTML = history.map((h, i) => `
+    <div class="timeline-item" style="padding:10px 16px">
+      <div class="timeline-icon ${h.change_type}" style="width:28px;height:28px;font-size:12px">${getIcon(h.change_type)}</div>
+      <div class="timeline-body">
+        <div style="font-size:12px;font-weight:500">${h.field}: ${h.old_value} → ${h.new_value}</div>
+        <div style="font-size:10px;color:var(--text3)">${h.change_type} · ${formatTime(h.changed_at)}</div>
+        ${h.reason ? `<div style="font-size:10px;color:var(--text3)">${h.reason}</div>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderSalienceChart(history) {
+  const salienceHistory = history.filter(h => h.field === 'salience').reverse();
+  if (!salienceHistory.length) return;
+
+  const labels = salienceHistory.map(h => formatTime(h.changed_at));
+  const values = salienceHistory.map(h => parseFloat(h.new_value));
+
+  const ctx = document.getElementById('salience-chart').getContext('2d');
+  if (salienceChart) salienceChart.destroy();
+
+  salienceChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Salience',
+        data: values,
+        borderColor: '#8b5cf6',
+        backgroundColor: 'rgba(139,92,246,0.1)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.3,
+        pointRadius: 4,
+        pointBackgroundColor: values.map(v =>
+          v >= 0.7 ? '#22c55e' : v >= 0.3 ? '#f97316' : '#ef4444'
+        ),
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => `Salience: ${ctx.raw.toFixed(4)}` } }
+      },
+      scales: {
+        y: { min: 0, max: 1, ticks: { color: '#555568' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        x: { ticks: { color: '#555568', maxTicksLimit: 6 }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+// ── Rollback Modal ──
+function openRollbackModal(revId, field, currentVal, restoreVal) {
+  pendingRollbackId = revId;
+  document.getElementById('rb-field').textContent = field;
+  document.getElementById('rb-current').textContent = currentVal;
+  document.getElementById('rb-restore').textContent = restoreVal;
+  document.getElementById('rollback-modal').classList.add('active');
+}
+
+function closeRollbackModal() {
+  document.getElementById('rollback-modal').classList.remove('active');
+  pendingRollbackId = null;
+}
+
+async function executeRollback() {
+  if (!pendingRollbackId) return;
+  try {
+    const res = await fetch(`${API}/rollback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ revision_id: pendingRollbackId })
+    });
+    const result = await res.json();
+    closeRollbackModal();
+    if (result.status === 'rolled_back') {
+      alert(`✅ 롤백 성공!\n${result.field}: ${result.restored_value}`);
+      refreshAll();
+      if (selectedMemoryUuid) selectMemory(selectedMemoryUuid);
+    } else {
+      alert(`❌ 실패: ${result.error || '알 수 없는 오류'}`);
+    }
+  } catch (e) {
+    alert('롤백 처리 중 오류: ' + e.message);
+  }
+}
+
+// ── Helpers ──
+function getIcon(type) {
+  const icons = { boost: '💪', decay: '📉', create: '✨', rollback: '🔄', edit: '✏️', archive: '📦' };
+  return icons[type] || '📝';
+}
+
+function formatTime(ts) {
+  if (!ts) return '?';
+  try {
+    const d = new Date(ts);
+    const now = new Date();
+    const diff = (now - d) / 1000;
+    if (diff < 60) return `${Math.floor(diff)}초 전`;
+    if (diff < 3600) return `${Math.floor(diff/60)}분 전`;
+    if (diff < 86400) return `${Math.floor(diff/3600)}시간 전`;
+    return d.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  } catch { return ts; }
+}
+</script>
+</body>
+</html>

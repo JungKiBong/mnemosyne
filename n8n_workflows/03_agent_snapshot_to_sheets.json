@@ -1,0 +1,77 @@
+{
+  "name": "Mnemosyne: 에이전트 프로필 스냅샷 → Google Sheets",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "hours", "hoursInterval": 24 }] }
+      },
+      "id": "daily-trigger",
+      "name": "Daily at Midnight",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://192.168.35.86:3100/mcp",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"mnemosyne_graph_query\",\n    \"arguments\": {\n      \"cypher\": \"MATCH (e:Entity) WHERE e.entity_type = 'Agent' RETURN e.uuid AS uuid, e.name AS name, e.traits AS traits, e.dynamic_state AS state ORDER BY e.name\",\n      \"limit\": 100\n    }\n  }\n}"
+      },
+      "id": "query-agents",
+      "name": "Query All Agents",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst content = JSON.parse(response.result.content[0].text);\nconst rows = content.rows || [];\nconst now = new Date().toISOString();\nreturn rows.map(r => ({\n  json: {\n    snapshot_date: now,\n    uuid: r.uuid,\n    name: r.name,\n    traits: r.traits || '',\n    dynamic_state: r.state || ''\n  }\n}));"
+      },
+      "id": "parse-agents",
+      "name": "Parse Agent Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": { "__rl": true, "mode": "id", "value": "={{ $env.GOOGLE_SHEET_ID }}" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "Agent Snapshots" },
+        "columns": {
+          "mappingMode": "autoMapInputData"
+        },
+        "options": {}
+      },
+      "id": "sheets-1",
+      "name": "Append to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [860, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "REPLACE_WITH_CREDENTIAL_ID", "name": "Google Sheets" }
+      }
+    }
+  ],
+  "connections": {
+    "Daily at Midnight": {
+      "main": [[{ "node": "Query All Agents", "type": "main", "index": 0 }]]
+    },
+    "Query All Agents": {
+      "main": [[{ "node": "Parse Agent Data", "type": "main", "index": 0 }]]
+    },
+    "Parse Agent Data": {
+      "main": [[{ "node": "Append to Google Sheets", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "mnemosyne-mcp" }
+}
