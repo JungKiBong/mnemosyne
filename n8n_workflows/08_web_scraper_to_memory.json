@@ -1,0 +1,86 @@
+{
+  "name": "Mories: 웹 스크래핑 → 지식 저장",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "scrape-to-memory",
+        "responseMode": "responseNode"
+      },
+      "id": "webhook-1",
+      "name": "Trigger (URL 입력)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.body.url || $json.url }}",
+        "options": { "response": { "response": { "fullResponse": false, "responseFormat": "text" } } }
+      },
+      "id": "fetch-page",
+      "name": "Fetch Web Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const html = $input.first().json.data || $input.first().json;\nlet text = typeof html === 'string' ? html : JSON.stringify(html);\n\n// Strip HTML tags\ntext = text.replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, '');\ntext = text.replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi, '');\ntext = text.replace(/<[^>]+>/g, ' ');\ntext = text.replace(/\\s+/g, ' ').trim();\n\n// Truncate to reasonable size\ntext = text.substring(0, 5000);\n\nconst url = $('Trigger (URL 입력)').first().json.body?.url || 'unknown';\nconst title = (text.match(/^\\s*(.{1,100})/) || ['', 'Untitled'])[1];\n\nreturn [{\n  json: {\n    url: url,\n    title: title.trim(),\n    content: text\n  }\n}];"
+      },
+      "id": "extract-text",
+      "name": "Extract Clean Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.MORIES_URL || 'http://localhost:5001' }}/api/gateway/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": \"[Web: {{ $json.title }}]\\nURL: {{ $json.url }}\\n\\n{{ $json.content }}\",\n  \"source\": \"web:{{ $json.url }}\",\n  \"graph_id\": \"{{ $env.MORIES_GRAPH_ID || 'web-research' }}\",\n  \"scope\": \"social\",\n  \"metadata\": {\n    \"url\": \"{{ $json.url }}\",\n    \"title\": \"{{ $json.title }}\",\n    \"scraped_at\": \"{{ new Date().toISOString() }}\"\n  }\n}"
+      },
+      "id": "ingest-1",
+      "name": "Ingest to Mories",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [860, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"status\": \"ok\", \"url\": \"{{ $json.url }}\", \"title\": \"{{ $json.title }}\"}"
+      },
+      "id": "response-1",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1080, 300]
+    }
+  ],
+  "connections": {
+    "Trigger (URL 입력)": {
+      "main": [[ { "node": "Fetch Web Page", "type": "main", "index": 0 } ]]
+    },
+    "Fetch Web Page": {
+      "main": [[ { "node": "Extract Clean Text", "type": "main", "index": 0 } ]]
+    },
+    "Extract Clean Text": {
+      "main": [[ { "node": "Ingest to Mories", "type": "main", "index": 0 } ]]
+    },
+    "Ingest to Mories": {
+      "main": [[ { "node": "Respond", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "mories-n8n" }
+}

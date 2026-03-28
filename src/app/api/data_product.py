@@ -50,7 +50,7 @@ def download_rag():
         return Response(
             result["content"],
             mimetype='application/x-jsonlines',
-            headers={"Content-Disposition": "attachment; filename=mnemosyne_rag_corpus.jsonl"},
+            headers={"Content-Disposition": "attachment; filename=mories_rag_corpus.jsonl"},
         )
     finally:
         dp.close()
@@ -102,7 +102,7 @@ def download_training():
         return Response(
             result["content"],
             mimetype='application/x-jsonlines',
-            headers={"Content-Disposition": "attachment; filename=mnemosyne_training.jsonl"},
+            headers={"Content-Disposition": "attachment; filename=mories_training.jsonl"},
         )
     finally:
         dp.close()
@@ -144,6 +144,96 @@ def list_manifests():
         dp.close()
 
 
+# ── Import — Manifest ──
+
+@data_product_bp.route('/manifest/import', methods=['POST'])
+def import_manifest():
+    """
+    Import a Memory Manifest JSON into Neo4j.
+    Body: Full manifest JSON (from create_manifest or downloaded file).
+    Query: graph_id (optional), strategy (merge|create), imported_by (optional)
+    """
+    data = request.get_json(force=True)
+    if not data:
+        return jsonify({"error": "Request body must be a valid manifest JSON"}), 400
+
+    graph_id = request.args.get('graph_id', '')
+    strategy = request.args.get('strategy', 'merge')
+    imported_by = request.args.get('imported_by', 'api')
+
+    if strategy not in ('merge', 'create'):
+        return jsonify({"error": "strategy must be 'merge' or 'create'"}), 400
+
+    dp = _get_dp()
+    try:
+        result = dp.import_manifest(
+            manifest=data,
+            target_graph_id=graph_id,
+            merge_strategy=strategy,
+            imported_by=imported_by,
+        )
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Manifest import failed: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        dp.close()
+
+
+# ── Import — RAG Corpus ──
+
+@data_product_bp.route('/rag/import', methods=['POST'])
+def import_rag():
+    """
+    Import a JSONL RAG corpus into Neo4j.
+    Content-Type: application/json → body: {"content": "...jsonl..."}
+    Content-Type: text/plain → body is raw JSONL content.
+    Query: graph_id, scope, imported_by
+    """
+    content_type = request.content_type or ''
+
+    if 'json' in content_type:
+        data = request.get_json(force=True)
+        content = data.get('content', '')
+    else:
+        # Accept raw JSONL text
+        content = request.get_data(as_text=True)
+
+    if not content or not content.strip():
+        return jsonify({"error": "JSONL content is required"}), 400
+
+    graph_id = request.args.get('graph_id', '')
+    scope = request.args.get('scope', 'personal')
+    imported_by = request.args.get('imported_by', 'api')
+
+    dp = _get_dp()
+    try:
+        result = dp.import_rag_corpus(
+            content=content,
+            target_graph_id=graph_id,
+            default_scope=scope,
+            imported_by=imported_by,
+        )
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"RAG import failed: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        dp.close()
+
+
+# ── Import History ──
+
+@data_product_bp.route('/imports', methods=['GET'])
+def list_imports():
+    """List all import records."""
+    dp = _get_dp()
+    try:
+        return jsonify(dp.list_imports())
+    finally:
+        dp.close()
+
+
 # ── Analytics CSV ──
 
 @data_product_bp.route('/analytics/csv', methods=['GET'])
@@ -155,7 +245,7 @@ def export_csv():
         return Response(
             csv_content,
             mimetype='text/csv',
-            headers={"Content-Disposition": "attachment; filename=mnemosyne_analytics.csv"},
+            headers={"Content-Disposition": "attachment; filename=mories_analytics.csv"},
         )
     finally:
         dp.close()
@@ -205,6 +295,29 @@ def catalog():
                 "endpoint": "/api/memory/data/analytics/csv",
                 "formats": ["csv"],
             },
+            {
+                "id": "manifest_import",
+                "name": "Manifest Import",
+                "description": "Import a Memory Manifest JSON into Neo4j (merge or create strategy)",
+                "endpoint": "/api/memory/data/manifest/import",
+                "method": "POST",
+                "params": ["graph_id", "strategy(merge|create)", "imported_by"],
+            },
+            {
+                "id": "rag_import",
+                "name": "RAG Corpus Import",
+                "description": "Import JSONL RAG corpus documents as Entity nodes",
+                "endpoint": "/api/memory/data/rag/import",
+                "method": "POST",
+                "params": ["graph_id", "scope", "imported_by"],
+            },
+            {
+                "id": "import_history",
+                "name": "Import History",
+                "description": "List all past import operations with statistics",
+                "endpoint": "/api/memory/data/imports",
+                "method": "GET",
+            },
         ],
-        "version": "1.0.0",
+        "version": "1.1.0",
     })

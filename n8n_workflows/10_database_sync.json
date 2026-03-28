@@ -1,0 +1,72 @@
+{
+  "name": "Mories: DB 변경 감지 → 기억 갱신",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "minutes", "minutesInterval": 15 }] }
+      },
+      "id": "schedule-1",
+      "name": "Every 15 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, title, content, updated_at, category FROM knowledge_base WHERE updated_at > NOW() - INTERVAL '15 minutes' ORDER BY updated_at DESC LIMIT 20"
+      },
+      "id": "postgres-1",
+      "name": "Query Recent Changes",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [420, 300],
+      "credentials": {
+        "postgres": { "id": "pg-cred", "name": "Knowledge DB" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all();\nif (rows.length === 0) return [];\nreturn rows.map(row => ({\n  json: {\n    id: row.json.id,\n    title: row.json.title || '',\n    content: (row.json.content || '').substring(0, 3000),\n    category: row.json.category || 'general',\n    updated_at: row.json.updated_at\n  }\n}));"
+      },
+      "id": "transform-1",
+      "name": "Transform Records",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.MORIES_URL || 'http://localhost:5001' }}/api/gateway/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": \"[DB Update: {{ $json.category }}] {{ $json.title }}\\n{{ $json.content }}\",\n  \"source\": \"database:knowledge_base\",\n  \"graph_id\": \"{{ $env.MORIES_GRAPH_ID || 'db-sync' }}\",\n  \"scope\": \"tribal\",\n  \"auto_promote\": true,\n  \"metadata\": {\n    \"db_id\": \"{{ $json.id }}\",\n    \"category\": \"{{ $json.category }}\",\n    \"updated_at\": \"{{ $json.updated_at }}\"\n  }\n}"
+      },
+      "id": "ingest-1",
+      "name": "Sync to Mories",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [860, 300]
+    }
+  ],
+  "connections": {
+    "Every 15 Minutes": {
+      "main": [[ { "node": "Query Recent Changes", "type": "main", "index": 0 } ]]
+    },
+    "Query Recent Changes": {
+      "main": [[ { "node": "Transform Records", "type": "main", "index": 0 } ]]
+    },
+    "Transform Records": {
+      "main": [[ { "node": "Sync to Mories", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "mories-n8n" }
+}

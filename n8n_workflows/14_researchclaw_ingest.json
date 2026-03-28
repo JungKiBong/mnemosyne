@@ -1,0 +1,76 @@
+{
+  "name": "Mories: AutoResearchClaw 연구 결과 → 기억 저장",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "researchclaw-ingest",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-1",
+      "name": "Research Complete Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "webhookId": "researchclaw-ingest"
+    },
+    {
+      "parameters": {
+        "jsCode": "// AutoResearchClaw artifacts → Mories memory items\nconst body = $input.first().json.body || $input.first().json;\nconst artifactsDir = body.artifacts_dir || '';\nconst topic = body.topic || 'Unknown Research';\nconst runId = body.run_id || `rc-${Date.now()}`;\nconst graphId = body.graph_id || $env.MORIES_GRAPH_ID || 'research';\n\nconst items = [];\n\n// 1. Paper Draft → high salience knowledge\nif (body.paper_draft) {\n  items.push({\n    json: {\n      content: `[Research Paper] ${topic}\\n\\n${body.paper_draft.substring(0, 5000)}`,\n      source: `researchclaw:${runId}:paper`,\n      graph_id: graphId,\n      scope: 'tribal',\n      salience: 0.9,\n      metadata: {\n        type: 'paper_draft',\n        run_id: runId,\n        topic: topic,\n        stage: 'PAPER_DRAFT'\n      }\n    }\n  });\n}\n\n// 2. Literature references → individual memories\nif (body.references && Array.isArray(body.references)) {\n  for (const ref of body.references.slice(0, 50)) {\n    items.push({\n      json: {\n        content: `[Citation] ${ref.title || ref.key || 'Unknown'} by ${ref.authors || 'Unknown'} (${ref.year || 'N/A'})\\nAbstract: ${(ref.abstract || ref.summary || '').substring(0, 1000)}`,\n        source: `researchclaw:${runId}:citation`,\n        graph_id: graphId,\n        scope: 'tribal',\n        salience: 0.6,\n        metadata: {\n          type: 'citation',\n          run_id: runId,\n          doi: ref.doi || '',\n          url: ref.url || '',\n          year: ref.year || ''\n        }\n      }\n    });\n  }\n}\n\n// 3. Experiment results → technical knowledge\nif (body.experiment_results) {\n  const results = typeof body.experiment_results === 'string'\n    ? body.experiment_results\n    : JSON.stringify(body.experiment_results, null, 2);\n  items.push({\n    json: {\n      content: `[Experiment Results] ${topic}\\n\\n${results.substring(0, 3000)}`,\n      source: `researchclaw:${runId}:experiment`,\n      graph_id: graphId,\n      scope: 'tribal',\n      salience: 0.8,\n      metadata: {\n        type: 'experiment_result',\n        run_id: runId,\n        topic: topic,\n        stage: 'EXPERIMENT_RUN'\n      }\n    }\n  });\n}\n\n// 4. Peer review feedback → meta-knowledge\nif (body.reviews) {\n  items.push({\n    json: {\n      content: `[Peer Review] ${topic}\\n\\n${(typeof body.reviews === 'string' ? body.reviews : JSON.stringify(body.reviews)).substring(0, 2000)}`,\n      source: `researchclaw:${runId}:review`,\n      graph_id: graphId,\n      scope: 'tribal',\n      salience: 0.7,\n      metadata: {\n        type: 'peer_review',\n        run_id: runId,\n        topic: topic,\n        stage: 'PEER_REVIEW'\n      }\n    }\n  });\n}\n\n// 5. Synthesis/Hypotheses → theoretical knowledge\nif (body.synthesis) {\n  items.push({\n    json: {\n      content: `[Research Synthesis] ${topic}\\n\\n${(typeof body.synthesis === 'string' ? body.synthesis : JSON.stringify(body.synthesis)).substring(0, 3000)}`,\n      source: `researchclaw:${runId}:synthesis`,\n      graph_id: graphId,\n      scope: 'tribal',\n      salience: 0.85,\n      metadata: {\n        type: 'synthesis',\n        run_id: runId,\n        topic: topic,\n        stage: 'SYNTHESIS'\n      }\n    }\n  });\n}\n\n// 6. Lessons learned (MetaClaw skills) → high-value operational memory\nif (body.lessons && Array.isArray(body.lessons)) {\n  for (const lesson of body.lessons) {\n    items.push({\n      json: {\n        content: `[Research Lesson] ${lesson.title || 'Lesson'}\\n${lesson.description || lesson.content || JSON.stringify(lesson)}`,\n        source: `researchclaw:${runId}:lesson`,\n        graph_id: graphId,\n        scope: 'global',\n        salience: 0.95,\n        metadata: {\n          type: 'lesson_learned',\n          run_id: runId,\n          severity: lesson.severity || 'info',\n          stage: lesson.stage || 'unknown'\n        }\n      }\n    });\n  }\n}\n\n// Fallback: if nothing was extracted, store raw payload summary\nif (items.length === 0) {\n  items.push({\n    json: {\n      content: `[Research Run Complete] ${topic}\\n\\nRun ID: ${runId}\\nPayload keys: ${Object.keys(body).join(', ')}`,\n      source: `researchclaw:${runId}:summary`,\n      graph_id: graphId,\n      scope: 'tribal',\n      salience: 0.5,\n      metadata: { type: 'run_summary', run_id: runId, topic: topic }\n    }\n  });\n}\n\nreturn items;"
+      },
+      "id": "transform-1",
+      "name": "Parse Research Artifacts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.MORIES_URL || 'http://localhost:5001' }}/api/gateway/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": \"{{ $json.content }}\",\n  \"source\": \"{{ $json.source }}\",\n  \"graph_id\": \"{{ $json.graph_id }}\",\n  \"scope\": \"{{ $json.scope }}\",\n  \"metadata\": {{ JSON.stringify($json.metadata) }}\n}",
+        "options": {
+          "batching": { "batch": { "batchSize": 5, "batchInterval": 1000 } }
+        }
+      },
+      "id": "ingest-1",
+      "name": "Ingest to Memory",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ok', ingested: $input.all().length, run_id: $input.first().json.metadata?.run_id || 'unknown' }) }}"
+      },
+      "id": "response-1",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Research Complete Webhook": {
+      "main": [[ { "node": "Parse Research Artifacts", "type": "main", "index": 0 } ]]
+    },
+    "Parse Research Artifacts": {
+      "main": [[ { "node": "Ingest to Memory", "type": "main", "index": 0 } ]]
+    },
+    "Ingest to Memory": {
+      "main": [[ { "node": "Respond OK", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "mories-n8n", "templateCredsSetupCompleted": true }
+}

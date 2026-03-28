@@ -81,10 +81,10 @@ class MemoryEncryption:
         """
         Load master key from environment or generate one.
 
-        In production: set MNEMOSYNE_MASTER_KEY environment variable.
+        In production: set MORIES_MASTER_KEY environment variable.
         In dev: auto-generates and stores in config directory.
         """
-        env_key = os.environ.get('MNEMOSYNE_MASTER_KEY')
+        env_key = os.environ.get('MORIES_MASTER_KEY')
         if env_key:
             return base64.urlsafe_b64decode(env_key.encode())
 
@@ -112,7 +112,7 @@ class MemoryEncryption:
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
-            salt=f"mnemosyne-scope-{scope}".encode(),
+            salt=f"mories-scope-{scope}".encode(),
             iterations=100_000,
         )
         derived = kdf.derive(self._master_key)
@@ -124,7 +124,7 @@ class MemoryEncryption:
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
-            salt=f"mnemosyne-memory-{memory_uuid}".encode(),
+            salt=f"mories-memory-{memory_uuid}".encode(),
             iterations=50_000,
         )
         derived = kdf.derive(scope_key)

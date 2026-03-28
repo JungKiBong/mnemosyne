@@ -1,0 +1,68 @@
+{
+  "name": "Mories: RSS 피드 수집기",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "hours", "hoursInterval": 4 }] }
+      },
+      "id": "schedule-1",
+      "name": "Every 4 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.RSS_FEED_URL || 'https://arxiv.org/rss/cs.AI' }}"
+      },
+      "id": "rss-1",
+      "name": "Read RSS Feed",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst cutoff = Date.now() - (4 * 3600 * 1000);\nreturn items\n  .filter(item => {\n    const pubDate = item.json.pubDate ? new Date(item.json.pubDate).getTime() : Date.now();\n    return pubDate > cutoff;\n  })\n  .slice(0, 10)\n  .map(item => ({\n    json: {\n      title: item.json.title || '',\n      summary: (item.json.contentSnippet || item.json.content || '').substring(0, 500),\n      link: item.json.link || '',\n      published: item.json.pubDate || '',\n      categories: (item.json.categories || []).join(', ')\n    }\n  }));"
+      },
+      "id": "filter-1",
+      "name": "Filter Recent & Limit",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.MORIES_URL || 'http://localhost:5001' }}/api/gateway/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": \"[RSS] {{ $json.title }}\\n{{ $json.summary }}\\nCategories: {{ $json.categories }}\",\n  \"source\": \"rss:{{ $env.RSS_FEED_NAME || 'arxiv-ai' }}\",\n  \"graph_id\": \"{{ $env.MORIES_GRAPH_ID || 'research' }}\",\n  \"scope\": \"social\",\n  \"metadata\": {\n    \"link\": \"{{ $json.link }}\",\n    \"published\": \"{{ $json.published }}\"\n  }\n}"
+      },
+      "id": "ingest-1",
+      "name": "Ingest to Mories",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [860, 300]
+    }
+  ],
+  "connections": {
+    "Every 4 Hours": {
+      "main": [[ { "node": "Read RSS Feed", "type": "main", "index": 0 } ]]
+    },
+    "Read RSS Feed": {
+      "main": [[ { "node": "Filter Recent & Limit", "type": "main", "index": 0 } ]]
+    },
+    "Filter Recent & Limit": {
+      "main": [[ { "node": "Ingest to Mories", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "mories-n8n" }
+}

@@ -1,5 +1,5 @@
 {
-  "name": "Mnemosyne: 지식 그래프 검색",
+  "name": "Mories: 지식 그래프 검색",
   "nodes": [
     {
       "parameters": {},
@@ -24,10 +24,10 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"mnemosyne_search\",\n    \"arguments\": {\n      \"query\": \"{{ $json.query || 'Alice의 최근 행동' }}\",\n      \"limit\": 10\n    }\n  }\n}"
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"mories_search\",\n    \"arguments\": {\n      \"query\": \"{{ $json.query || 'Alice의 최근 행동' }}\",\n      \"limit\": 10\n    }\n  }\n}"
       },
       "id": "search-1",
-      "name": "Mnemosyne Search",
+      "name": "Mories Search",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [420, 300]
@@ -48,14 +48,14 @@
       "main": [
         [
           {
-            "node": "Mnemosyne Search",
+            "node": "Mories Search",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Mnemosyne Search": {
+    "Mories Search": {
       "main": [
         [
           {
@@ -71,6 +71,6 @@
     "executionOrder": "v1"
   },
   "meta": {
-    "instanceId": "mnemosyne-mcp"
+    "instanceId": "mories-mcp"
   }
 }

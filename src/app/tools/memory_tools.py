@@ -1,5 +1,5 @@
 """
-Mnemosyne MCP Tools — Agent-Callable Memory Tool Definitions
+Mories MCP Tools — Agent-Callable Memory Tool Definitions
 
 Provides structured tool definitions that multi-agent frameworks
 (ADK, LangGraph, CrewAI, OpenAI Function Calling) can directly invoke.
@@ -93,12 +93,12 @@ class ToolDefinition:
 # Tool Registry
 # ──────────────────────────────────────────
 
-class MnemosyneToolkit:
+class MoriesToolkit:
     """
     Complete toolkit for agent-based memory operations.
 
     Usage:
-        toolkit = MnemosyneToolkit()
+        toolkit = MoriesToolkit()
         result = toolkit.execute("memory_store", {"content": "...", "source": "agent"})
         tools = toolkit.get_all_schemas("openai")
     """
@@ -260,6 +260,32 @@ class MnemosyneToolkit:
                 ToolParameter("action", "string", "확인할 작업",
                             enum=["search", "store", "boost", "share", "decrypt", "export"]),
                 ToolParameter("scope", "string", "기억 스코프", required=False, default="personal"),
+            ],
+        )
+
+        # 14. research_context — 연구 컨텍스트 조회 (AutoResearchClaw 통합)
+        self._tools["research_context"] = ToolDefinition(
+            name="research_context",
+            description="연구 주제에 대한 기존 지식·논문·실험·교훈을 검색하여 카테고리별로 정리된 컨텍스트를 반환합니다. AutoResearchClaw 파이프라인의 Stage 4(문헌 수집), Stage 7(합성)에서 활용합니다.",
+            category="research",
+            parameters=[
+                ToolParameter("topic", "string", "연구 주제 또는 검색 쿼리"),
+                ToolParameter("limit", "number", "최대 결과 수", required=False, default=20),
+                ToolParameter("categories", "array", "필터할 카테고리 (paper, citation, experiment, lesson, synthesis)", required=False),
+                ToolParameter("graph_id", "string", "프로젝트 그래프 ID", required=False),
+            ],
+        )
+
+        # 15. research_archive — 연구 결과 일괄 아카이브 (AutoResearchClaw 통합)
+        self._tools["research_archive"] = ToolDefinition(
+            name="research_archive",
+            description="연구 파이프라인의 결과물(논문, 참조, 실험, 리뷰, 교훈)을 구조화하여 기억에 일괄 저장합니다. AutoResearchClaw의 Stage 21(KNOWLEDGE_ARCHIVE)에서 호출합니다.",
+            category="research",
+            parameters=[
+                ToolParameter("run_id", "string", "연구 실행 ID"),
+                ToolParameter("topic", "string", "연구 주제"),
+                ToolParameter("artifacts", "object", "아티팩트 객체: {paper_draft?, references?, experiment_results?, reviews?, synthesis?, lessons?}"),
+                ToolParameter("graph_id", "string", "프로젝트 그래프 ID", required=False, default="research"),
             ],
         )
 
@@ -425,6 +451,149 @@ class MnemosyneToolkit:
         from ..security.memory_rbac import get_rbac
         rbac = get_rbac()
         return rbac.check_permission(principal_id, action, scope)
+
+    # ── Research Integration Handlers (AutoResearchClaw) ──
+
+    def _exec_research_context(self, topic: str, limit: int = 20,
+                               categories: list = None,
+                               graph_id: str = None) -> dict:
+        """Retrieve categorized prior knowledge for a research topic."""
+        from neo4j import GraphDatabase
+        from ..config import Config
+        driver = GraphDatabase.driver(Config.NEO4J_URI, auth=(Config.NEO4J_USER, Config.NEO4J_PASSWORD))
+
+        # Build category filter
+        cat_filter = ""
+        if categories:
+            type_list = ", ".join(f"'{c}'" for c in categories)
+            cat_filter = f"AND e.metadata_type IN [{type_list}]"
+
+        graph_filter = f"AND e.graph_id = '{graph_id}'" if graph_id else ""
+
+        with driver.session() as session:
+            records = session.run(f"""
+                MATCH (e:Entity)
+                WHERE e.salience IS NOT NULL
+                  AND e.salience >= 0.3
+                  AND (toLower(e.name) CONTAINS toLower($topic)
+                       OR toLower(COALESCE(e.summary, '')) CONTAINS toLower($topic))
+                  {cat_filter}
+                  {graph_filter}
+                RETURN e.uuid AS uuid, e.name AS name,
+                       e.salience AS salience,
+                       COALESCE(e.scope, 'personal') AS scope,
+                       e.summary AS summary,
+                       COALESCE(e.metadata_type, 'general') AS category,
+                       e.metadata_run_id AS run_id,
+                       e.metadata_topic AS topic
+                ORDER BY e.salience DESC
+                LIMIT $limit
+            """, topic=topic, limit=limit).data()
+
+        driver.close()
+
+        # Categorize results
+        categorized = {"papers": [], "citations": [], "experiments": [],
+                       "lessons": [], "synthesis": [], "other": []}
+        category_map = {
+            "paper_draft": "papers", "synthesis": "synthesis",
+            "citation": "citations", "experiment_result": "experiments",
+            "lesson_learned": "lessons"
+        }
+
+        for r in records:
+            bucket = category_map.get(r.get("category"), "other")
+            categorized[bucket].append({
+                "uuid": r["uuid"],
+                "content": r.get("name") or r.get("summary", ""),
+                "salience": r.get("salience", 0),
+                "run_id": r.get("run_id"),
+                "topic": r.get("topic"),
+            })
+
+        # Boost retrieved items
+        if records:
+            uuids = [r["uuid"] for r in records]
+            self._manager.boost_on_retrieval(uuids)
+
+        return {
+            "topic": topic,
+            "total_found": len(records),
+            "categories": {k: len(v) for k, v in categorized.items()},
+            "context": categorized,
+        }
+
+    def _exec_research_archive(self, run_id: str, topic: str,
+                               artifacts: dict,
+                               graph_id: str = "research") -> dict:
+        """Batch-store research pipeline outputs as structured memories."""
+        stored = []
+        errors = []
+
+        # Define artifact types with salience levels
+        artifact_types = [
+            ("paper_draft", "paper_draft", 0.9, "tribal"),
+            ("synthesis", "synthesis", 0.85, "tribal"),
+            ("experiment_results", "experiment_result", 0.8, "tribal"),
+            ("reviews", "peer_review", 0.7, "tribal"),
+            ("lessons", "lesson_learned", 0.95, "global"),
+        ]
+
+        for key, mem_type, salience, scope in artifact_types:
+            data = artifacts.get(key)
+            if not data:
+                continue
+
+            # Handle list-type artifacts (references, lessons)
+            items_to_store = data if isinstance(data, list) else [data]
+
+            for item in items_to_store:
+                content = item if isinstance(item, str) else json.dumps(item, ensure_ascii=False)
+                prefix = f"[{mem_type.replace('_', ' ').title()}] {topic}"
+                full_content = f"{prefix}\n\n{content[:5000]}"
+
+                try:
+                    result = self._exec_memory_store(
+                        content=full_content,
+                        source=f"researchclaw:{run_id}:{mem_type}",
+                        salience=salience,
+                        metadata={
+                            "type": mem_type,
+                            "run_id": run_id,
+                            "topic": topic,
+                            "graph_id": graph_id,
+                        },
+                        scope=scope,
+                    )
+                    stored.append({"type": mem_type, "status": result.get("status", "stored")})
+                except Exception as e:
+                    errors.append({"type": mem_type, "error": str(e)})
+
+        # Handle references separately (always a list)
+        refs = artifacts.get("references", [])
+        if isinstance(refs, list):
+            for ref in refs[:50]:
+                ref_text = ref if isinstance(ref, str) else f"{ref.get('title', 'Unknown')} ({ref.get('year', 'N/A')})"
+                try:
+                    self._exec_memory_store(
+                        content=f"[Citation] {ref_text}",
+                        source=f"researchclaw:{run_id}:citation",
+                        salience=0.6,
+                        metadata={"type": "citation", "run_id": run_id, "graph_id": graph_id},
+                        scope="tribal",
+                    )
+                    stored.append({"type": "citation", "status": "stored"})
+                except Exception as e:
+                    errors.append({"type": "citation", "error": str(e)})
+
+        return {
+            "run_id": run_id,
+            "topic": topic,
+            "graph_id": graph_id,
+            "total_stored": len(stored),
+            "errors": errors,
+            "summary": stored,
+        }
 
 
     # ── Helpers ──

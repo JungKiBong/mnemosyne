@@ -1,0 +1,129 @@
+{
+  "name": "Mories: 기억 건강 모니터 & 알림",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "hours", "hoursInterval": 12 }] }
+      },
+      "id": "schedule-1",
+      "name": "Every 12 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.MORIES_URL || 'http://localhost:5001' }}/api/health"
+      },
+      "id": "health-1",
+      "name": "Check Health",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [420, 200]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.MORIES_URL || 'http://localhost:5001' }}/api/memory/overview"
+      },
+      "id": "overview-1",
+      "name": "Memory Overview",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [420, 400]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.MORIES_URL || 'http://localhost:5001' }}/api/memory/weakest"
+      },
+      "id": "weakest-1",
+      "name": "Weakest Memories",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [420, 600]
+    },
+    {
+      "parameters": {
+        "jsCode": "const health = $('Check Health').first().json;\nconst overview = $('Memory Overview').first().json;\nconst weakest = $('Weakest Memories').first().json || [];\n\nconst neo4jOk = health.neo4j === 'connected';\nconst ltmCount = overview.ltm_count || 0;\nconst avgSalience = overview.avg_salience || 0;\nconst weakCount = Array.isArray(weakest) ? weakest.length : (weakest.memories || []).length;\n\n// Determine alert level\nlet alertLevel = 'ok';\nlet alerts = [];\n\nif (!neo4jOk) {\n  alertLevel = 'critical';\n  alerts.push('❌ Neo4j disconnected!');\n}\nif (avgSalience < 0.3) {\n  alertLevel = alertLevel === 'ok' ? 'warning' : alertLevel;\n  alerts.push(`⚠️ Average salience is low: ${avgSalience.toFixed(2)}`);\n}\nif (weakCount > 20) {\n  alertLevel = alertLevel === 'ok' ? 'warning' : alertLevel;\n  alerts.push(`⚠️ ${weakCount} memories at risk of decay`);\n}\n\nif (alerts.length === 0) {\n  alerts.push(`✅ All systems healthy (${ltmCount} LTM, avg salience: ${avgSalience.toFixed(2)})`);\n}\n\nreturn [{\n  json: {\n    alertLevel,\n    summary: alerts.join('\\n'),\n    ltm_count: ltmCount,\n    avg_salience: avgSalience,\n    weak_memories: weakCount,\n    neo4j: neo4jOk ? 'connected' : 'disconnected',\n    shouldNotify: alertLevel !== 'ok'\n  }\n}];"
+      },
+      "id": "analyze-1",
+      "name": "Analyze Health",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [{
+            "id": "cond-1",
+            "leftValue": "={{ $json.shouldNotify }}",
+            "rightValue": true,
+            "operator": { "type": "boolean", "operation": "equals", "singleValue": true }
+          }]
+        }
+      },
+      "id": "if-1",
+      "name": "Should Alert?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [920, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SLACK_WEBHOOK_URL || 'https://hooks.slack.com/services/xxx/yyy/zzz' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"text\": \"🧠 *Mories Memory Health Report*\\nLevel: {{ $json.alertLevel }}\\n\\n{{ $json.summary }}\\n\\n📊 LTM: {{ $json.ltm_count }} | 📉 Weak: {{ $json.weak_memories }} | Neo4j: {{ $json.neo4j }}\"\n}"
+      },
+      "id": "slack-alert",
+      "name": "Send Slack Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1140, 300]
+    },
+    {
+      "parameters": {},
+      "id": "noop-1",
+      "name": "All OK (No Alert)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1140, 500]
+    }
+  ],
+  "connections": {
+    "Every 12 Hours": {
+      "main": [
+        [
+          { "node": "Check Health", "type": "main", "index": 0 },
+          { "node": "Memory Overview", "type": "main", "index": 0 },
+          { "node": "Weakest Memories", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Check Health": {
+      "main": [[ { "node": "Analyze Health", "type": "main", "index": 0 } ]]
+    },
+    "Memory Overview": {
+      "main": [[ { "node": "Analyze Health", "type": "main", "index": 0 } ]]
+    },
+    "Weakest Memories": {
+      "main": [[ { "node": "Analyze Health", "type": "main", "index": 0 } ]]
+    },
+    "Analyze Health": {
+      "main": [[ { "node": "Should Alert?", "type": "main", "index": 0 } ]]
+    },
+    "Should Alert?": {
+      "main": [
+        [ { "node": "Send Slack Alert", "type": "main", "index": 0 } ],
+        [ { "node": "All OK (No Alert)", "type": "main", "index": 0 } ]
+      ]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "mories-n8n" }
+}

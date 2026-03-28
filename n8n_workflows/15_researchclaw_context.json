@@ -1,0 +1,79 @@
+{
+  "name": "Mories: AutoResearchClaw 연구 컨텍스트 조회",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "researchclaw-context",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-1",
+      "name": "Context Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "webhookId": "researchclaw-context"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.MORIES_URL || 'http://localhost:5001' }}/api/memory/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "q", "value": "={{ $json.body?.topic || $json.body?.query || 'research' }}" },
+            { "name": "limit", "value": "={{ $json.body?.limit || 20 }}" },
+            { "name": "min_salience", "value": "={{ $json.body?.min_salience || 0.3 }}" },
+            { "name": "scope", "value": "={{ $json.body?.scope || 'all' }}" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Accept", "value": "application/json" }
+          ]
+        }
+      },
+      "id": "search-memory",
+      "name": "Search Memory",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format search results as context for AutoResearchClaw\nconst results = $input.first().json;\nconst memories = results.results || results.data || [];\n\n// Categorize by type\nconst papers = memories.filter(m => m.metadata?.type === 'paper_draft' || m.metadata?.type === 'synthesis');\nconst citations = memories.filter(m => m.metadata?.type === 'citation');\nconst experiments = memories.filter(m => m.metadata?.type === 'experiment_result');\nconst lessons = memories.filter(m => m.metadata?.type === 'lesson_learned');\nconst other = memories.filter(m => !['paper_draft','synthesis','citation','experiment_result','lesson_learned'].includes(m.metadata?.type));\n\nconst context = {\n  total_memories: memories.length,\n  categories: {\n    papers: papers.length,\n    citations: citations.length,\n    experiments: experiments.length,\n    lessons: lessons.length,\n    other: other.length\n  },\n  // High-priority context for LLM injection\n  prior_research: papers.map(m => ({\n    content: m.name || m.content || m.summary,\n    salience: m.salience,\n    run_id: m.metadata?.run_id,\n    topic: m.metadata?.topic\n  })),\n  known_citations: citations.map(m => ({\n    content: m.name || m.content,\n    salience: m.salience\n  })).slice(0, 30),\n  experiment_insights: experiments.map(m => ({\n    content: m.name || m.content,\n    salience: m.salience,\n    topic: m.metadata?.topic\n  })),\n  lessons_learned: lessons.map(m => ({\n    content: m.name || m.content,\n    severity: m.metadata?.severity,\n    salience: m.salience\n  })),\n  additional_knowledge: other.slice(0, 10).map(m => ({\n    content: m.name || m.content,\n    salience: m.salience\n  }))\n};\n\nreturn [{ json: context }];"
+      },
+      "id": "format-context",
+      "name": "Format Research Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "response-1",
+      "name": "Return Context",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Context Request": {
+      "main": [[ { "node": "Search Memory", "type": "main", "index": 0 } ]]
+    },
+    "Search Memory": {
+      "main": [[ { "node": "Format Research Context", "type": "main", "index": 0 } ]]
+    },
+    "Format Research Context": {
+      "main": [[ { "node": "Return Context", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "mories-n8n", "templateCredsSetupCompleted": true }
+}

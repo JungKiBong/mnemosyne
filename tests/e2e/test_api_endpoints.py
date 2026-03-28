@@ -1,5 +1,5 @@
 """
-E2E API tests — Mnemosyne REST endpoints.
+E2E API tests — Mories REST endpoints.
 
 Uses Flask test client to verify end-to-end API behavior
 for memory management, search, and dashboard endpoints.

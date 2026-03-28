@@ -1,4 +1,4 @@
-# 📖 Mnemosyne 운영 가이드
+# 📖 Mories 운영 가이드
 
 > 시스템 운영, 관리, 트러블슈팅을 위한 실무 가이드
 
@@ -37,8 +37,8 @@
 
 ```bash
 # 1. 프로젝트 클론
-git clone https://github.com/JungKiBong/mnemosyne.git
-cd mnemosyne
+git clone https://github.com/JungKiBong/mories.git
+cd mories
 
 # 2. 환경 변수 설정
 cp .env.example .env
@@ -196,7 +196,7 @@ curl -X POST http://localhost:5050/api/memory/audit/rollback \
 
 ## 6. MCP 서버 연동
 
-Mnemosyne는 MCP(Model Context Protocol) 서버를 내장하고 있어 AI 에이전트가 직접 도구로 호출 가능합니다.
+Mories는 MCP(Model Context Protocol) 서버를 내장하고 있어 AI 에이전트가 직접 도구로 호출 가능합니다.
 
 ### 지원 도구 (5개)
 

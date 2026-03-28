@@ -1,5 +1,5 @@
 """
-conftest.py — Shared fixtures for Mnemosyne test suite.
+conftest.py — Shared fixtures for Mories test suite.
 
 Provides:
   - Flask test client (app fixture)

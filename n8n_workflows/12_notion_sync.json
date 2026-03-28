@@ -1,0 +1,80 @@
+{
+  "name": "Mories: Notion 페이지 → 기억 동기화",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "hours", "hoursInterval": 2 }] }
+      },
+      "id": "schedule-1",
+      "name": "Every 2 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/databases/{{ $env.NOTION_DATABASE_ID }}/query",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.NOTION_API_KEY }}" },
+            { "name": "Notion-Version", "value": "2022-06-28" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"filter\": {\n    \"timestamp\": \"last_edited_time\",\n    \"last_edited_time\": {\n      \"after\": \"={{ new Date(Date.now() - 7200000).toISOString() }}\"\n    }\n  },\n  \"page_size\": 10\n}"
+      },
+      "id": "notion-query",
+      "name": "Query Notion DB",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst pages = data.results || [];\nif (pages.length === 0) return [];\n\nreturn pages.map(page => {\n  // Extract title from properties\n  const titleProp = Object.values(page.properties || {}).find(p => p.type === 'title');\n  const title = titleProp?.title?.[0]?.plain_text || 'Untitled';\n  \n  // Extract other text properties\n  const textProps = Object.entries(page.properties || {})\n    .filter(([k, v]) => v.type === 'rich_text')\n    .map(([k, v]) => `${k}: ${v.rich_text?.[0]?.plain_text || ''}`)\n    .join('\\n');\n\n  return {\n    json: {\n      pageId: page.id,\n      title,\n      content: textProps || title,\n      url: page.url || '',\n      lastEdited: page.last_edited_time\n    }\n  };\n});"
+      },
+      "id": "transform-1",
+      "name": "Extract Properties",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.MORIES_URL || 'http://localhost:5001' }}/api/gateway/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": \"[Notion] {{ $json.title }}\\n{{ $json.content }}\",\n  \"source\": \"notion:{{ $json.pageId }}\",\n  \"graph_id\": \"{{ $env.MORIES_GRAPH_ID || 'knowledge-base' }}\",\n  \"scope\": \"tribal\",\n  \"metadata\": {\n    \"notion_id\": \"{{ $json.pageId }}\",\n    \"url\": \"{{ $json.url }}\",\n    \"last_edited\": \"{{ $json.lastEdited }}\"\n  }\n}"
+      },
+      "id": "ingest-1",
+      "name": "Ingest to Mories",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [860, 300]
+    }
+  ],
+  "connections": {
+    "Every 2 Hours": {
+      "main": [[ { "node": "Query Notion DB", "type": "main", "index": 0 } ]]
+    },
+    "Query Notion DB": {
+      "main": [[ { "node": "Extract Properties", "type": "main", "index": 0 } ]]
+    },
+    "Extract Properties": {
+      "main": [[ { "node": "Ingest to Mories", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "mories-n8n" }
+}

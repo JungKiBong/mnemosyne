@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mories — Knowledge Graph Explorer</title>
+<script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+<style>
+:root {
+  --bg-0: #0a0a0f;
+  --bg-1: #12121a;
+  --bg-2: #16161f;
+  --border: #2a2a3a;
+  --text-0: #e8e8f0;
+  --text-1: #8888a0;
+  --text-2: #555568;
+  --accent-blue: #4a7dff;
+  --accent-purple: #8b5cf6;
+  --accent-green: #22c55e;
+  --accent-cyan: #06b6d4;
+  --accent-orange: #f97316;
+  --radius: 12px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Inter',system-ui,sans-serif; background:var(--bg-0); color:var(--text-0); height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+a { color:var(--accent-cyan); text-decoration:none; }
+a:hover { text-decoration:underline; }
+
+/* Header */
+.header { padding:16px 24px; display:flex; align-items:center; gap:16px; border-bottom:1px solid var(--border); background:rgba(22,22,31,0.7); backdrop-filter:blur(10px); z-index:100; flex-shrink:0; }
+.header h1 { font-size:1.2rem; background:linear-gradient(135deg,var(--accent-purple),var(--accent-cyan)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+.badge { padding:3px 10px; border-radius:999px; font-size:.7rem; font-weight:600; letter-spacing:.5px; background:rgba(139,92,246,.2); color:#a78bfa; }
+.nav-links { margin-left:auto; display:flex; gap:16px; font-size:.85rem; }
+.nav-links a { color:var(--text-1); transition:color .2s; }
+.nav-links a:hover { color:var(--text-0); text-decoration:none; }
+
+/* Main Layout */
+.layout { display:flex; flex:1; overflow:hidden; }
+
+/* Sidebar */
+.sidebar { width:320px; background:var(--bg-1); border-right:1px solid var(--border); display:flex; flex-direction:column; z-index:10; }
+.sidebar-section { padding:20px; border-bottom:1px solid var(--border); }
+.sidebar-section h3 { font-size:0.85rem; text-transform:uppercase; letter-spacing:1px; color:var(--text-1); margin-bottom:12px; }
+
+.input-group { margin-bottom:12px; }
+.input-group label { display:block; font-size:0.75rem; color:var(--text-1); margin-bottom:6px; }
+input[type="text"], textarea { width:100%; border-radius:6px; border:1px solid var(--border); background:var(--bg-2); color:white; padding:10px; font-size:0.85rem; font-family:inherit; outline:none; transition:border 0.2s; }
+input[type="text"]:focus, textarea:focus { border-color:var(--accent-blue); }
+textarea { height:120px; resize:none; font-family:'JetBrains Mono',monospace; font-size:0.75rem; }
+
+.btn { width:100%; padding:10px; border-radius:8px; border:none; cursor:pointer; font-size:0.85rem; font-weight:600; transition:all 0.2s; }
+.btn-primary { background:linear-gradient(135deg,var(--accent-blue),var(--accent-purple)); color:white; box-shadow:0 4px 12px rgba(74,125,255,0.2); }
+.btn-primary:hover { opacity:0.9; transform:translateY(-1px); }
+
+/* Node Details */
+#node-details { padding:20px; overflow-y:auto; flex:1; font-size:0.85rem; line-height:1.5; color:var(--text-1); }
+.detail-title { color:white; font-size:1rem; font-weight:600; margin-bottom:12px; word-break:break-word; }
+.detail-meta { margin-bottom:16px; padding:10px; background:var(--bg-2); border-radius:8px; border:1px solid var(--border); }
+.detail-row { display:flex; margin-bottom:6px; }
+.detail-row:last-child { margin-bottom:0; }
+.detail-label { width:80px; color:var(--text-2); font-size:0.75rem; font-family:'JetBrains Mono',monospace; }
+.detail-val { flex:1; color:var(--accent-cyan); word-break:break-all; }
+.detail-summary { background:var(--bg-2); padding:12px; border-radius:8px; white-space:pre-wrap; border:1px solid var(--border); }
+
+/* Graph Container */
+#network { flex:1; height:100%; position:relative; background:#050508; }
+.legend { position:absolute; bottom:24px; left:24px; background:rgba(22,22,31,0.8); backdrop-filter:blur(10px); padding:16px; border-radius:12px; border:1px solid var(--border); z-index:10; }
+.legend-item { display:flex; align-items:center; gap:8px; margin-bottom:8px; font-size:0.8rem; color:var(--text-1); }
+.legend-item:last-child { margin-bottom:0; }
+.legend-dot { width:12px; height:12px; border-radius:50%; border:2px solid; }
+
+.loading-overlay { position:absolute; inset:0; background:rgba(10,10,15,0.7); display:none; justify-content:center; align-items:center; z-index:50; color:white; font-weight:600; backdrop-filter:blur(4px); }
+.loading-overlay.active { display:flex; flex-direction:column; gap:16px; }
+.spinner { width:32px; height:32px; border:3px solid var(--border); border-top-color:var(--accent-cyan); border-radius:50%; animation:spin 1s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🕸️ Knowledge Graph & Synaptic Visualizer</h1>
+  <span class="badge">MiroFish × Neo4j</span>
+  <div class="nav-links">
+    <a href="/">🏠 Dashboard</a>
+    <a href="/memory">🧠 Memory</a>
+    <a href="/synaptic">🌐 Synaptic</a>
+    <a href="/memory/history">📜 Audit</a>
+    <a href="/maturity">🌱 Maturity</a>
+  </div>
+</div>
+
+<div class="layout">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <h3>🔍 Graph Query</h3>
+      <div class="input-group">
+        <label>Cypher Query</label>
+        <textarea id="cypherInput">MATCH (n)-[r]->(m) RETURN n, type(r) as type, m LIMIT 300</textarea>
+      </div>
+      <button class="btn btn-primary" onclick="runQuery()">▶ Execute Query</button>
+    </div>
+    
+    <div class="sidebar-section">
+      <h3>🤖 Agents</h3>
+      <button class="btn btn-primary" style="background:#22c55e; margin-bottom:10px;" onclick="loadAgents()">🧬 Overlay Agents Network</button>
+      <p style="font-size:0.75rem; color:var(--text-2); line-height:1.4;">Active agents and their shared memories via Synaptic Bridge will be highlighted.</p>
+    </div>
+
+    <div id="node-details">
+      <div style="text-align:center; color:var(--text-2); margin-top:40px;">
+        <span style="font-size:2rem; display:block; margin-bottom:10px;">👆</span>
+        Select a node to view its memory, agent scope, and access metrics.
+      </div>
+    </div>
+  </div>
+
+  <!-- Graph Canvas -->
+  <div id="network">
+    <div class="loading-overlay" id="loading">
+      <div class="spinner"></div>
+      <div>Loading Neural Map...</div>
+    </div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(74,125,255,0.2); border-color:#4a7dff;"></div> Memory (Personal)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(34,197,94,0.2); border-color:#22c55e;"></div> Memory (Social/Tribal)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(249,115,22,0.2); border-color:#f97316;"></div> Revision / Metadata</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(139,92,246,0.3); border-color:#8b5cf6;"></div> Synaptic Agent</div>
+    </div>
+  </div>
+</div>
+
+<script>
+let network = null;
+const nodesData = new vis.DataSet();
+const edgesData = new vis.DataSet();
+
+// Configuration for visually stunning network
+const displayOptions = {
+  nodes: {
+    shape: 'dot', size: 16,
+    font: { color: '#e8e8f0', size: 12, face: 'Inter', strokeWidth: 3, strokeColor: '#0a0a0f' },
+    borderWidth: 2, shadow: { enabled: true, color: 'rgba(0,0,0,0.5)', size: 10, x: 0, y: 0 }
+  },
+  edges: {
+    width: 1.5, color: { color: '#2a2a3a', highlight: '#06b6d4', hover: '#4a7dff' },
+    smooth: { type: 'continuous', roundness: 0.5 },
+    font: { color: '#555568', size: 10, strokeWidth: 0, align: 'top' },
+    arrows: { to: { enabled: true, scaleFactor: 0.5 } }
+  },
+  physics: {
+    enabled: true, solver: 'forceAtlas2Based',
+    forceAtlas2Based: { gravitationalConstant: -60, centralGravity: 0.01, springLength: 100, springConstant: 0.08, damping: 0.4 },
+    stabilization: { iterations: 150 }
+  },
+  interaction: { hover: true, tooltipDelay: 200, zoomSpeed: 0.5 }
+};
+
+// Map backend color logic
+function getNodeStyle(nodeData) {
+  let bg = 'rgba(74,125,255,0.2)'; let border = '#4a7dff';
+  if(nodeData.role) { // Agent
+    bg = 'rgba(139,92,246,0.5)'; border = '#8b5cf6';
+  } else if(nodeData.revision_id) { // Revision
+    bg = 'rgba(249,115,22,0.2)'; border = '#f97316';
+  } else if(nodeData.scope === 'social' || nodeData.scope === 'global') {
+    bg = 'rgba(34,197,94,0.2)'; border = '#22c55e';
+  }
+  return { background: bg, border: border, highlight: { background: border, border: '#fff' } };
+}
+
+function getNodeLabel(data) {
+  if (data.name && data.name.includes("{'title'")) {
+    try { const p = JSON.parse(data.name.replace(/'/g, '"')); return p.title || 'Memory Node'; }catch(e){}
+  }
+  return data.name || data.agent_id || data.revision_id?.slice(0,8) || data.uuid?.slice(0,8) || 'Unknown';
+}
+
+function initNetwork() {
+  const container = document.getElementById('network');
+  network = new vis.Network(container, { nodes: nodesData, edges: edgesData }, displayOptions);
+  
+  network.on("selectNode", function (params) {
+    if (params.nodes.length > 0) {
+      const nodeId = params.nodes[0];
+      const nodeObj = nodesData.get(nodeId);
+      showNodeDetails(nodeObj.raw);
+    }
+  });
+
+  network.on("deselectNode", function () {
+    document.getElementById('node-details').innerHTML = `
+      <div style="text-align:center; color:var(--text-2); margin-top:40px;">
+        <span style="font-size:2rem; display:block; margin-bottom:10px;">👆</span>
+        Select a node to view its memory, agent scope, and access metrics.
+      </div>
+    `;
+  });
+}
+
+function showNodeDetails(data) {
+  const panel = document.getElementById('node-details');
+  const uuid = data.uuid || data.revision_id || data.agent_id;
+  
+  let html = `<div class="detail-title">${getNodeLabel(data)}</div>`;
+  html += `<div class="detail-meta">`;
+  html += `<div class="detail-row"><div class="detail-label">ID</div><div class="detail-val">${uuid?.slice(0,18)}...</div></div>`;
+  if(data.scope) html += `<div class="detail-row"><div class="detail-label">Scope</div><div class="detail-val">${data.scope}</div></div>`;
+  if(data.salience !== undefined) html += `<div class="detail-row"><div class="detail-label">Salience</div><div class="detail-val">${data.salience}</div></div>`;
+  if(data.access_count !== undefined) html += `<div class="detail-row"><div class="detail-label">Accesses</div><div class="detail-val">${data.access_count}</div></div>`;
+  if(data.role) html += `<div class="detail-row"><div class="detail-label">Role</div><div class="detail-val" style="color:#8b5cf6">${data.role}</div></div>`;
+  html += `</div>`;
+
+  if(data.summary) {
+    let summaryStr = data.summary;
+    if (summaryStr.startsWith("{'title'")) {
+      try { const p = JSON.parse(summaryStr.replace(/'/g, '"')); summaryStr = p.body; } catch(e){}
+    }
+    html += `<h3>Memory Snapshot</h3><div class="detail-summary">${summaryStr.replace(/\\n/g, '<br>')}</div>`;
+  }
+  
+  panel.innerHTML = html;
+}
+
+function toggleLoader(active) {
+  const loader = document.getElementById('loading');
+  if (loader) loader.classList.toggle('active', active);
+}
+
+// 1. Load Cypher Query
+async function runQuery() {
+  toggleLoader(true);
+  const cypher = document.getElementById('cypherInput').value;
+  try {
+    const res = await fetch('/api/query', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cypher })
+    });
+    const result = await res.json();
+    processGraphData(result);
+  } catch(e) {
+    alert("Query failed: " + e.message);
+  } finally {
+    toggleLoader(false);
+  }
+}
+
+// 2. Add Agents to the Network
+async function loadAgents() {
+  toggleLoader(true);
+  try {
+    const res = await fetch('/api/memory/synaptic/agents');
+    const agents = await res.json();
+    
+    // Add central bridge node
+    const bridgeId = "BRIDGE_CORE";
+    if(!nodesData.get(bridgeId)) {
+      nodesData.add({ id: bridgeId, label: 'Mories Synaptic Bridge', raw: {role: 'Network Hub'}, size: 24, font: {size: 14}, color: getNodeStyle({role:'hub'}) });
+    }
+
+    agents.forEach(a => {
+      const aId = "AGENT_" + a.name;
+      if(!nodesData.get(aId)) {
+        nodesData.add({ id: aId, label: '🤖 ' + a.name, raw: a, color: getNodeStyle({role:'agent'}), size: 20 });
+        edgesData.add({ from: aId, to: bridgeId, label: 'REGISTERED', color: {color: '#8b5cf6', opacity: 0.5} });
+        
+        // Connect agent to any nodes it created or interacted with
+        const allNodes = nodesData.get();
+        allNodes.forEach(n => {
+          if (n.raw.source && n.raw.source.includes(a.name)) {
+            edgesData.add({ from: aId, to: n.id, label: 'OWNER', dashes: true, color: {color: '#8b5cf6', opacity: 0.3} });
+          }
+        });
+      }
+    });
+  } catch(e) {
+    alert("Agent load failed: " + e.message);
+  } finally {
+    toggleLoader(false);
+  }
+}
+
+function processGraphData(result) {
+  nodesData.clear();
+  edgesData.clear();
+  const addedNodes = new Set();
+  const addedEdges = new Set();
+  
+  if(!result.rows) return;
+
+  result.rows.forEach(r => {
+    // Process Node n
+    if(r.n && r.n.uuid) {
+      if(!addedNodes.has(r.n.uuid)) {
+        nodesData.add({ id: r.n.uuid, label: getNodeLabel(r.n), raw: r.n, color: getNodeStyle(r.n) });
+        addedNodes.add(r.n.uuid);
+      }
+    }
+    // Process Node m
+    if(r.m) {
+      const mId = r.m.uuid || r.m.revision_id;
+      if(mId && !addedNodes.has(mId)) {
+        nodesData.add({ id: mId, label: getNodeLabel(r.m), raw: r.m, color: getNodeStyle(r.m) });
+        addedNodes.add(mId);
+      }
+      
+      // Add edge
+      if(r.n && r.n.uuid && mId && r.type) {
+        const edgeId = r.n.uuid + '_' + r.type + '_' + mId;
+        if(!addedEdges.has(edgeId)) {
+          edgesData.add({ id: edgeId, from: r.n.uuid, to: mId, label: r.type });
+          addedEdges.add(edgeId);
+        }
+      }
+    }
+  });
+
+  network.fit({animation:{duration:1000, easingFunction:'easeInOutQuad'}});
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  initNetwork();
+  runQuery(); // Load default graph
+});
+</script>
+</body>
+</html>

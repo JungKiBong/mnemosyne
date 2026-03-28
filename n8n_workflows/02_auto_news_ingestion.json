@@ -1,5 +1,5 @@
 {
-  "name": "Mnemosyne: 자동 데이터 수집 파이프라인",
+  "name": "Mories: 자동 데이터 수집 파이프라인",
   "nodes": [
     {
       "parameters": {
@@ -52,10 +52,10 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"id\": {{ $runIndex + 1 }},\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"mnemosyne_ingest\",\n    \"arguments\": {\n      \"graph_id\": \"news_feed\",\n      \"text_content\": \"[{{ $json.source }}] {{ $json.title }}\\n{{ $json.description }}\\n{{ $json.content }}\",\n      \"source_type\": \"auto\"\n    }\n  }\n}"
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"id\": {{ $runIndex + 1 }},\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"mories_ingest\",\n    \"arguments\": {\n      \"graph_id\": \"news_feed\",\n      \"text_content\": \"[{{ $json.source }}] {{ $json.title }}\\n{{ $json.description }}\\n{{ $json.content }}\",\n      \"source_type\": \"auto\"\n    }\n  }\n}"
       },
       "id": "ingest-1",
-      "name": "Ingest to Mnemosyne",
+      "name": "Ingest to Mories",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [860, 300]
@@ -69,9 +69,9 @@
       "main": [[{ "node": "Extract Articles", "type": "main", "index": 0 }]]
     },
     "Extract Articles": {
-      "main": [[{ "node": "Ingest to Mnemosyne", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Ingest to Mories", "type": "main", "index": 0 }]]
     }
   },
   "settings": { "executionOrder": "v1" },
-  "meta": { "instanceId": "mnemosyne-mcp" }
+  "meta": { "instanceId": "mories-mcp" }
 }

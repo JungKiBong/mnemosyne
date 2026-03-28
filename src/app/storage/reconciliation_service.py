@@ -109,7 +109,7 @@ class ReconciliationResult:
 
 class ReconciliationService:
     """
-    Data consistency engine for Mnemosyne.
+    Data consistency engine for Mories.
 
     Checks Neo4j entities for:
     1. Schema completeness (required properties present)

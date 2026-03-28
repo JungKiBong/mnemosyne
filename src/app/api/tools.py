@@ -21,8 +21,8 @@ _toolkit = None
 def _get_toolkit():
     global _toolkit
     if _toolkit is None:
-        from ..tools.memory_tools import MnemosyneToolkit
-        _toolkit = MnemosyneToolkit()
+        from ..tools.memory_tools import MoriesToolkit
+        _toolkit = MoriesToolkit()
     return _toolkit
 
 

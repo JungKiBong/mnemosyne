@@ -1,0 +1,106 @@
+{
+  "name": "Mories: YouTube 자막 → 지식 저장",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "youtube-to-memory",
+        "responseMode": "responseNode"
+      },
+      "id": "webhook-1",
+      "name": "YouTube URL 입력",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst url = body.url || body.youtube_url || '';\n\n// Extract video ID from URL\nlet videoId = '';\nconst match = url.match(/(?:v=|youtu\\.be\\/)([a-zA-Z0-9_-]{11})/);\nif (match) videoId = match[1];\n\nif (!videoId) {\n  throw new Error('Invalid YouTube URL: ' + url);\n}\n\nreturn [{ json: { videoId, url, graph_id: body.graph_id || 'research' } }];"
+      },
+      "id": "extract-id",
+      "name": "Extract Video ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://www.googleapis.com/youtube/v3/captions",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "videoId", "value": "={{ $json.videoId }}" },
+            { "name": "key", "value": "={{ $env.YOUTUBE_API_KEY }}" },
+            { "name": "part", "value": "snippet" }
+          ]
+        }
+      },
+      "id": "captions-1",
+      "name": "Get Caption List",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const captionData = $input.first().json;\nconst videoId = $('Extract Video ID').first().json.videoId;\nconst graphId = $('Extract Video ID').first().json.graph_id;\n\n// Build summary from caption info\nconst captions = captionData.items || [];\nconst langList = captions.map(c => c.snippet?.language || 'unknown').join(', ');\n\n// Use oEmbed for video metadata\nreturn [{\n  json: {\n    videoId,\n    graphId,\n    title: `YouTube Video ${videoId}`,\n    languages: langList,\n    captionCount: captions.length,\n    url: `https://www.youtube.com/watch?v=${videoId}`\n  }\n}];"
+      },
+      "id": "build-content",
+      "name": "Build Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [860, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.MORIES_URL || 'http://localhost:5001' }}/api/gateway/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": \"[YouTube] {{ $json.title }}\\nURL: {{ $json.url }}\\nAvailable Captions: {{ $json.languages }} ({{ $json.captionCount }} tracks)\",\n  \"source\": \"youtube:{{ $json.videoId }}\",\n  \"graph_id\": \"{{ $json.graphId }}\",\n  \"scope\": \"social\",\n  \"metadata\": {\n    \"video_id\": \"{{ $json.videoId }}\",\n    \"url\": \"{{ $json.url }}\",\n    \"caption_languages\": \"{{ $json.languages }}\"\n  }\n}"
+      },
+      "id": "ingest-1",
+      "name": "Ingest to Mories",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1080, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"status\": \"ok\", \"videoId\": \"{{ $json.videoId }}\", \"title\": \"{{ $json.title }}\"}"
+      },
+      "id": "response-1",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1300, 300]
+    }
+  ],
+  "connections": {
+    "YouTube URL 입력": {
+      "main": [[ { "node": "Extract Video ID", "type": "main", "index": 0 } ]]
+    },
+    "Extract Video ID": {
+      "main": [[ { "node": "Get Caption List", "type": "main", "index": 0 } ]]
+    },
+    "Get Caption List": {
+      "main": [[ { "node": "Build Content", "type": "main", "index": 0 } ]]
+    },
+    "Build Content": {
+      "main": [[ { "node": "Ingest to Mories", "type": "main", "index": 0 } ]]
+    },
+    "Ingest to Mories": {
+      "main": [[ { "node": "Respond", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "mories-n8n" }
+}

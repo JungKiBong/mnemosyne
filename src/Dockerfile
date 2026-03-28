@@ -18,6 +18,10 @@ RUN uv pip install --system -r pyproject.toml 2>/dev/null || \
 # Copy application code
 COPY . .
 
+# Ensure gunicorn is definitely available
+RUN pip install gunicorn 2>/dev/null || true
+RUN which gunicorn && gunicorn --version
+
 # Create non-root user
 RUN useradd -m appuser && chown -R appuser:appuser /app
 USER appuser

@@ -21,7 +21,7 @@ services:
       retries: 10
       start_period: 30s
     networks:
-      - mnemosyne-net
+      - mories-net
 
   mirofish-api:
     build:
@@ -29,7 +29,7 @@ services:
       dockerfile: Dockerfile
     container_name: mirofish-api
     ports:
-      - "5000:5000"
+      - "5001:5000"
     environment:
       - NEO4J_URI=bolt://neo4j:7687
       - NEO4J_USER=neo4j
@@ -41,6 +41,7 @@ services:
       - FLASK_ENV=${FLASK_ENV:-development}
     volumes:
       - ./uploads:/app/uploads
+      - ./mcp_server:/mcp_server
     depends_on:
       neo4j:
         condition: service_healthy
@@ -52,7 +53,7 @@ services:
       retries: 5
       start_period: 20s
     networks:
-      - mnemosyne-net
+      - mories-net
 
   dashboard:
     image: nginx:alpine
@@ -67,12 +68,12 @@ services:
         condition: service_healthy
     restart: unless-stopped
     networks:
-      - mnemosyne-net
+      - mories-net
 
 volumes:
   neo4j_data:
   neo4j_logs:
 
 networks:
-  mnemosyne-net:
+  mories-net:
     driver: bridge

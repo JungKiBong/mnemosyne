@@ -2,7 +2,7 @@
 # Full Phase Verification (P7~P12+)
 BASE="http://localhost:5001"
 
-echo "=== Mnemosyne 전체 Phase 검증 ==="
+echo "=== Mories 전체 Phase 검증 ==="
 echo ""
 
 echo "🏥 Health Check"

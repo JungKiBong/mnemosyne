@@ -1,6 +1,6 @@
 # 프로젝트 개요: MiroFish × Supermemory 통합
 
-> **프로젝트명:** MiroFish-SuperMemory (코드명: **Mnemosyne** — 기억의 여신)  
+> **프로젝트명:** MiroFish-SuperMemory (코드명: **Mories** — 기억의 여신)  
 > **작성일:** 2026-03-27  
 > **상태:** 설계 단계
 

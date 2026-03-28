@@ -1,0 +1,72 @@
+{
+  "name": "Mories: 파일 업로드 → 지식 추출",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "file-to-memory",
+        "responseMode": "responseNode",
+        "options": { "rawBody": false }
+      },
+      "id": "webhook-1",
+      "name": "File Upload Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const binaryData = item.binary;\n  if (!binaryData) continue;\n\n  for (const [key, bin] of Object.entries(binaryData)) {\n    const mimeType = bin.mimeType || '';\n    const fileName = bin.fileName || 'unknown';\n    let text = '';\n\n    if (mimeType.includes('text') || mimeType.includes('json') || mimeType.includes('csv')) {\n      text = Buffer.from(bin.data, 'base64').toString('utf-8');\n    } else {\n      text = `[Binary file: ${fileName} (${mimeType})]`;\n    }\n\n    // Chunk large text (max 2000 chars per chunk)\n    const chunks = [];\n    for (let i = 0; i < text.length; i += 2000) {\n      chunks.push(text.substring(i, i + 2000));\n    }\n\n    chunks.forEach((chunk, idx) => {\n      results.push({\n        json: {\n          fileName,\n          mimeType,\n          chunkIndex: idx,\n          totalChunks: chunks.length,\n          content: chunk\n        }\n      });\n    });\n  }\n}\n\nreturn results;"
+      },
+      "id": "extract-1",
+      "name": "Extract & Chunk Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.MORIES_URL || 'http://localhost:5001' }}/api/gateway/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": \"[File: {{ $json.fileName }} ({{ $json.chunkIndex + 1 }}/{{ $json.totalChunks }})]\\n{{ $json.content }}\",\n  \"source\": \"upload:{{ $json.fileName }}\",\n  \"graph_id\": \"{{ $env.MORIES_GRAPH_ID || 'documents' }}\",\n  \"scope\": \"tribal\",\n  \"metadata\": {\n    \"file_name\": \"{{ $json.fileName }}\",\n    \"mime_type\": \"{{ $json.mimeType }}\",\n    \"chunk\": {{ $json.chunkIndex }},\n    \"total_chunks\": {{ $json.totalChunks }}\n  }\n}"
+      },
+      "id": "ingest-1",
+      "name": "Ingest to Mories",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"status\": \"ok\", \"file\": \"{{ $json.fileName }}\", \"chunks_ingested\": {{ $json.totalChunks }} }"
+      },
+      "id": "response-1",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [860, 300]
+    }
+  ],
+  "connections": {
+    "File Upload Webhook": {
+      "main": [[ { "node": "Extract & Chunk Text", "type": "main", "index": 0 } ]]
+    },
+    "Extract & Chunk Text": {
+      "main": [[ { "node": "Ingest to Mories", "type": "main", "index": 0 } ]]
+    },
+    "Ingest to Mories": {
+      "main": [[ { "node": "Respond Success", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "mories-n8n" }
+}

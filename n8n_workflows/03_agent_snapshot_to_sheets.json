@@ -1,5 +1,5 @@
 {
-  "name": "Mnemosyne: 에이전트 프로필 스냅샷 → Google Sheets",
+  "name": "Mories: 에이전트 프로필 스냅샷 → Google Sheets",
   "nodes": [
     {
       "parameters": {
@@ -23,7 +23,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"mnemosyne_graph_query\",\n    \"arguments\": {\n      \"cypher\": \"MATCH (e:Entity) WHERE e.entity_type = 'Agent' RETURN e.uuid AS uuid, e.name AS name, e.traits AS traits, e.dynamic_state AS state ORDER BY e.name\",\n      \"limit\": 100\n    }\n  }\n}"
+        "jsonBody": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"mories_graph_query\",\n    \"arguments\": {\n      \"cypher\": \"MATCH (e:Entity) WHERE e.entity_type = 'Agent' RETURN e.uuid AS uuid, e.name AS name, e.traits AS traits, e.dynamic_state AS state ORDER BY e.name\",\n      \"limit\": 100\n    }\n  }\n}"
       },
       "id": "query-agents",
       "name": "Query All Agents",
@@ -73,5 +73,5 @@
     }
   },
   "settings": { "executionOrder": "v1" },
-  "meta": { "instanceId": "mnemosyne-mcp" }
+  "meta": { "instanceId": "mories-mcp" }
 }

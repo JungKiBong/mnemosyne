@@ -1,4 +1,4 @@
-# 🧠 Mnemosyne — Cognitive Memory Architecture for AI Agents
+# 🧠 Mories — Cognitive Memory Architecture for AI Agents
 
 > **인간의 기억을 모방한 AI 에이전트 인지 메모리 시스템.**  
 > 단기기억(STM) → 장기기억(LTM) → 영구기억(PM) 전환, Ebbinghaus 망각곡선 기반 자연 감쇠,  
@@ -54,7 +54,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                     Mnemosyne System                            │
+│                     Mories System                            │
 │                                                                  │
 │   ┌──────────────┐     ┌──────────────┐    ┌──────────────┐    │
 │   │  Dashboard   │     │  MCP Server  │    │  n8n / NiFi  │    │
@@ -112,8 +112,8 @@
 ### 1. Clone & Setup
 
 ```bash
-git clone https://github.com/JungKiBong/mnemosyne.git
-cd mnemosyne
+git clone https://github.com/JungKiBong/mories.git
+cd mories
 
 # Environment setup
 cp .env.example .env
@@ -179,7 +179,7 @@ PYTHONPATH=src .venv/bin/python -m pytest tests/unit/test_resilience.py tests/in
 ## 📁 Project Structure
 
 ```
-mnemosyne/
+mories/
 ├── src/app/
 │   ├── storage/
 │   │   ├── memory_manager.py          # STM/LTM lifecycle, decay, boost
@@ -365,4 +365,4 @@ Based on [MiroFish-Offline](https://github.com/nikmcfly/MiroFish-Offline) and [S
 
 ---
 
-*Built with 🧠 by the Mnemosyne Project*
+*Built with 🧠 by the Mories Project*

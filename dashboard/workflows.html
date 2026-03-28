@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mories — n8n Workflow Catalog</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0a12;--surface:#12121e;--card:#1a1a2e;--border:#2a2a3e;
+  --text:#e0e0f0;--muted:#8888aa;--accent:#6c63ff;--accent2:#ff6b9d;
+  --green:#00e676;--orange:#ff9800;--blue:#448aff;--cyan:#00bcd4;
+  --purple:#ab47bc;--red:#ff5252;
+}
+body{font-family:'Inter','Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* ── Layout ── */
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 32px;display:flex;align-items:center;gap:16px}
+.topbar h1{font-size:20px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.topbar .nav{margin-left:auto;display:flex;gap:12px}
+.topbar .nav a{color:var(--muted);font-size:13px;padding:6px 14px;border-radius:8px;transition:.2s}
+.topbar .nav a:hover,.topbar .nav a.active{color:var(--text);background:var(--card);text-decoration:none}
+
+.main{max-width:1200px;margin:0 auto;padding:32px}
+
+/* ── Header Section ── */
+.hero{text-align:center;padding:40px 0 32px}
+.hero h2{font-size:28px;margin-bottom:8px}
+.hero p{color:var(--muted);font-size:15px;max-width:600px;margin:0 auto}
+.stats-row{display:flex;gap:16px;justify-content:center;margin-top:20px}
+.stat-chip{background:var(--card);padding:8px 20px;border-radius:20px;font-size:13px;border:1px solid var(--border)}
+.stat-chip span{color:var(--accent);font-weight:700;margin-right:4px}
+
+/* ── Search ── */
+.search-bar{max-width:500px;margin:24px auto;position:relative}
+.search-bar input{width:100%;padding:12px 16px 12px 42px;background:var(--card);border:1px solid var(--border);border-radius:12px;color:var(--text);font-size:14px;outline:none;transition:.2s}
+.search-bar input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(108,99,255,.15)}
+.search-bar .icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted)}
+
+/* ── Grid ── */
+.wf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:20px;margin-top:32px}
+
+/* ── Card ── */
+.wf-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;transition:.3s;cursor:pointer;position:relative;overflow:hidden}
+.wf-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 32px rgba(108,99,255,.12)}
+.wf-card .number{position:absolute;top:16px;right:16px;font-size:32px;font-weight:800;color:rgba(108,99,255,.15);line-height:1}
+.wf-card h3{font-size:16px;margin-bottom:8px;padding-right:50px}
+.wf-card .desc{color:var(--muted);font-size:13px;line-height:1.5;margin-bottom:16px;min-height:40px}
+.wf-card .meta{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.tag{font-size:11px;padding:4px 10px;border-radius:6px;font-weight:600}
+.tag-trigger{background:rgba(0,230,118,.1);color:var(--green)}
+.tag-nodes{background:rgba(68,138,255,.1);color:var(--blue)}
+.tag-source{background:rgba(171,71,188,.1);color:var(--purple)}
+.tag-scope{background:rgba(255,152,0,.1);color:var(--orange)}
+.wf-card .actions{display:flex;gap:8px}
+.btn{padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;border:none;cursor:pointer;transition:.2s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{opacity:.85}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--muted)}
+.btn-outline:hover{border-color:var(--accent);color:var(--text)}
+
+/* ── Modal ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:none;justify-content:center;align-items:center;backdrop-filter:blur(4px)}
+.modal-overlay.show{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:20px;width:90%;max-width:700px;max-height:85vh;overflow:hidden;display:flex;flex-direction:column}
+.modal-header{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-header h3{font-size:18px}
+.modal-close{background:none;border:none;color:var(--muted);font-size:24px;cursor:pointer;padding:4px}
+.modal-close:hover{color:var(--text)}
+.modal-body{padding:24px;overflow-y:auto;flex:1}
+.modal-body pre{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px;font-size:12px;line-height:1.5;overflow-x:auto;color:var(--cyan);white-space:pre-wrap}
+.modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+
+/* ── Architecture ── */
+.arch-section{margin-top:48px;padding:32px;background:var(--card);border-radius:16px;border:1px solid var(--border)}
+.arch-section h3{margin-bottom:16px;font-size:18px}
+.arch-section pre{background:var(--bg);padding:20px;border-radius:12px;font-size:12px;line-height:1.6;color:var(--cyan);overflow-x:auto}
+
+/* ── Setup Guide ── */
+.setup-section{margin-top:32px}
+.setup-section h3{font-size:18px;margin-bottom:16px}
+.env-table{width:100%;border-collapse:collapse;margin-top:12px}
+.env-table th,.env-table td{padding:10px 16px;text-align:left;border-bottom:1px solid var(--border);font-size:13px}
+.env-table th{color:var(--muted);font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:.5px}
+.env-table td:first-child{font-family:monospace;color:var(--cyan)}
+.env-table tr:hover{background:rgba(108,99,255,.05)}
+
+/* ── Responsive ── */
+@media(max-width:768px){
+  .wf-grid{grid-template-columns:1fr}
+  .main{padding:16px}
+  .hero h2{font-size:22px}
+}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<!-- Top Bar -->
+<div class="topbar">
+  <h1>🧠 Mories</h1>
+  <div class="nav">
+    <a href="/">Dashboard</a>
+    <a href="/graph">Graph Explorer</a>
+    <a href="/memory">Memory</a>
+    <a href="/memory/synaptic">Synaptic</a>
+    <a href="/maturity">Maturity</a>
+    <a href="/api-docs">API Explorer</a>
+    <a href="/workflows" class="active">Workflows</a>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- Hero -->
+  <div class="hero">
+    <h2>⚡ n8n Workflow Catalog</h2>
+    <p>다양한 데이터 소스에서 지식을 수집하여 Mories 메모리로 자동 인제스트하는 즉시 사용 가능한 워크플로우 모음</p>
+    <div class="stats-row" id="statsRow">
+      <div class="stat-chip"><span id="totalCount">-</span> 워크플로우</div>
+      <div class="stat-chip"><span>6</span> 데이터 소스</div>
+      <div class="stat-chip"><span>3</span> 트리거 유형</div>
+    </div>
+  </div>
+
+  <!-- Search -->
+  <div class="search-bar">
+    <span class="icon">🔍</span>
+    <input type="text" id="searchInput" placeholder="워크플로우 검색 (예: github, slack, rss...)">
+  </div>
+
+  <!-- Grid -->
+  <div class="wf-grid" id="wfGrid"></div>
+
+  <!-- Architecture -->
+  <div class="arch-section">
+    <h3>📐 아키텍처</h3>
+    <pre>
+┌─────────────────────────────────────────────────────────────┐
+│                       n8n Workflows                         │
+│  ┌────────┐ ┌─────┐ ┌───────┐ ┌──────┐ ┌──────┐ ┌──────┐ │
+│  │ GitHub │ │ RSS │ │ Slack │ │Email │ │Notion│ │  DB  │ │
+│  └───┬────┘ └──┬──┘ └───┬───┘ └──┬───┘ └──┬───┘ └──┬───┘ │
+│      └────┬────┘────┬───┘────┬───┘────┬───┘────┬───┘     │
+│           ▼         ▼        ▼        ▼        ▼          │
+│  ┌────────────────────────────────────────────────────┐   │
+│  │             Transform & Normalize                  │   │
+│  └───────────────────────┬────────────────────────────┘   │
+└──────────────────────────┼────────────────────────────────┘
+                           │ POST /api/gateway/webhook
+                           ▼
+┌──────────────────────────────────────────────────────────────┐
+│  Mories Memory System                                     │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │  Gateway → MemoryPipeline                              │  │
+│  │    STM Create → Evaluate Salience → Promote to LTM    │  │
+│  └────────────────────────┬───────────────────────────────┘  │
+│                           ▼                                   │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │              Neo4j Knowledge Graph                     │  │
+│  └────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────┘
+    </pre>
+  </div>
+
+  <!-- Setup Guide -->
+  <div class="setup-section">
+    <h3>🔧 환경변수 설정</h3>
+    <table class="env-table">
+      <thead><tr><th>변수</th><th>워크플로우</th><th>설명</th></tr></thead>
+      <tbody>
+        <tr><td>MORIES_URL</td><td>전체</td><td>Mories 서버 URL (기본: http://localhost:5001)</td></tr>
+        <tr><td>MORIES_GRAPH_ID</td><td>전체</td><td>대상 그래프 ID (기본: default)</td></tr>
+        <tr><td>GITHUB_TOKEN</td><td>04</td><td>GitHub Personal Access Token</td></tr>
+        <tr><td>GITHUB_OWNER / GITHUB_REPO</td><td>04</td><td>감시할 저장소 소유자/이름</td></tr>
+        <tr><td>RSS_FEED_URL</td><td>05</td><td>RSS 피드 URL</td></tr>
+        <tr><td>NEWS_API_KEY</td><td>02</td><td>NewsAPI API Key</td></tr>
+        <tr><td>SLACK_WEBHOOK_URL</td><td>06, 11</td><td>Slack Incoming Webhook URL</td></tr>
+        <tr><td>NOTION_API_KEY</td><td>12</td><td>Notion Integration API Key</td></tr>
+        <tr><td>NOTION_DATABASE_ID</td><td>12</td><td>Notion Database ID</td></tr>
+        <tr><td>YOUTUBE_API_KEY</td><td>13</td><td>YouTube Data API Key</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modalTitle">Workflow Details</h3>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <pre id="modalCode"></pre>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()">닫기</button>
+      <button class="btn btn-outline" id="copyBtn" onclick="copyWorkflow()">📋 복사</button>
+      <button class="btn btn-primary" id="downloadBtn" onclick="downloadWorkflow()">⬇ 다운로드</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const BASE = window.location.origin;
+
+// Workflow metadata enrichment
+const WORKFLOW_META = {
+  '01': { desc: 'MCP를 통해 Mories 지식 그래프를 검색하고 결과를 파싱합니다.', source: 'Mories', scope: 'Internal' },
+  '02': { desc: '한국 뉴스를 NewsAPI에서 자동으로 수집하여 기억에 저장합니다.', source: 'NewsAPI', scope: 'Social' },
+  '03': { desc: '에이전트 스냅샷을 Google Sheets로 내보내 분석합니다.', source: 'Mories', scope: 'Analytics' },
+  '04': { desc: 'GitHub 저장소의 최근 커밋을 감시하여 개발 지식으로 저장합니다.', source: 'GitHub', scope: 'Tribal' },
+  '05': { desc: 'RSS/Atom 피드(arXiv, 블로그 등)를 구독하여 연구 자료를 수집합니다.', source: 'RSS/Atom', scope: 'Social' },
+  '06': { desc: 'Slack 채널에서 📝/#remember 태그된 메시지를 팀 기억으로 저장합니다.', source: 'Slack', scope: 'Tribal' },
+  '07': { desc: '텍스트 파일(txt/json/csv)을 업로드하면 청킹하여 메모리에 저장합니다.', source: 'File Upload', scope: 'Tribal' },
+  '08': { desc: 'URL을 입력하면 웹 페이지를 스크래핑하여 텍스트를 기억에 저장합니다.', source: 'Web', scope: 'Social' },
+  '09': { desc: 'Gmail에서 별표/태그된 이메일을 자동으로 기억에 저장합니다.', source: 'Gmail', scope: 'Personal' },
+  '10': { desc: 'PostgreSQL DB 변경 사항을 실시간으로 감지하여 기억에 동기화합니다.', source: 'PostgreSQL', scope: 'Tribal' },
+  '11': { desc: '메모리 시스템 건강을 12시간마다 체크하고 이상 시 Slack으로 알림합니다.', source: 'Mories', scope: 'Ops' },
+  '12': { desc: 'Notion 데이터베이스의 최근 변경을 감지하여 기억에 동기화합니다.', source: 'Notion', scope: 'Tribal' },
+  '13': { desc: 'YouTube URL을 입력하면 자막/메타데이터를 추출하여 기억에 저장합니다.', source: 'YouTube', scope: 'Social' },
+};
+
+let allWorkflows = [];
+let currentWfFile = null;
+
+async function loadWorkflows() {
+  try {
+    const resp = await fetch(`${BASE}/api/workflows`);
+    const data = await resp.json();
+    allWorkflows = data.workflows || [];
+    document.getElementById('totalCount').textContent = allWorkflows.length;
+    renderGrid(allWorkflows);
+  } catch(e) {
+    document.getElementById('wfGrid').innerHTML =
+      '<div style="text-align:center;color:var(--muted);padding:40px">워크플로우를 불러올 수 없습니다. 서버 상태를 확인해주세요.</div>';
+  }
+}
+
+function renderGrid(workflows) {
+  const grid = document.getElementById('wfGrid');
+  grid.innerHTML = workflows.map(wf => {
+    const num = wf.file.match(/^(\d+)/)?.[1] || '??';
+    const meta = WORKFLOW_META[num] || { desc: '', source: '?', scope: '?' };
+    return `
+      <div class="wf-card" onclick="openModal('${wf.file}')">
+        <div class="number">${num}</div>
+        <h3>${wf.name}</h3>
+        <div class="desc">${meta.desc}</div>
+        <div class="meta">
+          <span class="tag tag-trigger">${wf.trigger || '?'}</span>
+          <span class="tag tag-nodes">${wf.nodes} nodes</span>
+          <span class="tag tag-source">${meta.source}</span>
+          <span class="tag tag-scope">${meta.scope}</span>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" onclick="event.stopPropagation();downloadFile('${wf.file}')">⬇ 다운로드</button>
+          <button class="btn btn-outline" onclick="event.stopPropagation();openModal('${wf.file}')">👁 보기</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function openModal(filename) {
+  currentWfFile = filename;
+  const modal = document.getElementById('modal');
+  const wf = allWorkflows.find(w => w.file === filename);
+  document.getElementById('modalTitle').textContent = wf?.name || filename;
+
+  try {
+    const resp = await fetch(`${BASE}/api/workflows/${filename}`);
+    const json = await resp.json();
+    document.getElementById('modalCode').textContent = JSON.stringify(json, null, 2);
+  } catch(e) {
+    document.getElementById('modalCode').textContent = 'Error loading workflow';
+  }
+  modal.classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('show');
+}
+
+function copyWorkflow() {
+  const code = document.getElementById('modalCode').textContent;
+  navigator.clipboard.writeText(code).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = '✅ 복사됨!';
+    setTimeout(() => btn.textContent = '📋 복사', 2000);
+  });
+}
+
+function downloadWorkflow() {
+  if (!currentWfFile) return;
+  downloadFile(currentWfFile);
+}
+
+function downloadFile(filename) {
+  const a = document.createElement('a');
+  a.href = `${BASE}/api/workflows/${filename}`;
+  a.download = filename;
+  a.click();
+}
+
+// Search
+document.getElementById('searchInput').addEventListener('input', (e) => {
+  const q = e.target.value.toLowerCase();
+  if (!q) return renderGrid(allWorkflows);
+  const filtered = allWorkflows.filter(wf => {
+    const num = wf.file.match(/^(\d+)/)?.[1] || '';
+    const meta = WORKFLOW_META[num] || {};
+    const searchText = `${wf.name} ${wf.file} ${meta.desc || ''} ${meta.source || ''} ${meta.scope || ''} ${wf.trigger || ''}`.toLowerCase();
+    return searchText.includes(q);
+  });
+  renderGrid(filtered);
+});
+
+// Close modal on escape or overlay click
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+document.getElementById('modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
+
+// Init
+loadWorkflows();
+</script>
+</body>
+</html>

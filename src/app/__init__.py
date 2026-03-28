@@ -149,6 +149,10 @@ def create_app(config_class=Config):
     from .api.permanent_memory import permanent_bp
     app.register_blueprint(permanent_bp, url_prefix='/api/memory')
 
+    # Graph (Project/Scope) Visibility API
+    from .api.graphs import graphs_bp
+    app.register_blueprint(graphs_bp)
+
     # Settings API (Runtime LLM/Embedding configuration)
     from .api.settings import settings_bp
     app.register_blueprint(settings_bp)
@@ -186,6 +190,73 @@ def create_app(config_class=Config):
         def serve_synaptic():
             return send_from_directory(os.path.abspath(dashboard_dir), 'synaptic.html')
 
+        @app.route('/api-docs')
+        @app.route('/api-explorer')
+        def serve_api_explorer():
+            return send_from_directory(os.path.abspath(dashboard_dir), 'api.html')
+
+        @app.route('/workflows')
+        @app.route('/n8n-workflows')
+        def serve_workflow_catalog():
+            return send_from_directory(os.path.abspath(dashboard_dir), 'workflows.html')
+
+        # --- n8n Workflow Catalog API ---
+        import json as _json
+        import glob as _glob
+
+        @app.route('/api/workflows')
+        def list_n8n_workflows():
+            """List all available n8n workflow templates."""
+            wf_dir = os.path.join(os.path.dirname(dashboard_dir), 'n8n_workflows')
+            workflows = []
+            for fpath in sorted(_glob.glob(os.path.join(wf_dir, '*.json'))):
+                fname = os.path.basename(fpath)
+                try:
+                    with open(fpath, 'r') as f:
+                        wf = _json.load(f)
+                    workflows.append({
+                        'file': fname,
+                        'name': wf.get('name', fname),
+                        'nodes': len(wf.get('nodes', [])),
+                        'trigger': _detect_trigger(wf),
+                        'size': os.path.getsize(fpath),
+                    })
+                except Exception:
+                    workflows.append({'file': fname, 'name': fname, 'error': 'parse_failed'})
+            from flask import jsonify as _jf
+            return _jf({'workflows': workflows, 'total': len(workflows)})
+
+        @app.route('/api/workflows/<filename>')
+        def get_n8n_workflow(filename):
+            """Download a specific n8n workflow JSON."""
+            wf_dir = os.path.join(os.path.dirname(dashboard_dir), 'n8n_workflows')
+            if not filename.endswith('.json'):
+                filename += '.json'
+            fpath = os.path.join(wf_dir, filename)
+            if not os.path.isfile(fpath):
+                from flask import jsonify as _jf
+                return _jf({'error': 'Workflow not found'}), 404
+            return send_from_directory(os.path.abspath(wf_dir), filename,
+                                       mimetype='application/json')
+
+        def _detect_trigger(wf):
+            for node in wf.get('nodes', []):
+                ntype = node.get('type', '')
+                if 'scheduleTrigger' in ntype:
+                    params = node.get('parameters', {}).get('rule', {}).get('interval', [{}])
+                    if params:
+                        p = params[0]
+                        if 'hoursInterval' in p:
+                            return f"⏰ {p['hoursInterval']}시간"
+                        elif 'minutesInterval' in p:
+                            return f"⏰ {p['minutesInterval']}분"
+                    return '⏰ Schedule'
+                elif 'webhook' in ntype:
+                    return '🔗 Webhook'
+                elif 'manualTrigger' in ntype:
+                    return '👆 Manual'
+            return '❓ Unknown'
+
     # --- Health / Status API ---
     @app.route('/health')
     @app.route('/api/health')
@@ -215,7 +286,7 @@ def create_app(config_class=Config):
 
         return {
             'status': 'healthy',
-            'service': 'Mnemosyne (MiroFish × Supermemory)',
+            'service': 'Mories (MiroFish × Supermemory)',
             'backend': backend,
             'neo4j': neo4j_status,
             'neo4j_nodes': node_count,
@@ -265,7 +336,7 @@ def create_app(config_class=Config):
         if mcp_path not in sys.path:
             sys.path.insert(0, mcp_path)
 
-        from mcp_server.tools import mnemosyne_search
+        from mcp_server.tools import mories_search
         data = flask_request.get_json(silent=True) or {}
         query = data.get('query', '')
         graph_id = data.get('graph_id', '')
@@ -274,7 +345,7 @@ def create_app(config_class=Config):
         if not query:
             return flask_jsonify({"error": "query is required"}), 400
 
-        result = mnemosyne_search(query=query, graph_id=graph_id, limit=limit)
+        result = mories_search(query=query, graph_id=graph_id, limit=limit)
 
         # Auto-boost retrieved memories (Retrieval Boost)
         try:
@@ -305,7 +376,7 @@ def create_app(config_class=Config):
         if mcp_path not in sys.path:
             sys.path.insert(0, mcp_path)
 
-        from mcp_server.tools import mnemosyne_graph_query
+        from mcp_server.tools import mories_graph_query
         data = flask_request.get_json(silent=True) or {}
         cypher = data.get('cypher', '')
         params = data.get('params', {})
@@ -314,7 +385,7 @@ def create_app(config_class=Config):
         if not cypher:
             return flask_jsonify({"error": "cypher is required"}), 400
 
-        result = mnemosyne_graph_query(cypher=cypher, params=params, limit=limit)
+        result = mories_graph_query(cypher=cypher, params=params, limit=limit)
         return flask_jsonify(result)
 
     if should_log_startup:

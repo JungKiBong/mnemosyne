@@ -1,0 +1,71 @@
+{
+  "name": "Mories: Slack 대화 → 기억 저장",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "slack-to-memory",
+        "responseMode": "responseNode"
+      },
+      "id": "webhook-1",
+      "name": "Slack Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst event = body.event || body;\n\n// Slack URL verification challenge\nif (body.challenge) {\n  return [{ json: { challenge: body.challenge } }];\n}\n\n// Filter: only messages, skip bots\nif (event.type !== 'message' || event.bot_id) {\n  return [];\n}\n\n// Check for memory-save trigger (emoji reaction or keyword)\nconst text = event.text || '';\nconst shouldSave = text.includes(':brain:') || text.includes('📝') || text.includes('#remember');\n\nif (!shouldSave) return [];\n\nreturn [{\n  json: {\n    text: text.replace(/:brain:|📝|#remember/g, '').trim(),\n    user: event.user || 'unknown',\n    channel: event.channel || 'unknown',\n    ts: event.ts || '',\n    thread_ts: event.thread_ts || ''\n  }\n}];"
+      },
+      "id": "filter-1",
+      "name": "Filter & Extract",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.MORIES_URL || 'http://localhost:5001' }}/api/gateway/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": \"{{ $json.text }}\",\n  \"source\": \"slack:{{ $json.channel }}\",\n  \"graph_id\": \"{{ $env.MORIES_GRAPH_ID || 'team-knowledge' }}\",\n  \"scope\": \"tribal\",\n  \"metadata\": {\n    \"user\": \"{{ $json.user }}\",\n    \"channel\": \"{{ $json.channel }}\",\n    \"timestamp\": \"{{ $json.ts }}\",\n    \"thread\": \"{{ $json.thread_ts }}\"\n  }\n}"
+      },
+      "id": "ingest-1",
+      "name": "Ingest to Mories",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"status\": \"ok\", \"saved\": true}"
+      },
+      "id": "response-1",
+      "name": "Response OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [860, 300]
+    }
+  ],
+  "connections": {
+    "Slack Webhook": {
+      "main": [[ { "node": "Filter & Extract", "type": "main", "index": 0 } ]]
+    },
+    "Filter & Extract": {
+      "main": [[ { "node": "Ingest to Mories", "type": "main", "index": 0 } ]]
+    },
+    "Ingest to Mories": {
+      "main": [[ { "node": "Response OK", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "mories-n8n" }
+}

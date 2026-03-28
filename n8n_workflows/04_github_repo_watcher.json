@@ -1,0 +1,83 @@
+{
+  "name": "Mories: GitHub 저장소 변경 감시",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "hours", "hoursInterval": 1 }] }
+      },
+      "id": "schedule-1",
+      "name": "Every Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.github.com/repos/{{ $env.GITHUB_OWNER }}/{{ $env.GITHUB_REPO }}/commits",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "since", "value": "={{ new Date(Date.now() - 3600000).toISOString() }}" },
+            { "name": "per_page", "value": "10" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.GITHUB_TOKEN }}" },
+            { "name": "Accept", "value": "application/vnd.github.v3+json" }
+          ]
+        }
+      },
+      "id": "fetch-commits",
+      "name": "Fetch Commits",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const commits = Array.isArray($input.first().json) ? $input.first().json : [];\nif (commits.length === 0) return [];\nreturn commits.map(c => ({\n  json: {\n    sha: c.sha?.substring(0, 8),\n    author: c.commit?.author?.name || 'unknown',\n    message: c.commit?.message || '',\n    date: c.commit?.author?.date || '',\n    files_changed: c.stats?.total || 0,\n    url: c.html_url || ''\n  }\n}));"
+      },
+      "id": "transform-1",
+      "name": "Extract Commits",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.MORIES_URL || 'http://localhost:5001' }}/api/gateway/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": \"[GitHub Commit {{ $json.sha }}] {{ $json.author }}: {{ $json.message }}\",\n  \"source\": \"github:{{ $env.GITHUB_OWNER }}/{{ $env.GITHUB_REPO }}\",\n  \"graph_id\": \"{{ $env.MORIES_GRAPH_ID || 'dev-knowledge' }}\",\n  \"scope\": \"tribal\",\n  \"metadata\": {\n    \"sha\": \"{{ $json.sha }}\",\n    \"author\": \"{{ $json.author }}\",\n    \"date\": \"{{ $json.date }}\",\n    \"url\": \"{{ $json.url }}\"\n  }\n}"
+      },
+      "id": "ingest-1",
+      "name": "Ingest to Mories",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [860, 300]
+    }
+  ],
+  "connections": {
+    "Every Hour": {
+      "main": [[ { "node": "Fetch Commits", "type": "main", "index": 0 } ]]
+    },
+    "Fetch Commits": {
+      "main": [[ { "node": "Extract Commits", "type": "main", "index": 0 } ]]
+    },
+    "Extract Commits": {
+      "main": [[ { "node": "Ingest to Mories", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "mories-n8n", "templateCredsSetupCompleted": true }
+}

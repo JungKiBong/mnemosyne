@@ -1,0 +1,77 @@
+{
+  "name": "Mories: Email 수신 → 기억 저장",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "minutes", "minutesInterval": 30 }] }
+      },
+      "id": "schedule-1",
+      "name": "Every 30 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 5,
+        "filters": {
+          "readStatus": "unread",
+          "receivedAfter": "={{ new Date(Date.now() - 1800000).toISOString() }}"
+        }
+      },
+      "id": "gmail-1",
+      "name": "Get New Emails",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [420, 300],
+      "credentials": {
+        "gmailOAuth2": { "id": "gmail-oauth", "name": "Gmail OAuth2" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nreturn items\n  .filter(item => {\n    const subject = (item.json.subject || '').toLowerCase();\n    // Filter: save only emails with specific labels or keywords\n    return subject.includes('#remember') || subject.includes('[knowledge]') || (item.json.labelIds || []).includes('STARRED');\n  })\n  .map(item => ({\n    json: {\n      subject: item.json.subject || '',\n      from: item.json.from?.emailAddress || '',\n      snippet: (item.json.snippet || '').substring(0, 1000),\n      body: (item.json.textPlain || item.json.snippet || '').substring(0, 3000),\n      date: item.json.date || '',\n      labels: (item.json.labelIds || []).join(',')\n    }\n  }));"
+      },
+      "id": "filter-1",
+      "name": "Filter Tagged Emails",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.MORIES_URL || 'http://localhost:5001' }}/api/gateway/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": \"[Email] {{ $json.subject }}\\nFrom: {{ $json.from }}\\n\\n{{ $json.body }}\",\n  \"source\": \"email:{{ $json.from }}\",\n  \"graph_id\": \"{{ $env.MORIES_GRAPH_ID || 'communications' }}\",\n  \"scope\": \"personal\",\n  \"metadata\": {\n    \"subject\": \"{{ $json.subject }}\",\n    \"from\": \"{{ $json.from }}\",\n    \"date\": \"{{ $json.date }}\"\n  }\n}"
+      },
+      "id": "ingest-1",
+      "name": "Ingest to Mories",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [860, 300]
+    }
+  ],
+  "connections": {
+    "Every 30 Minutes": {
+      "main": [[ { "node": "Get New Emails", "type": "main", "index": 0 } ]]
+    },
+    "Get New Emails": {
+      "main": [[ { "node": "Filter Tagged Emails", "type": "main", "index": 0 } ]]
+    },
+    "Filter Tagged Emails": {
+      "main": [[ { "node": "Ingest to Mories", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "mories-n8n" }
+}
