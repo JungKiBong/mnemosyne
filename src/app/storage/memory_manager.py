@@ -331,16 +331,19 @@ class MemoryManager:
         }
 
         with self._driver.session() as session:
-            # Get all entities with salience
+            # Get all entities with salience (Phase 16: skip immutable/permanent)
             records = session.run("""
                 MATCH (n:Entity)
                 WHERE n.salience IS NOT NULL
+                  AND (n.immutable IS NULL OR n.immutable = false)
                 RETURN n.uuid AS uuid, n.name AS name,
                        n.salience AS salience,
                        n.access_count AS access_count,
                        n.last_accessed AS last_accessed,
                        n.created_at AS created_at,
-                       COALESCE(n.scope, 'personal') AS scope
+                       COALESCE(n.scope, 'personal') AS scope,
+                       COALESCE(n.memory_category, 'declarative') AS memory_category,
+                       COALESCE(n.attributes_json, '{}') AS meta_json
                 ORDER BY n.salience ASC
             """).data()
 
@@ -367,6 +370,16 @@ class MemoryManager:
                     from .memory_scopes import MemoryScopeManager
                     scope_decay = MemoryScopeManager.get_decay_rate_static(scope)
                     effective_rate = min(self.config.decay_rate, scope_decay)
+
+                    # Phase 16: Apply category-specific decay modifier
+                    mem_cat = record.get('memory_category', 'declarative')
+                    if mem_cat == 'procedural':
+                        from .memory_categories import MemoryCategoryManager
+                        cat_modifier = MemoryCategoryManager.calculate_decay_modifier(
+                            mem_cat, record.get('meta_json', '{}')
+                        )
+                        effective_rate = min(1.0, effective_rate * cat_modifier)
+
                     new_salience = old_salience * (effective_rate ** days_idle)
                 new_salience = max(self.config.min_salience, new_salience)
 

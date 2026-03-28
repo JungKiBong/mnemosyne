@@ -152,6 +152,20 @@ class SynapticBridge:
                 if agent_id not in self._subscriptions[scope]:
                     self._subscriptions[scope].append(agent_id)
 
+        # Phase 16: Auto-inherit permanent memories from higher scopes
+        try:
+            from .permanent_memory import PermanentMemoryManager
+            pm_mgr = PermanentMemoryManager(driver=self._driver)
+            inherit_result = pm_mgr.inherit_for_agent(
+                agent_id=agent_id,
+                scopes=subscribed_scopes or ["global", "social"],
+            )
+            inherited_count = inherit_result.get("inherited_count", 0)
+            if inherited_count > 0:
+                logger.info(f"Agent {name} auto-inherited {inherited_count} permanent memories")
+        except Exception as e:
+            logger.debug(f"PM auto-inherit skipped: {e}")
+
         logger.info(f"Agent registered: {name} ({agent_id[:8]}) role={role}")
         return agent
 

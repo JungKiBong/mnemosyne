@@ -1,14 +1,15 @@
 # 🧠 Mnemosyne — Cognitive Memory Architecture for AI Agents
 
 > **인간의 기억을 모방한 AI 에이전트 인지 메모리 시스템.**  
-> 단기기억(STM) → 장기기억(LTM) 전환, Ebbinghaus 망각곡선 기반 자연 감쇠,  
-> 검색 시 강화(Retrieval Boost), 계층적 기억 범위(Scope), 시냅틱 에이전트 간 기억 공유를 지원합니다.
+> 단기기억(STM) → 장기기억(LTM) → 영구기억(PM) 전환, Ebbinghaus 망각곡선 기반 자연 감쇠,  
+> 검색 시 강화(Retrieval Boost), 계층적 기억 범위(Scope), 영구기억 각인/상속,  
+> 도구사용(Procedural) & 모방(Observational) 카테고리 확장, 시냅틱 에이전트 간 기억 공유를 지원합니다.
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/)
 [![Neo4j](https://img.shields.io/badge/Neo4j-5.x-green.svg)](https://neo4j.com/)
 [![Flask](https://img.shields.io/badge/Flask-3.x-lightgrey.svg)](https://flask.palletsprojects.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests: 58 passed](https://img.shields.io/badge/tests-58%20passed-brightgreen.svg)](#-test-suite)
+[![Tests: 76 passed](https://img.shields.io/badge/tests-76%20passed-brightgreen.svg)](#-test-suite)
 
 ---
 
@@ -20,6 +21,11 @@
 | **STM → LTM Lifecycle** | 단기기억 자동 평가 → 중요도 기반 장기기억 승격 |
 | **Ebbinghaus Decay** | 시간에 따른 자연적 기억 감쇠 (`salience = salience × decay_rate`) |
 | **Retrieval Boost** | 검색/접근 시 기억 강화 (인출 강화 효과) |
+| **Permanent Memory** | 영구기억 (Imprint 각인 + Frozen LTM) — 감쇠/변경 불가 |
+| **Inheritance Chain** | Global → Social → Tribal 영구기억 자동 상속 |
+| **Priority Resolution** | 스코프/관리자Pin/에이전트가중치 기반 우선순위 엔진 |
+| **Procedural Memory** | 도구 사용(API/MCP/Code) 경험 기록 & 성공률 기반 감쇠 수정 |
+| **Observational Memory** | 사용자/에이전트 행동 관찰 & 패턴 학습 |
 | **Memory Scopes** | Personal → Tribal → Social → Universal 계층적 범위 |
 | **Synaptic Bridge** | 에이전트 간 기억 공유 및 이벤트 발행 |
 | **Audit Trail** | 모든 변경의 불변 이력 + 롤백 기능 |
@@ -37,7 +43,7 @@
 ### 📊 Dashboard & APIs
 | Feature | Description |
 |---------|-------------|
-| **139 REST Endpoints** | 메모리 CRUD, 검색, 감사, 범위, 시냅틱, 보안, 성숙도 |
+| **166 REST Endpoints** | 메모리 CRUD, 검색, 감사, 범위, 시냅틱, 보안, 성숙도, 영구기억, 카테고리 |
 | **Admin Dashboard** | 실시간 메모리 모니터링, 가중치 관리, 탐색 |
 | **Data Products** | RAG 코퍼스, Knowledge Graph 스냅샷, Training 데이터셋 내보내기 |
 | **External Gateway** | n8n, NiFi, Spark, REST API 연동 |
@@ -56,15 +62,21 @@
 │   └──────┬───────┘     └──────┬───────┘    └──────┬───────┘    │
 │          │                    │                    │              │
 │   ┌──────┴────────────────────┴────────────────────┴──────┐     │
-│   │              Flask REST API (139 endpoints)           │     │
-│   │   Memory · Audit · Scope · Synaptic · Security · ...  │     │
+│   │              Flask REST API (166 endpoints)           │     │
+│   │  Memory · PM · Category · Audit · Scope · Synaptic ·  │     │
+│   │  Security · Maturity · Reconciliation · Data Products  │     │
 │   └──────────────────────┬────────────────────────────────┘     │
 │                          │                                       │
 │   ┌──────────────────────┼────────────────────────┐             │
 │   │           Cognitive Memory Engine             │             │
 │   │  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ │             │
-│   │  │  STM   │→│  LTM   │→│ Scopes │→│Maturity│ │             │
-│   │  │ Buffer │ │ Store  │ │ Ladder │ │ Levels │ │             │
+│   │  │  STM   │→│  LTM   │→│  PM    │→│Maturity│ │             │
+│   │  │ Buffer │ │ Store  │ │Imprint │ │ Levels │ │             │
+│   │  └────────┘ └────────┘ │Frozen  │ └────────┘ │             │
+│   │                        └────────┘             │             │
+│   │  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ │             │
+│   │  │ Scopes │ │Categor.│ │Priority│ │Inherit │ │             │
+│   │  │ Ladder │ │Proc/Obs│ │ Engine │ │ Chain  │ │             │
 │   │  └────────┘ └────────┘ └────────┘ └────────┘ │             │
 │   │  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ │             │
 │   │  │ Decay  │ │ Boost  │ │ Audit  │ │Synapse │ │             │

@@ -145,6 +145,10 @@ def create_app(config_class=Config):
     from .api.reconciliation import reconciliation_bp
     app.register_blueprint(reconciliation_bp)
 
+    # Permanent Memory & Category Extension API (Phase 16)
+    from .api.permanent_memory import permanent_bp
+    app.register_blueprint(permanent_bp, url_prefix='/api/memory')
+
     # Start Memory Scheduler (background thread)
     try:
         from .services.memory_scheduler import start_scheduler
