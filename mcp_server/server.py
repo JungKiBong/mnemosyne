@@ -40,6 +40,7 @@ TOOL_DEFINITIONS = [
         "description": (
             "Search the Mories memory system. Returns a COMPACT INDEX "
             "(~50-100 tokens/result) with type icons and relevance scores. "
+            "Filter by status for task tracking. "
             "Use mories_detail for full content, mories_timeline for context."
         ),
         "inputSchema": {
@@ -58,6 +59,12 @@ TOOL_DEFINITIONS = [
                     "type": "integer",
                     "description": "Max results to return",
                     "default": 10,
+                },
+                "status": {
+                    "type": "string",
+                    "description": "Filter by status: pending, in_progress, completed, blocked",
+                    "enum": ["pending", "in_progress", "completed", "blocked"],
+                    "default": "",
                 },
             },
             "required": ["query"],
@@ -104,6 +111,38 @@ TOOL_DEFINITIONS = [
                     "type": "integer",
                     "description": "Number of items before/after center",
                     "default": 5,
+                },
+            },
+            "required": ["uuid"],
+        },
+    },
+    {
+        "name": "mories_update_status",
+        "description": (
+            "Update status/priority/assignment on a memory node. "
+            "Lightweight Whiteboard — replaces deleted Orchestration Blackboard. "
+            "Use with mories_search(status=...) for task tracking."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "uuid": {
+                    "type": "string",
+                    "description": "Target node UUID",
+                },
+                "status": {
+                    "type": "string",
+                    "description": "New status",
+                    "enum": ["pending", "in_progress", "completed", "blocked"],
+                },
+                "priority": {
+                    "type": "integer",
+                    "description": "Priority (1=highest)",
+                },
+                "assigned_to": {
+                    "type": "string",
+                    "description": "Agent UUID to assign",
+                    "default": "",
                 },
             },
             "required": ["uuid"],
@@ -243,6 +282,7 @@ def dispatch_tool(name: str, arguments: dict, allowed_scopes: list[str] = None) 
         mories_search,
         mories_detail,
         mories_timeline,
+        mories_update_status,
         mories_ingest,
         mories_profile,
         mories_graph_query,
@@ -253,6 +293,7 @@ def dispatch_tool(name: str, arguments: dict, allowed_scopes: list[str] = None) 
         "mories_search": mories_search,
         "mories_detail": mories_detail,
         "mories_timeline": mories_timeline,
+        "mories_update_status": mories_update_status,
         "mories_ingest": mories_ingest,
         "mories_profile": mories_profile,
         "mories_graph_query": mories_graph_query,
@@ -296,7 +337,7 @@ def handle_jsonrpc(message: dict, allowed_scopes: list[str] = None) -> dict | No
                 },
                 "serverInfo": {
                     "name": "mories-memory",
-                    "version": "0.6.0",
+                    "version": "0.7.0",
                 },
             },
         }
@@ -464,7 +505,7 @@ def run_sse(host: str = "0.0.0.0", port: int = 3100):
         return jsonify({
             "status": "ok",
             "service": "mories-mcp-server",
-            "version": "0.6.0",
+            "version": "0.7.0",
             "tools": len(TOOL_DEFINITIONS),
             "read_only": MCPConfig.READ_ONLY_CYPHER,
         })

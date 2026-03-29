@@ -1,14 +1,15 @@
 """
-Mories MCP Tools — 7 core tools for external AI agents.
+Mories MCP Tools — 8 core tools for external AI agents.
 
 Tools:
-  1. mories_search      — Compact index search (Progressive Disclosure Layer 1)
-  2. mories_detail      — Full content retrieval (Progressive Disclosure Layer 3)
-  3. mories_timeline    — Temporal neighborhood (Progressive Disclosure Layer 2)
-  4. mories_ingest      — Data ingestion from file/URL/text
-  5. mories_profile     — Agent profile lookup
-  6. mories_graph_query — Read-only Cypher queries
-  7. mories_stream      — Stream ingestion control
+  1. mories_search        — Compact index search (Progressive Disclosure Layer 1)
+  2. mories_detail        — Full content retrieval (Progressive Disclosure Layer 3)
+  3. mories_timeline      — Temporal neighborhood (Progressive Disclosure Layer 2)
+  4. mories_update_status — Lightweight Whiteboard (status/priority management)
+  5. mories_ingest        — Data ingestion from file/URL/text
+  6. mories_profile       — Agent profile lookup
+  7. mories_graph_query   — Read-only Cypher queries
+  8. mories_stream        — Stream ingestion control
 """
 
 import json
@@ -96,12 +97,12 @@ def _estimate_tokens(text: str) -> int:
 SEARCH_DESCRIPTION = (
     "Search the Mories memory system. Returns a COMPACT INDEX of results "
     "(~50-100 tokens/result) with type icons, relevance scores, and token costs. "
-    "Use mories_detail to retrieve full content for selected items. "
-    "Use mories_timeline for temporal context around a memory."
+    "Filter by status (pending/in_progress/completed/blocked) for task tracking. "
+    "Use mories_detail for full content, mories_timeline for temporal context."
 )
 
 
-def mories_search(query: str, graph_id: str = "", limit: int = 10, **kwargs) -> dict:
+def mories_search(query: str, graph_id: str = "", limit: int = 10, status: str = "", **kwargs) -> dict:
     """
     Search the knowledge graph — returns compact index only.
 
@@ -109,11 +110,13 @@ def mories_search(query: str, graph_id: str = "", limit: int = 10, **kwargs) -> 
     - Returns type icon + name + score + estimated token cost
     - Agent decides which items need full detail (→ mories_detail)
     - Saves ~80% context vs returning full content
+    - Optional status filter for lightweight Whiteboard tracking
 
     Args:
         query: Natural language search query
         graph_id: Optional graph/project ID to scope the search
         limit: Max results to return (default 10)
+        status: Filter by status (pending/in_progress/completed/blocked). Empty = all.
 
     Returns:
         Compact index with token budget metadata
@@ -127,10 +130,14 @@ def mories_search(query: str, graph_id: str = "", limit: int = 10, **kwargs) -> 
 
     with driver.session() as session:
         # 1) Fulltext search on entities
-        entity_cypher = """
+        # Build optional status filter clause
+        status_clause = "AND node.status = $status" if status else ""
+
+        entity_cypher = f"""
         CALL db.index.fulltext.queryNodes('entity_fulltext', $q)
         YIELD node, score
         WHERE score > 0.3
+        {status_clause}
         OPTIONAL MATCH (g:Graph)-[:CONTAINS]->(node)
         WITH node, score, collect(g.uuid) AS gids, collect(COALESCE(g.is_public, false)) AS pubs
         WHERE $is_admin = true
@@ -142,19 +149,21 @@ def mories_search(query: str, graph_id: str = "", limit: int = 10, **kwargs) -> 
                node.entity_type AS type,
                node.summary AS summary,
                node.description AS description,
+               node.status AS status,
                labels(node) AS labels,
                score
         ORDER BY score DESC
         LIMIT $lim
         """
         try:
-            entity_results = session.run(
-                entity_cypher, q=query, lim=limit, is_admin=is_admin, allowed_scopes=_allowed_scopes
-            )
+            params = dict(q=query, lim=limit, is_admin=is_admin, allowed_scopes=_allowed_scopes)
+            if status:
+                params["status"] = status
+            entity_results = session.run(entity_cypher, **params)
             for r in entity_results:
                 etype = r["type"] or "entity"
                 full_content = r["description"] or r["summary"] or r["name"] or ""
-                results.append({
+                entry = {
                     "icon": _type_icon(etype),
                     "uuid": r["uuid"],
                     "name": r["name"],
@@ -163,7 +172,10 @@ def mories_search(query: str, graph_id: str = "", limit: int = 10, **kwargs) -> 
                     "preview": (r["summary"] or r["name"] or "")[:80],
                     "token_cost": _estimate_tokens(full_content),
                     "source": "entity",
-                })
+                }
+                if r.get("status"):
+                    entry["status"] = r["status"]
+                results.append(entry)
         except Exception as e:
             logger.warning("Entity fulltext search failed: %s", e)
 
@@ -772,3 +784,104 @@ def mories_stream(
 
     else:
         return {"error": f"Unknown action: {action}. Use start/stop/list"}
+
+
+# ---------------------------------------------------------------------------
+#  Tool 8: mories_update_status (Lightweight Whiteboard)
+# ---------------------------------------------------------------------------
+
+_VALID_STATUSES = {"pending", "in_progress", "completed", "blocked"}
+
+
+def mories_update_status(
+    uuid: str,
+    status: str = "",
+    priority: int | None = None,
+    assigned_to: str = "",
+    **kwargs
+) -> dict:
+    """
+    Update status fields on a memory/entity node — Lightweight Whiteboard.
+
+    Replaces the deleted Orchestration Blackboard (384 lines, was causing
+    zombie Neo4j drivers). Instead of a separate state management system,
+    we add simple status fields to existing Entity/Memory nodes.
+
+    Args:
+        uuid: Target node UUID
+        status: New status (pending/in_progress/completed/blocked)
+        priority: Task priority (1=highest, optional)
+        assigned_to: Agent UUID to assign the task to (optional)
+
+    Returns:
+        dict with updated node summary
+    """
+    _rate_check()
+
+    if not uuid:
+        return {"error": "uuid is required"}
+
+    if status and status not in _VALID_STATUSES:
+        return {
+            "error": f"Invalid status '{status}'. Must be one of: {sorted(_VALID_STATUSES)}"
+        }
+
+    if not status and priority is None and not assigned_to:
+        return {"error": "At least one of status, priority, or assigned_to must be provided"}
+
+    driver = _get_driver()
+
+    # Build dynamic SET clause
+    set_parts = ["n.updated_at = datetime()"]
+    params = {"uuid": uuid}
+
+    if status:
+        set_parts.append("n.status = $status")
+        params["status"] = status
+    if priority is not None:
+        set_parts.append("n.priority = $priority")
+        params["priority"] = priority
+    if assigned_to:
+        set_parts.append("n.assigned_to = $assigned_to")
+        params["assigned_to"] = assigned_to
+
+    set_clause = ", ".join(set_parts)
+
+    cypher = f"""
+    MATCH (n)
+    WHERE n.uuid = $uuid AND (n:Entity OR n:Memory)
+    SET {set_clause}
+    RETURN n.uuid AS uuid,
+           n.name AS name,
+           n.entity_type AS type,
+           n.status AS status,
+           n.priority AS priority,
+           n.assigned_to AS assigned_to,
+           n.updated_at AS updated_at
+    """
+
+    try:
+        with driver.session() as session:
+            result = session.run(cypher, **params).single()
+            if not result:
+                return {"error": f"Node not found: {uuid}"}
+
+            response = {
+                "uuid": result["uuid"],
+                "name": result["name"],
+                "type": result["type"],
+                "status": result["status"],
+                "updated_at": str(result["updated_at"]),
+            }
+            if result["priority"] is not None:
+                response["priority"] = result["priority"]
+            if result["assigned_to"]:
+                response["assigned_to"] = result["assigned_to"]
+
+            return {
+                "result": response,
+                "_hint": "Use mories_search(status='in_progress') to find active tasks",
+            }
+    except Exception as e:
+        return {"error": str(e)}
+
