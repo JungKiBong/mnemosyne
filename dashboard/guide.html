@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mories Guide</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0e1a;
+  --bg-card: #111827;
+  --bg-surface: #1a2236;
+  --bg-hover: #1f2b42;
+  --border: #2a3550;
+  --border-bright: #3b4f73;
+  --text: #e2e8f0;
+  --text-dim: #94a3b8;
+  --text-muted: #64748b;
+  --accent: #6366f1;
+  --accent-glow: rgba(99,102,241,.15);
+  --green: #22c55e;
+  --cyan: #06b6d4;
+  --radius: 10px;
+  --font: 'Inter', -apple-system, sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; }
+a { color: var(--accent); text-decoration: none; }
+
+/* Topbar */
+.topbar { background: rgba(17,24,39,0.9); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: space-between; padding: 0 32px; height: 64px; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; }
+.topbar h1 { font-size: 20px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+.topbar h1 span { background: linear-gradient(135deg, var(--accent), var(--cyan)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.nav { display: flex; gap: 24px; font-size: 14px; font-weight: 500; }
+.nav a { color: var(--text-dim); transition: color .2s; }
+.nav a:hover, .nav a.active { color: var(--text); }
+
+.layout { display: flex; min-height: calc(100vh - 64px); }
+.sidebar { width: 320px; border-right: 1px solid var(--border); display: flex; flex-direction: column; background: var(--bg-card); flex-shrink: 0; position: sticky; top: 64px; height: calc(100vh - 64px); overflow-y: auto; }
+.main { flex: 1; padding: 40px 60px; max-width: calc(100% - 320px); overflow-y: auto; scroll-behavior: smooth; }
+
+.sidebar-header { padding: 20px; border-bottom: 1px solid var(--border); }
+.sidebar-header h2 { font-size: 16px; font-weight: 600; }
+
+.category-list { flex: 1; padding: 8px 0; }
+.cat-group { margin-bottom: 2px; }
+.cat-header { padding: 8px 20px; font-size: 12px; font-weight: 600; color: var(--text-dim); cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; }
+.cat-header:hover { background: var(--bg-hover); color: var(--text); }
+.cat-group.collapsed .arrow { transform: rotate(-90deg); }
+.cat-group.collapsed .cat-items { display: none; }
+.endpoint-item { padding: 8px 20px 8px 32px; font-size: 13px; color: var(--text-muted); cursor: pointer; }
+.endpoint-item:hover { background: var(--bg-surface); color: var(--text); }
+
+.markdown-body { font-size: 15px; line-height: 1.7; color: var(--text); max-width: 900px; margin: 0 auto; }
+.markdown-body h1 { font-size: 32px; margin-bottom: 24px; font-weight: 700; background: linear-gradient(135deg, #fff, #94a3b8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.markdown-body h2 { font-size: 24px; margin-top: 48px; margin-bottom: 16px; font-weight: 600; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+.markdown-body h3 { font-size: 18px; margin-top: 32px; margin-bottom: 12px; font-weight: 600; color: #fff; }
+.markdown-body p { margin-bottom: 16px; color: var(--text-dim); }
+.markdown-body ul, .markdown-body ol { margin-bottom: 16px; padding-left: 24px; color: var(--text-dim); }
+.markdown-body li { margin-bottom: 8px; }
+.markdown-body code { font-family: var(--mono); background: var(--bg-surface); padding: 2px 6px; border-radius: 4px; font-size: 13px; color: var(--cyan); }
+.markdown-body pre { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; overflow-x: auto; margin-bottom: 16px; }
+.markdown-body pre code { background: none; padding: 0; color: #e2e8f0; font-size: 13px; line-height: 1.5; }
+.markdown-body blockquote { border-left: 4px solid var(--accent); padding-left: 16px; color: var(--text-muted); margin-bottom: 16px; background: var(--bg-surface); padding: 12px 16px; border-radius: 0 8px 8px 0; }
+.markdown-body hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+.markdown-body table { width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 14px; }
+.markdown-body th { text-align: left; padding: 12px; background: var(--bg-surface); color: var(--text-muted); font-weight: 600; border-bottom: 2px solid var(--border); }
+.markdown-body td { padding: 12px; border-bottom: 1px solid var(--border); color: var(--text-dim); }
+.markdown-body tr:hover td { background: rgba(255,255,255,0.02); color: var(--text); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>🧠 <span>Mories</span></h1>
+  <div class="nav">
+    <a href="/">Dashboard</a>
+    <a href="/graph">Graph Explorer</a>
+    <a href="/memory">Memory</a>
+    <a href="/memory/synaptic">Synaptic</a>
+    <a href="/maturity">Maturity</a>
+    <a href="/api-docs">API Explorer</a>
+    <a href="/workflows">Workflows</a>
+    <a href="/guide" class="active">Guide</a>
+  </div>
+</div>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h2>CONTENTS</h2>
+    </div>
+    <div class="category-list">
+      
+        <div class="cat-group">
+          <div class="cat-header" onclick="this.parentElement.classList.toggle('collapsed')">
+            <span><a href="#_1" style="color:inherit">목차</a></span>
+            <span class="arrow">▼</span>
+          </div>
+          <div class="cat-items">
+        </div></div>
+
+        <div class="cat-group">
+          <div class="cat-header" onclick="this.parentElement.classList.toggle('collapsed')">
+            <span><a href="#1" style="color:inherit">1. 시스템 요구사항</a></span>
+            <span class="arrow">▼</span>
+          </div>
+          <div class="cat-items">
+        </div></div>
+
+        <div class="cat-group">
+          <div class="cat-header" onclick="this.parentElement.classList.toggle('collapsed')">
+            <span><a href="#2" style="color:inherit">2. 설치 및 실행</a></span>
+            <span class="arrow">▼</span>
+          </div>
+          <div class="cat-items">
+        
+            <div class="endpoint-item" onclick="document.getElementById('21').scrollIntoView({behavior:'smooth'})">2.1 기본 설치</div>
+        
+            <div class="endpoint-item" onclick="document.getElementById('22-docker').scrollIntoView({behavior:'smooth'})">2.2 Docker 전체 스택</div>
+        
+            <div class="endpoint-item" onclick="document.getElementById('23').scrollIntoView({behavior:'smooth'})">2.3 테스트 실행</div>
+        </div></div>
+
+        <div class="cat-group">
+          <div class="cat-header" onclick="this.parentElement.classList.toggle('collapsed')">
+            <span><a href="#3" style="color:inherit">3. 인지 메모리 엔진 이해</a></span>
+            <span class="arrow">▼</span>
+          </div>
+          <div class="cat-items">
+        
+            <div class="endpoint-item" onclick="document.getElementById('31').scrollIntoView({behavior:'smooth'})">3.1 기억의 생명주기</div>
+        
+            <div class="endpoint-item" onclick="document.getElementById('32').scrollIntoView({behavior:'smooth'})">3.2 핵심 개념</div>
+        
+            <div class="endpoint-item" onclick="document.getElementById('33-scope').scrollIntoView({behavior:'smooth'})">3.3 기억 범위 (Scope)</div>
+        
+            <div class="endpoint-item" onclick="document.getElementById('34-maturity').scrollIntoView({behavior:'smooth'})">3.4 지식 성숙도 (Maturity)</div>
+        </div></div>
+
+        <div class="cat-group">
+          <div class="cat-header" onclick="this.parentElement.classList.toggle('collapsed')">
+            <span><a href="#4" style="color:inherit">4. 대시보드 사용법</a></span>
+            <span class="arrow">▼</span>
+          </div>
+          <div class="cat-items">
+        
+            <div class="endpoint-item" onclick="document.getElementById('41-url').scrollIntoView({behavior:'smooth'})">4.1 접속 URL</div>
+        
+            <div class="endpoint-item" onclick="document.getElementById('42').scrollIntoView({behavior:'smooth'})">4.2 주요 기능</div>
+        </div></div>
+
+        <div class="cat-group">
+          <div class="cat-header" onclick="this.parentElement.classList.toggle('collapsed')">
+            <span><a href="#5-api" style="color:inherit">5. API 활용 가이드</a></span>
+            <span class="arrow">▼</span>
+          </div>
+          <div class="cat-items">
+        
+            <div class="endpoint-item" onclick="document.getElementById('51-stm-ltm').scrollIntoView({behavior:'smooth'})">5.1 기억 저장 (STM → LTM)</div>
+        
+            <div class="endpoint-item" onclick="document.getElementById('52').scrollIntoView({behavior:'smooth'})">5.2 기억 검색</div>
+        
+            <div class="endpoint-item" onclick="document.getElementById('53').scrollIntoView({behavior:'smooth'})">5.3 감쇠 수동 트리거</div>
+        
+            <div class="endpoint-item" onclick="document.getElementById('54').scrollIntoView({behavior:'smooth'})">5.4 감사 및 롤백</div>
+        </div></div>
+
+        <div class="cat-group">
+          <div class="cat-header" onclick="this.parentElement.classList.toggle('collapsed')">
+            <span><a href="#6-mcp" style="color:inherit">6. MCP 서버 연동</a></span>
+            <span class="arrow">▼</span>
+          </div>
+          <div class="cat-items">
+        
+            <div class="endpoint-item" onclick="document.getElementById('5').scrollIntoView({behavior:'smooth'})">지원 도구 (5개)</div>
+        
+            <div class="endpoint-item" onclick="document.getElementById('rest-mcp-proxy').scrollIntoView({behavior:'smooth'})">REST MCP Proxy</div>
+        </div></div>
+
+        <div class="cat-group">
+          <div class="cat-header" onclick="this.parentElement.classList.toggle('collapsed')">
+            <span><a href="#7-n8n" style="color:inherit">7. n8n / 외부 시스템 연동</a></span>
+            <span class="arrow">▼</span>
+          </div>
+          <div class="cat-items">
+        
+            <div class="endpoint-item" onclick="document.getElementById('gateway').scrollIntoView({behavior:'smooth'})">Gateway 엔드포인트</div>
+        
+            <div class="endpoint-item" onclick="document.getElementById('n8n').scrollIntoView({behavior:'smooth'})">n8n 워크플로우 예시</div>
+        </div></div>
+
+        <div class="cat-group">
+          <div class="cat-header" onclick="this.parentElement.classList.toggle('collapsed')">
+            <span><a href="#8" style="color:inherit">8. 보안 설정</a></span>
+            <span class="arrow">▼</span>
+          </div>
+          <div class="cat-items">
+        
+            <div class="endpoint-item" onclick="document.getElementById('81-rbac').scrollIntoView({behavior:'smooth'})">8.1 RBAC (역할 기반 접근 제어)</div>
+        
+            <div class="endpoint-item" onclick="document.getElementById('82-aes-256').scrollIntoView({behavior:'smooth'})">8.2 필드 암호화 (AES-256)</div>
+        </div></div>
+
+        <div class="cat-group">
+          <div class="cat-header" onclick="this.parentElement.classList.toggle('collapsed')">
+            <span><a href="#9" style="color:inherit">9. 데이터 정합성 관리</a></span>
+            <span class="arrow">▼</span>
+          </div>
+          <div class="cat-items">
+        
+            <div class="endpoint-item" onclick="document.getElementById('91-quick-check').scrollIntoView({behavior:'smooth'})">9.1 Quick Check</div>
+        
+            <div class="endpoint-item" onclick="document.getElementById('92-full-reconciliation').scrollIntoView({behavior:'smooth'})">9.2 Full Reconciliation</div>
+        
+            <div class="endpoint-item" onclick="document.getElementById('93').scrollIntoView({behavior:'smooth'})">9.3 검사 항목</div>
+        </div></div>
+
+        <div class="cat-group">
+          <div class="cat-header" onclick="this.parentElement.classList.toggle('collapsed')">
+            <span><a href="#10" style="color:inherit">10. 트러블슈팅</a></span>
+            <span class="arrow">▼</span>
+          </div>
+          <div class="cat-items">
+        
+            <div class="endpoint-item" onclick="document.getElementById('neo4j').scrollIntoView({behavior:'smooth'})">Neo4j 연결 실패</div>
+        
+            <div class="endpoint-item" onclick="document.getElementById('_2').scrollIntoView({behavior:'smooth'})">메모리 감쇠가 안 될 때</div>
+        
+            <div class="endpoint-item" onclick="document.getElementById('_3').scrollIntoView({behavior:'smooth'})">테스트 실패 시</div>
+        
+            <div class="endpoint-item" onclick="document.getElementById('_4').scrollIntoView({behavior:'smooth'})">포트 충돌</div>
+        </div></div>
+
+        <div class="cat-group">
+          <div class="cat-header" onclick="this.parentElement.classList.toggle('collapsed')">
+            <span><a href="#_5" style="color:inherit">📋 주요 환경 변수 정리</a></span>
+            <span class="arrow">▼</span>
+          </div>
+          <div class="cat-items">
+        </div></div>
+
+    </div>
+  </aside>
+  <div class="main">
+    <div class="markdown-body">
+      <h1 id="mories">📖 Mories 운영 가이드</h1>
+<blockquote>
+<p>시스템 운영, 관리, 트러블슈팅을 위한 실무 가이드</p>
+</blockquote>
+<hr />
+<h2 id="_1">목차</h2>
+<ol>
+<li><a href="#1-시스템-요구사항">시스템 요구사항</a></li>
+<li><a href="#2-설치-및-실행">설치 및 실행</a></li>
+<li><a href="#3-인지-메모리-엔진-이해">인지 메모리 엔진 이해</a></li>
+<li><a href="#4-대시보드-사용법">대시보드 사용법</a></li>
+<li><a href="#5-api-활용-가이드">API 활용 가이드</a></li>
+<li><a href="#6-mcp-서버-연동">MCP 서버 연동</a></li>
+<li><a href="#7-n8n--외부-시스템-연동">n8n / 외부 시스템 연동</a></li>
+<li><a href="#8-보안-설정">보안 설정</a></li>
+<li><a href="#9-데이터-정합성-관리">데이터 정합성 관리</a></li>
+<li><a href="#10-트러블슈팅">트러블슈팅</a></li>
+</ol>
+<hr />
+<h2 id="1">1. 시스템 요구사항</h2>
+<table>
+<thead>
+<tr>
+<th>구성 요소</th>
+<th>최소 사양</th>
+<th>권장 사양</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Python</td>
+<td>3.12+</td>
+<td>3.13+</td>
+</tr>
+<tr>
+<td>Neo4j</td>
+<td>5.x</td>
+<td>5.x (Docker)</td>
+</tr>
+<tr>
+<td>RAM</td>
+<td>4GB</td>
+<td>8GB+</td>
+</tr>
+<tr>
+<td>Disk</td>
+<td>2GB</td>
+<td>10GB+</td>
+</tr>
+<tr>
+<td>Ollama (선택)</td>
+<td>—</td>
+<td>llama3.1, nomic-embed-text</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="2">2. 설치 및 실행</h2>
+<h3 id="21">2.1 기본 설치</h3>
+<pre><code class="language-bash"># 1. 프로젝트 클론
+git clone https://github.com/JungKiBong/mories.git
+cd mories
+
+# 2. 환경 변수 설정
+cp .env.example .env
+nano .env  # NEO4J_PASSWORD 등 수정
+
+# 3. Neo4j 시작
+docker-compose -f docker-compose.mac.yml up -d neo4j
+
+# 4. Python 환경 구성
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r src/requirements.txt
+
+# 5. 서버 실행
+cd src
+FLASK_APP=app FLASK_DEBUG=0 flask run --host=0.0.0.0 --port=5050
+</code></pre>
+<h3 id="22-docker">2.2 Docker 전체 스택</h3>
+<pre><code class="language-bash">docker-compose up -d
+# API: localhost:5050, Neo4j: localhost:7474, Dashboard: localhost:5050/dashboard
+</code></pre>
+<h3 id="23">2.3 테스트 실행</h3>
+<pre><code class="language-bash"># 프로젝트 루트에서
+PYTHONPATH=src .venv/bin/python -m pytest tests/unit/test_resilience.py tests/integration/ tests/e2e/ -v
+# 결과: 58 passed ✅
+</code></pre>
+<hr />
+<h2 id="3">3. 인지 메모리 엔진 이해</h2>
+<h3 id="31">3.1 기억의 생명주기</h3>
+<pre><code>[데이터 수집]  →  [STM 버퍼]  →  [평가]  →  [LTM 저장]  →  [감쇠/강화]  →  [아카이브/소멸]
+                    ↑                           ↓
+              salience &lt; 0.3 → 폐기    salience × 0.95/day (Ebbinghaus)
+                                        검색 시 +0.15 강화 (Retrieval Boost)
+</code></pre>
+<h3 id="32">3.2 핵심 개념</h3>
+<table>
+<thead>
+<tr>
+<th>개념</th>
+<th>설명</th>
+<th>파라미터</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Salience</strong></td>
+<td>기억의 중요도 (0.0 ~ 1.0)</td>
+<td>초기값은 평가에 의해 결정</td>
+</tr>
+<tr>
+<td><strong>Decay Rate</strong></td>
+<td>일일 감쇠율</td>
+<td>기본: 0.95 (매일 5% 감소)</td>
+</tr>
+<tr>
+<td><strong>Boost Amount</strong></td>
+<td>검색 시 강화량</td>
+<td>기본: +0.15</td>
+</tr>
+<tr>
+<td><strong>STM TTL</strong></td>
+<td>단기기억 유효시간</td>
+<td>기본: 86,400초 (24시간)</td>
+</tr>
+<tr>
+<td><strong>Promote Threshold</strong></td>
+<td>LTM 승격 기준</td>
+<td>salience ≥ 0.3</td>
+</tr>
+</tbody>
+</table>
+<h3 id="33-scope">3.3 기억 범위 (Scope)</h3>
+<pre><code>Personal (개인) → Tribal (팀) → Social (조직) → Universal (전체)
+</code></pre>
+<ul>
+<li>승격 조건: <code>salience &gt; 0.7</code> AND <code>access_count &gt;= 5</code></li>
+<li>승격은 단방향 (강등 불가)</li>
+<li>각 범위에 따라 접근 가능 에이전트가 달라짐</li>
+</ul>
+<h3 id="34-maturity">3.4 지식 성숙도 (Maturity)</h3>
+<pre><code>Draft → Reviewed → Validated → Certified → Archived
+</code></pre>
+<ul>
+<li>자동 승격 규칙 기반 (access_count, salience, 기간)</li>
+<li>API: <code>/api/maturity/check-promotions</code></li>
+</ul>
+<hr />
+<h2 id="4">4. 대시보드 사용법</h2>
+<h3 id="41-url">4.1 접속 URL</h3>
+<table>
+<thead>
+<tr>
+<th>페이지</th>
+<th>URL</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>시스템 개요</td>
+<td><code>/dashboard</code></td>
+<td>전체 시스템 상태</td>
+</tr>
+<tr>
+<td>메모리 관리</td>
+<td><code>/memory</code></td>
+<td>STM/LTM, Decay, Boost, Scope, 설정</td>
+</tr>
+<tr>
+<td>감사 이력</td>
+<td><code>/memory/history</code></td>
+<td>전체 변경 이력 + 롤백</td>
+</tr>
+<tr>
+<td>시냅틱 네트워크</td>
+<td><code>/memory/synaptic</code></td>
+<td>에이전트 간 연결 시각화</td>
+</tr>
+</tbody>
+</table>
+<h3 id="42">4.2 주요 기능</h3>
+<ul>
+<li><strong>Overview 탭</strong>: 총 기억 수, 활성 STM, 평균 salience, health score</li>
+<li><strong>STM 탭</strong>: 현재 STM 버퍼 내용, 평가/승격/폐기 액션</li>
+<li><strong>LTM 탭</strong>: 장기기억 목록, salience 그래프, 검색</li>
+<li><strong>Settings 탭</strong>: decay_rate, boost_amount, stm_ttl 실시간 조정</li>
+</ul>
+<hr />
+<h2 id="5-api">5. API 활용 가이드</h2>
+<h3 id="51-stm-ltm">5.1 기억 저장 (STM → LTM)</h3>
+<pre><code class="language-bash"># 1. STM에 추가
+curl -X POST http://localhost:5050/api/memory/stm/add \
+  -H &quot;Content-Type: application/json&quot; \
+  -d '{&quot;content&quot;: &quot;프로젝트 X의 아키텍처 결정&quot;, &quot;source&quot;: &quot;meeting&quot;}'
+
+# 2. 평가 (salience 부여)
+curl -X POST http://localhost:5050/api/memory/stm/evaluate \
+  -H &quot;Content-Type: application/json&quot; \
+  -d '{&quot;id&quot;: &quot;&lt;stm-uuid&gt;&quot;, &quot;salience&quot;: 0.8}'
+
+# 3. LTM으로 승격
+curl -X POST http://localhost:5050/api/memory/stm/promote \
+  -H &quot;Content-Type: application/json&quot; \
+  -d '{&quot;id&quot;: &quot;&lt;stm-uuid&gt;&quot;}'
+</code></pre>
+<h3 id="52">5.2 기억 검색</h3>
+<pre><code class="language-bash">curl -X POST http://localhost:5050/api/search \
+  -H &quot;Content-Type: application/json&quot; \
+  -d '{&quot;query&quot;: &quot;아키텍처 결정&quot;, &quot;limit&quot;: 10}'
+# 검색 시 자동으로 Retrieval Boost 적용
+</code></pre>
+<h3 id="53">5.3 감쇠 수동 트리거</h3>
+<pre><code class="language-bash"># Dry-run (실제 변경 없이 영향 확인)
+curl -X POST http://localhost:5050/api/memory/decay \
+  -H &quot;Content-Type: application/json&quot; \
+  -d '{&quot;dry_run&quot;: true}'
+
+# 실제 실행
+curl -X POST http://localhost:5050/api/memory/decay \
+  -H &quot;Content-Type: application/json&quot; \
+  -d '{&quot;dry_run&quot;: false}'
+</code></pre>
+<h3 id="54">5.4 감사 및 롤백</h3>
+<pre><code class="language-bash"># 특정 기억의 변경 이력
+curl http://localhost:5050/api/memory/audit/history/&lt;memory-uuid&gt;
+
+# 이전 버전으로 롤백
+curl -X POST http://localhost:5050/api/memory/audit/rollback \
+  -H &quot;Content-Type: application/json&quot; \
+  -d '{&quot;revision_id&quot;: &quot;&lt;revision-uuid&gt;&quot;}'
+</code></pre>
+<hr />
+<h2 id="6-mcp">6. MCP 서버 연동</h2>
+<p>Mories는 MCP(Model Context Protocol) 서버를 내장하고 있어 AI 에이전트가 직접 도구로 호출 가능합니다.</p>
+<h3 id="5">지원 도구 (5개)</h3>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>memory_store</code></td>
+<td>기억 저장 (STM/LTM)</td>
+</tr>
+<tr>
+<td><code>memory_search</code></td>
+<td>의미 기반 기억 검색</td>
+</tr>
+<tr>
+<td><code>memory_boost</code></td>
+<td>기억 중요도 강화</td>
+</tr>
+<tr>
+<td><code>memory_scope</code></td>
+<td>범위 조회/승격</td>
+</tr>
+<tr>
+<td><code>memory_audit</code></td>
+<td>감사 이력 조회</td>
+</tr>
+</tbody>
+</table>
+<h3 id="rest-mcp-proxy">REST MCP Proxy</h3>
+<pre><code class="language-bash"># JSON-RPC 형식으로 MCP 도구 호출
+curl -X POST http://localhost:5050/api/mcp \
+  -H &quot;Content-Type: application/json&quot; \
+  -d '{&quot;method&quot;: &quot;memory_search&quot;, &quot;params&quot;: {&quot;query&quot;: &quot;architecture&quot;}}'
+</code></pre>
+<hr />
+<h2 id="7-n8n">7. n8n / 외부 시스템 연동</h2>
+<h3 id="gateway">Gateway 엔드포인트</h3>
+<pre><code class="language-bash"># n8n 웹훅 수신
+POST /api/gateway/n8n
+
+# NiFi 데이터 수신
+POST /api/gateway/nifi
+
+# Spark 배치 데이터
+POST /api/gateway/spark
+
+# 범용 웹훅
+POST /api/gateway/webhook
+</code></pre>
+<h3 id="n8n">n8n 워크플로우 예시</h3>
+<p><code>n8n_workflows/</code> 폴더에 사전 구성된 템플릿이 있습니다.</p>
+<hr />
+<h2 id="8">8. 보안 설정</h2>
+<h3 id="81-rbac">8.1 RBAC (역할 기반 접근 제어)</h3>
+<pre><code class="language-bash"># 역할 목록 조회
+curl http://localhost:5050/api/security/roles
+
+# 접근 권한 검사
+curl -X POST http://localhost:5050/api/security/check \
+  -H &quot;Content-Type: application/json&quot; \
+  -d '{&quot;principal_id&quot;: &quot;agent-1&quot;, &quot;resource&quot;: &quot;memory-uuid&quot;, &quot;action&quot;: &quot;read&quot;}'
+</code></pre>
+<h3 id="82-aes-256">8.2 필드 암호화 (AES-256)</h3>
+<pre><code class="language-bash"># 특정 기억의 필드 암호화
+curl -X POST http://localhost:5050/api/security/encrypt \
+  -H &quot;Content-Type: application/json&quot; \
+  -d '{&quot;uuid&quot;: &quot;&lt;memory-uuid&gt;&quot;, &quot;fields&quot;: [&quot;content&quot;]}'
+</code></pre>
+<hr />
+<h2 id="9">9. 데이터 정합성 관리</h2>
+<h3 id="91-quick-check">9.1 Quick Check</h3>
+<pre><code class="language-bash">curl http://localhost:5050/api/reconciliation/check
+# 반환: total_memories, without_scope, stale_30d, health_score
+</code></pre>
+<h3 id="92-full-reconciliation">9.2 Full Reconciliation</h3>
+<pre><code class="language-bash"># 자동 수정 포함
+curl -X POST http://localhost:5050/api/reconciliation/run \
+  -H &quot;Content-Type: application/json&quot; \
+  -d '{&quot;auto_fix&quot;: true}'
+</code></pre>
+<h3 id="93">9.3 검사 항목</h3>
+<table>
+<thead>
+<tr>
+<th>검사</th>
+<th>설명</th>
+<th>자동 수정</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Schema Completeness</td>
+<td>필수 속성 누락</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Scope Assignment</td>
+<td>유효하지 않은 scope</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Audit Coverage</td>
+<td>감사 기록 없는 엔티티</td>
+<td>❌ (경고만)</td>
+</tr>
+<tr>
+<td>Salience Staleness</td>
+<td>30일 이상 미갱신</td>
+<td>❌ (경고만)</td>
+</tr>
+<tr>
+<td>Dead Letter Queue</td>
+<td>Outbox 실패 건수</td>
+<td>❌ (경고만)</td>
+</tr>
+<tr>
+<td>Orphaned Revisions</td>
+<td>고아 리비전 노드</td>
+<td>✅</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="10">10. 트러블슈팅</h2>
+<h3 id="neo4j">Neo4j 연결 실패</h3>
+<pre><code class="language-bash"># Neo4j 컨테이너 상태 확인
+docker ps | grep neo4j
+
+# Neo4j 로그 확인
+docker logs mirofish-neo4j
+
+# 환경 변수 확인
+grep NEO4J .env
+</code></pre>
+<h3 id="_2">메모리 감쇠가 안 될 때</h3>
+<pre><code class="language-bash"># 스케줄러 상태 확인
+curl http://localhost:5050/api/health
+# → &quot;scheduler&quot;: &quot;running&quot; 확인
+
+# 수동 감쇠 실행
+curl -X POST http://localhost:5050/api/memory/decay -d '{&quot;dry_run&quot;: false}'
+</code></pre>
+<h3 id="_3">테스트 실패 시</h3>
+<pre><code class="language-bash"># 개별 테스트 실행 (디버그)
+PYTHONPATH=src .venv/bin/python -m pytest tests/integration/test_memory_lifecycle.py -v --tb=long -s
+
+# Neo4j 연결 확인
+PYTHONPATH=src .venv/bin/python -c &quot;
+from neo4j import GraphDatabase
+d = GraphDatabase.driver('bolt://localhost:7687', auth=('neo4j', 'mirofish'))
+with d.session() as s: print(s.run('RETURN 1').single()[0])
+d.close()
+&quot;
+</code></pre>
+<h3 id="_4">포트 충돌</h3>
+<pre><code class="language-bash"># 사용 중인 포트 확인
+lsof -i :5050
+lsof -i :7687
+lsof -i :7474
+</code></pre>
+<hr />
+<h2 id="_5">📋 주요 환경 변수 정리</h2>
+<table>
+<thead>
+<tr>
+<th>변수</th>
+<th>기본값</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>NEO4J_URI</code></td>
+<td><code>bolt://localhost:7687</code></td>
+<td>Neo4j 연결</td>
+</tr>
+<tr>
+<td><code>NEO4J_USER</code></td>
+<td><code>neo4j</code></td>
+<td>Neo4j 사용자</td>
+</tr>
+<tr>
+<td><code>NEO4J_PASSWORD</code></td>
+<td>—</td>
+<td>Neo4j 비밀번호</td>
+</tr>
+<tr>
+<td><code>SUPERMEMORY_API_KEY</code></td>
+<td>—</td>
+<td>Supermemory API 키 (선택)</td>
+</tr>
+<tr>
+<td><code>LLM_PROVIDER</code></td>
+<td><code>ollama</code></td>
+<td>LLM 제공자</td>
+</tr>
+<tr>
+<td><code>OLLAMA_BASE_URL</code></td>
+<td><code>http://localhost:11434</code></td>
+<td>Ollama 서버</td>
+</tr>
+<tr>
+<td><code>LLM_MODEL</code></td>
+<td><code>llama3.1</code></td>
+<td>LLM 모델명</td>
+</tr>
+<tr>
+<td><code>FLASK_SECRET_KEY</code></td>
+<td>—</td>
+<td>Flask 세션 키</td>
+</tr>
+<tr>
+<td><code>WEBHOOK_SECRET</code></td>
+<td>—</td>
+<td>웹훅 HMAC 시크릿</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<p><em>Last updated: 2026-03-28</em></p>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
