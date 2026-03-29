@@ -17,6 +17,26 @@ from datetime import datetime, timezone
 
 logger = logging.getLogger('mirofish.memory_pipeline')
 
+# ── Semantic Compression: Type Icons ──────────────
+# Mories uses type-prefixed summaries for search accuracy.
+# Format: "{icon} {actionable_summary}"
+# Example: "🔴 Neo4j driver leak: use singleton, don't create inside functions"
+_MEMORY_TYPE_ICONS = {
+    "gotcha":         "🔴",
+    "fix":            "🟡",
+    "how-it-works":   "🔵",
+    "decision":       "🟤",
+    "rule":           "📏",
+    "fact":           "📝",
+    "event":          "📅",
+    "person":         "👤",
+    "organization":   "🏢",
+    "concept":        "💡",
+    "task":           "🎯",
+    "project":        "📦",
+    "default":        "📌",
+}
+
 
 class MemoryPipeline:
     """
@@ -165,6 +185,31 @@ class MemoryPipeline:
             }
 
     # ──────────────────────────────────────────
+    # Semantic Compression
+    # ──────────────────────────────────────────
+
+    def compress_summary(self, content: str, entity_type: str = "default") -> str:
+        """
+        Apply Semantic Compression to a memory summary.
+
+        Format: "{icon} {actionable_one_liner}"
+        - Bad:  "Neo4j 관련 작업을 수행함"
+        - Good: "🔴 Neo4j driver leak: 함수 내 GraphDatabase.driver() 생성 금지 → 싱글턴 재사용"
+        """
+        icon = _MEMORY_TYPE_ICONS.get(entity_type.lower(), _MEMORY_TYPE_ICONS["default"])
+
+        # Strip leading/trailing whitespace and normalize
+        summary = content.strip()
+
+        # If already icon-prefixed, return as-is
+        if summary and summary[0] in '🔴🟡🔵🟤📌📏📝📅👤🏢💡🎯📦':
+            return summary
+
+        # Truncate to one actionable line
+        first_line = summary.split('\n')[0][:120]
+        return f"{icon} {first_line}"
+
+    # ──────────────────────────────────────────
     # Salience Estimation (Rule-Based Fallback)
     # ──────────────────────────────────────────
 
@@ -248,10 +293,16 @@ class MemoryPipeline:
         return chunks[:50]  # cap
 
     def _set_scope(self, uuid: str, scope: str):
-        from neo4j import GraphDatabase
-        from ..config import Config
-        driver = GraphDatabase.driver(Config.NEO4J_URI, auth=(Config.NEO4J_USER, Config.NEO4J_PASSWORD))
-        with driver.session() as session:
-            session.run("MATCH (e:Entity {uuid: $uuid}) SET e.scope = $scope",
-                       uuid=uuid, scope=scope)
-        driver.close()
+        """Set scope on a promoted LTM node. Uses manager's existing driver."""
+        try:
+            storage = self._manager._storage
+            if hasattr(storage, 'driver') and storage.driver:
+                with storage.driver.session() as session:
+                    session.run(
+                        "MATCH (e:Entity {uuid: $uuid}) SET e.scope = $scope",
+                        uuid=uuid, scope=scope,
+                    )
+            else:
+                logger.warning("No driver available for _set_scope, skipping scope=%s for uuid=%s", scope, uuid)
+        except Exception as e:
+            logger.warning("Failed to set scope for %s: %s", uuid, e)
