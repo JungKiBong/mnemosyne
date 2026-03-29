@@ -153,6 +153,10 @@ def create_app(config_class=Config):
     from .api.graphs import graphs_bp
     app.register_blueprint(graphs_bp)
 
+    # Orchestration Blackboard API (Phase 3)
+    from .api.orchestration import orchestration_bp
+    app.register_blueprint(orchestration_bp, url_prefix='/api/orchestration')
+
     # Settings API (Runtime LLM/Embedding configuration)
     from .api.settings import settings_bp
     app.register_blueprint(settings_bp)
@@ -189,6 +193,10 @@ def create_app(config_class=Config):
         @app.route('/memory/synaptic')
         def serve_synaptic():
             return send_from_directory(os.path.abspath(dashboard_dir), 'synaptic.html')
+
+        @app.route('/orchestration')
+        def serve_orchestration():
+            return send_from_directory(os.path.abspath(dashboard_dir), 'orchestration.html')
 
         @app.route('/api-docs')
         @app.route('/api-explorer')

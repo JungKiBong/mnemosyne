@@ -35,10 +35,15 @@ class NodeType(str, Enum):
     DECISION = "decision"       # Decision, conclusion, resolution
     TASK = "task"               # Action item, to-do, assignment
     AGENT = "agent"             # Simulation agent, AI persona
-
+    
+    # Orchestration & State Tracking (Phase 3 Blackboard)
+    SESSION = "session"         # A continuous working session
+    ERROR_LOG = "error_log"     # Tracebacks or failures
+    REVIEW = "review"           # Feedback from Expert Agent
+    CODE_UPDATE = "code_update" # Pull Request or proposed change
 
 # ──────────────────────────────────────────
-# Edge Types (16 types in 6 categories)
+# Edge Types (20 types in 7 categories)
 # ──────────────────────────────────────────
 
 class EdgeType(str, Enum):
@@ -75,6 +80,12 @@ class EdgeType(str, Enum):
     # Data flow (0.6–0.8)
     SOURCED_FROM = "sourced_from"   # Data originates from
     VALIDATES = "validates"         # Confirms / verifies
+    
+    # Execution & Orchestration (0.7-1.0)
+    RESOLVED_BY = "resolved_by"     # Issue/Error fixed by update
+    BLOCKS = "blocks"               # Error prevents Task
+    IMPLEMENTS = "implements"       # Update implements Task
+    REQUIRED_FOR = "required_for"   # Dependency link between Tasks
 
 
 # Default weights for each edge type
@@ -95,6 +106,10 @@ EDGE_WEIGHTS: Dict[EdgeType, float] = {
     EdgeType.ASSIGNED_TO: 0.7,
     EdgeType.SOURCED_FROM: 0.6,
     EdgeType.VALIDATES: 0.8,
+    EdgeType.RESOLVED_BY: 0.9,
+    EdgeType.BLOCKS: 0.9,
+    EdgeType.IMPLEMENTS: 0.8,
+    EdgeType.REQUIRED_FOR: 1.0,
 }
 
 # Edge category groupings (for UI filtering)
@@ -105,6 +120,7 @@ EDGE_CATEGORIES: Dict[str, List[EdgeType]] = {
     "semantic": [EdgeType.RELATED_TO, EdgeType.SIMILAR_TO, EdgeType.ELABORATES],
     "behavioral": [EdgeType.CREATED_BY, EdgeType.DECIDED_BY, EdgeType.ASSIGNED_TO],
     "data_flow": [EdgeType.SOURCED_FROM, EdgeType.VALIDATES],
+    "orchestration": [EdgeType.RESOLVED_BY, EdgeType.BLOCKS, EdgeType.IMPLEMENTS, EdgeType.REQUIRED_FOR],
 }
 
 

@@ -16,6 +16,7 @@ from ..utils.llm_client import LLMClient
 from ..storage.hybrid_storage import HybridStorage
 from .observer_agent import ObserverAgent, ObserverType
 from .graph_memory_updater import AgentActivity
+from .orchestrator_service import OrchestratorService
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ class ObserverOrchestrator:
     Activities are fanned out to all 3 observers in parallel.
     Each observer processes its batch independently and stores
     cognitive insights in Supermemory via HybridStorage.
+    Uses OrchestratorService to register operations on Neo4j Blackboard.
     """
 
     def __init__(
@@ -43,6 +45,9 @@ class ObserverOrchestrator:
         self.graph_id = graph_id
         self.llm_client = llm_client
         self._running = False
+        
+        self.orchestrator_svc = OrchestratorService()
+        self.session_id: Optional[str] = None
 
         # Create the 3 parallel observers
         self.observers: Dict[ObserverType, ObserverAgent] = {
@@ -76,13 +81,22 @@ class ObserverOrchestrator:
         )
 
     def start(self):
-        """Start all 3 observer agents."""
+        """Start all 3 observer agents and create an Orchestration Session."""
         if self._running:
             return
+            
+        # Register a Blackboard Session
+        self.session_id = self.orchestrator_svc.start_session(
+            graph_id=self.graph_id,
+            name="Cognitive Observation Loop",
+            goal="Continuously monitor and extract insights from agent activities."
+        )
+        
         self._running = True
         for obs_type, agent in self.observers.items():
+            agent.session_id = self.session_id
             agent.start()
-            logger.info("Started %s observer", obs_type.value)
+            logger.info("Started %s observer in session %s", obs_type.value, self.session_id)
 
     def stop(self):
         """Stop all 3 observer agents."""
@@ -112,6 +126,7 @@ class ObserverOrchestrator:
         """Return basic stats."""
         return {
             "graph_id": self.graph_id,
+            "session_id": self.session_id,
             "running": self._running,
             "total_observed": self._total_observed,
             "observers": {
