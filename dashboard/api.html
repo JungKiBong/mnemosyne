@@ -539,9 +539,13 @@ const API_REGISTRY = {
   ],
 
   "Data Ingestion": [
-    { id:"ingest_post", method:"POST", path:"/api/ingest", name:"Ingest Text", desc:"텍스트/문서를 지식 그래프에 인제스트합니다.",
+    { id:"ingest_post", method:"POST", path:"/api/ingest", name:"Ingest (NER)", desc:"텍스트/문서를 기존 NER 파이프라인으로 인제스트합니다.",
       body: '{"content":"분석할 텍스트...","source":"manual","graph_id":"project-1"}' },
+    { id:"ingest_hybrid", method:"POST", path:"/api/ingest/hybrid", name:"Hybrid Ingest (2-Phase)", desc:"2-Phase 하이브리드 파이프라인: Phase 1 구조 추출 → Phase 2 LLM 의미 보강. 핑거프린트 기반 증분 업데이트 지원.",
+      body: '{"graph_id":"project-1","source_ref":"/path/to/file.pdf","incremental":true,"enrich":true,"also_run_ner":true}' },
     { id:"ingest_batch", method:"POST", path:"/api/ingest/batch", name:"Batch Ingest", desc:"여러 문서를 일괄 인제스트합니다." },
+    { id:"ingest_fingerprints", method:"GET", path:"/api/ingest/fingerprints", name:"List Fingerprints", desc:"저장된 콘텐츠 핑거프린트 목록을 조회합니다. 증분 업데이트 추적용." },
+    { id:"ingest_fingerprint_del", method:"DELETE", path:"/api/ingest/fingerprint", name:"Delete Fingerprint", desc:"특정 소스의 핑거프린트를 삭제하여 전체 재처리를 강제합니다. ?source_ref=..." },
     { id:"ingest_streams", method:"GET", path:"/api/ingest/streams", name:"List Streams", desc:"활성 스트리밍 인제스트 목록을 조회합니다." },
   ],
 

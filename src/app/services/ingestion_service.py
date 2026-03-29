@@ -3,6 +3,13 @@ DataIngestionService — Unified entry point for all data sources.
 
 Routes any source_ref to the correct adapter, normalizes the result,
 and sends it through the text/structured pipeline into GraphStorage.
+
+## 2-Phase Hybrid Pipeline (Understand-Anything inspired)
+1. StructuralExtractor: deterministic structure extraction (no LLM)
+2. SemanticEnricher:    LLM-based semantic annotation (typed nodes/edges)
+3. ContentFingerprint:  incremental delta-only updates
+
+The classic NER pipeline is preserved as a fallback / parallel path.
 """
 import logging
 import threading
@@ -44,6 +51,8 @@ class DataIngestionService:
     - One-shot ingestion for files, structured data, and DB connectors
     - Stream ingestion for Webhook, Kafka, and REST polling
     - Pre-extracted entity/relation injection (graph DB imports)
+    - 2-Phase hybrid pipeline: structural extraction → semantic enrichment
+    - Fingerprint-based incremental updates (delta-only reprocessing)
     """
 
     def __init__(self, storage: GraphStorage, chunk_size: int = 500, chunk_overlap: int = 50):
@@ -53,6 +62,11 @@ class DataIngestionService:
         self.adapters: List[SourceAdapter] = []
         self._stream_threads: Dict[str, threading.Thread] = {}
         self._register_default_adapters()
+
+        # Lazy-initialized Phase pipeline components
+        self._structural_extractor = None
+        self._semantic_enricher = None
+        self._fingerprint_manager = None
 
     def _register_default_adapters(self):
         """Register built-in adapters in priority order."""
@@ -77,6 +91,30 @@ class DataIngestionService:
             RestPollingAdapter(),
         ])
 
+    @property
+    def structural_extractor(self):
+        """Lazy-init Phase 1 structural extractor."""
+        if self._structural_extractor is None:
+            from app.services.structural_extractor import StructuralExtractor
+            self._structural_extractor = StructuralExtractor()
+        return self._structural_extractor
+
+    @property
+    def semantic_enricher(self):
+        """Lazy-init Phase 2 semantic enricher."""
+        if self._semantic_enricher is None:
+            from app.services.semantic_enricher import SemanticEnricher
+            self._semantic_enricher = SemanticEnricher()
+        return self._semantic_enricher
+
+    @property
+    def fingerprint_manager(self):
+        """Lazy-init fingerprint manager for incremental updates."""
+        if self._fingerprint_manager is None:
+            from app.utils.fingerprint import ContentFingerprint
+            self._fingerprint_manager = ContentFingerprint()
+        return self._fingerprint_manager
+
     def register_adapter(self, adapter: SourceAdapter):
         """Register a custom adapter with highest priority."""
         self.adapters.insert(0, adapter)
@@ -89,12 +127,12 @@ class DataIngestionService:
         raise ValueError(f"No adapter found for source: {source_ref}")
 
     # ==========================================
-    # One-shot ingestion
+    # One-shot ingestion (classic NER pipeline)
     # ==========================================
 
     def ingest(self, graph_id: str, source_ref: str, **kwargs) -> Dict[str, Any]:
         """
-        Ingest data from any source into the graph.
+        Ingest data from any source into the graph (classic NER pipeline).
         
         Args:
             graph_id:    Target graph ID in storage
@@ -139,6 +177,134 @@ class DataIngestionService:
             "metadata": result.metadata,
         }
         logger.info("Ingestion complete: %s", summary)
+        return summary
+
+    # ==========================================
+    # 2-Phase Hybrid Pipeline (UA-inspired)
+    # ==========================================
+
+    def ingest_with_knowledge_graph(
+        self,
+        graph_id: str,
+        source_ref: str,
+        incremental: bool = True,
+        enrich: bool = True,
+        also_run_ner: bool = True,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """
+        Ingest data using the 2-Phase hybrid pipeline.
+
+        Phase 1: StructuralExtractor — deterministic structure extraction (no LLM)
+        Phase 2: SemanticEnricher — LLM-based typed nodes/edges with summaries
+        + Fingerprint-based incremental updates
+
+        Args:
+            graph_id:     Target graph ID
+            source_ref:   Data source reference
+            incremental:  If True, only process changed sections (via fingerprint)
+            enrich:       If True, run Phase 2 LLM enrichment
+            also_run_ner: If True, also run classic NER pipeline in parallel
+            **kwargs:     Adapter-specific options
+
+        Returns:
+            Summary dict with hybrid pipeline statistics
+        """
+        adapter = self.find_adapter(source_ref)
+        logger.info(
+            "Hybrid ingestion [%s] via %s (incremental=%s, enrich=%s)",
+            source_ref, type(adapter).__name__, incremental, enrich
+        )
+
+        result: IngestionResult = adapter.ingest(source_ref, **kwargs)
+
+        summary = {
+            "source": source_ref,
+            "adapter": type(adapter).__name__,
+            "source_type": result.source_type.value,
+            "text_length": len(result.text) if result.text else 0,
+            "pipeline": "hybrid_2phase",
+            "phase1_sections": 0,
+            "phase1_chunks": 0,
+            "phase2_nodes": 0,
+            "phase2_edges": 0,
+            "fingerprint_status": "n/a",
+            "ner_chunks": 0,
+        }
+
+        if not result.text and not result.entities:
+            logger.warning("No text or entities extracted from %s", source_ref)
+            return summary
+
+        # ── Phase 1: Structural Extraction ──
+        skeleton = self.structural_extractor.extract(
+            source_ref=source_ref,
+            text=result.text,
+        )
+        summary["phase1_sections"] = len(skeleton.sections)
+        summary["phase1_chunks"] = len(skeleton.structural_chunks)
+
+        # ── Fingerprint / Incremental Check ──
+        if incremental and result.text:
+            section_fps = {}
+            for sec in skeleton.sections:
+                section_fps[sec.name] = self.fingerprint_manager.hash_text(
+                    sec.content_preview
+                )
+
+            diff = self.fingerprint_manager.compare(
+                source_ref=source_ref,
+                new_global_fp=skeleton.fingerprint,
+                new_section_fps=section_fps,
+            )
+            summary["fingerprint_status"] = diff.summary()
+
+            if diff.is_unchanged:
+                logger.info("Source unchanged, skipping: %s", source_ref)
+                summary["pipeline"] = "skipped_unchanged"
+                return summary
+
+            # Save updated fingerprint
+            self.fingerprint_manager.save(
+                source_ref=source_ref,
+                global_fp=skeleton.fingerprint,
+                section_fps=section_fps,
+                metadata=skeleton.metadata,
+            )
+
+        # ── Phase 2: Semantic Enrichment (LLM) ──
+        if enrich:
+            try:
+                knowledge_graph = self.semantic_enricher.enrich(
+                    skeleton=skeleton,
+                    graph_id=graph_id,
+                )
+                summary["phase2_nodes"] = knowledge_graph.node_count
+                summary["phase2_edges"] = knowledge_graph.edge_count
+
+                # Inject enriched nodes/edges into Neo4j
+                self._inject_knowledge_graph(graph_id, knowledge_graph)
+
+            except Exception as e:
+                logger.error(
+                    "Phase 2 enrichment failed for %s: %s — continuing with NER only",
+                    source_ref, e
+                )
+
+        # ── Classic NER (parallel path) ──
+        if also_run_ner and result.text:
+            # Use structure-aware chunks from Phase 1 instead of naive splitting
+            chunks = skeleton.structural_chunks or split_text_into_chunks(
+                result.text, self.chunk_size, self.chunk_overlap,
+            )
+            episode_ids = self.storage.add_text_batch(graph_id, chunks)
+            summary["ner_chunks"] = len(episode_ids)
+
+        # Inject pre-extracted entities if any
+        if result.entities or result.relations:
+            self._inject_pre_extracted(graph_id, result)
+
+        logger.info("Hybrid ingestion complete: %s", summary)
         return summary
 
     def ingest_batch(self, graph_id: str, source_refs: List[str], **kwargs) -> List[Dict[str, Any]]:
@@ -240,3 +406,89 @@ class DataIngestionService:
                 relation_texts.append(f"{src} {rtype} {tgt}.")
             if relation_texts:
                 self.storage.add_text_batch(graph_id, relation_texts)
+
+    def _inject_knowledge_graph(self, graph_id: str, knowledge_graph) -> None:
+        """
+        Inject typed knowledge graph (from SemanticEnricher) into Neo4j.
+
+        Unlike _inject_pre_extracted which converts entities to plain text,
+        this stores structured nodes with:
+        - Extended labels (NodeType-based)
+        - Semantic properties (summary, tags, complexity, fingerprint)
+        - Typed, weighted edges with descriptions
+
+        Uses MERGE to avoid duplicating nodes on repeated ingestion.
+        """
+        from neo4j import GraphDatabase
+        from ..config import Config
+
+        driver = GraphDatabase.driver(
+            Config.NEO4J_URI,
+            auth=(Config.NEO4J_USER, Config.NEO4J_PASSWORD)
+        )
+
+        try:
+            with driver.session() as session:
+                # Inject nodes
+                for node in knowledge_graph.nodes:
+                    props = node.to_neo4j_props()
+                    node_label = node.type.value.capitalize()
+
+                    session.run(
+                        f"""
+                        MERGE (n:Entity {{uuid: $uuid}})
+                        SET n:{node_label},
+                            n.name = $name,
+                            n.node_type = $node_type,
+                            n.summary = $summary,
+                            n.tags = $tags,
+                            n.complexity = $complexity,
+                            n.source_path = $source_path,
+                            n.fingerprint = $fingerprint,
+                            n.metadata = $metadata,
+                            n.graph_id = $graph_id
+                        """,
+                        uuid=props["uuid"],
+                        name=props["name"],
+                        node_type=props["node_type"],
+                        summary=props["summary"],
+                        tags=props["tags"],
+                        complexity=props["complexity"],
+                        source_path=props["source_path"],
+                        fingerprint=props["fingerprint"],
+                        metadata=props["metadata"],
+                        graph_id=graph_id,
+                    )
+
+                # Inject edges
+                for edge in knowledge_graph.edges:
+                    props = edge.to_neo4j_props()
+
+                    session.run(
+                        """
+                        MATCH (src:Entity {uuid: $source_id})
+                        MATCH (tgt:Entity {uuid: $target_id})
+                        MERGE (src)-[r:RELATES_TO {edge_type: $edge_type}]->(tgt)
+                        SET r.weight = $weight,
+                            r.direction = $direction,
+                            r.description = $description,
+                            r.metadata = $metadata,
+                            r.graph_id = $graph_id
+                        """,
+                        source_id=edge.source_id,
+                        target_id=edge.target_id,
+                        edge_type=props["edge_type"],
+                        weight=props["weight"],
+                        direction=props["direction"],
+                        description=props["description"],
+                        metadata=props["metadata"],
+                        graph_id=graph_id,
+                    )
+
+                logger.info(
+                    "Injected knowledge graph: %d nodes, %d edges into graph_id=%s",
+                    knowledge_graph.node_count, knowledge_graph.edge_count, graph_id
+                )
+        finally:
+            driver.close()
+

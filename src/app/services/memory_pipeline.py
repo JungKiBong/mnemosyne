@@ -46,13 +46,18 @@ class MemoryPipeline:
         entities: List[Dict[str, Any]] = None,
         metadata: Dict[str, Any] = None,
         auto_promote: bool = True,
+        incremental: bool = False,
     ) -> Dict[str, Any]:
         """
         Process ingestion output through memory pipeline.
 
-        1. Chunk text → STM items
-        2. Evaluate salience (rule-based)
-        3. Auto-promote high-salience items
+        1. (Optional) Fingerprint check for incremental mode
+        2. Chunk text → STM items
+        3. Evaluate salience (rule-based, with node type awareness)
+        4. Auto-promote high-salience items
+
+        Args:
+            incremental: If True, check fingerprint first and skip unchanged content
         """
         result = {
             "source": source_ref,
@@ -62,7 +67,28 @@ class MemoryPipeline:
             "discarded": 0,
             "duplicates_skipped": 0,
             "items": [],
+            "incremental_status": "disabled",
         }
+
+        # ── Incremental check ──
+        if incremental and text:
+            try:
+                from ..utils.fingerprint import ContentFingerprint
+                fp_manager = ContentFingerprint()
+                content_hash = ContentFingerprint.hash_text(text)
+                diff = fp_manager.compare(source_ref, content_hash, {})
+                result["incremental_status"] = diff.summary()
+
+                if diff.is_unchanged:
+                    logger.info("MemoryPipeline: source unchanged, skipping: %s", source_ref)
+                    return result
+
+                # Save new fingerprint
+                fp_manager.save(source_ref, content_hash, {})
+                fp_manager.close()
+            except Exception as e:
+                logger.warning("Fingerprint check failed (continuing): %s", e)
+                result["incremental_status"] = f"error: {e}"
 
         # Determine scope from source type
         scope = self._infer_scope(source_ref, metadata or {})
