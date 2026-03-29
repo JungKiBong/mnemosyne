@@ -145,10 +145,6 @@ def create_app(config_class=Config):
     from .api.reconciliation import reconciliation_bp
     app.register_blueprint(reconciliation_bp)
 
-    # Orchestration API (Phase 3 Blackboard)
-    from .api.orchestration import orchestration_bp
-    app.register_blueprint(orchestration_bp, url_prefix='/api/orchestration')
-
     # Permanent Memory & Category Extension API (Phase 16)
     from .api.permanent_memory import permanent_bp
     app.register_blueprint(permanent_bp, url_prefix='/api/memory')
