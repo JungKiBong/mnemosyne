@@ -72,9 +72,11 @@ class MemoryPipeline:
 
         # ── Incremental check ──
         if incremental and text:
+            fp_manager = None
             try:
                 from ..utils.fingerprint import ContentFingerprint
-                fp_manager = ContentFingerprint()
+                # Reuse MemoryManager's existing Neo4j driver (DEF-H02 fix)
+                fp_manager = ContentFingerprint(neo4j_driver=self._manager._driver)
                 content_hash = ContentFingerprint.hash_text(text)
                 diff = fp_manager.compare(source_ref, content_hash, {})
                 result["incremental_status"] = diff.summary()
@@ -85,7 +87,6 @@ class MemoryPipeline:
 
                 # Save new fingerprint
                 fp_manager.save(source_ref, content_hash, {})
-                fp_manager.close()
             except Exception as e:
                 logger.warning("Fingerprint check failed (continuing): %s", e)
                 result["incremental_status"] = f"error: {e}"
@@ -274,10 +275,8 @@ class MemoryPipeline:
         return chunks[:50]  # cap
 
     def _set_scope(self, uuid: str, scope: str):
-        from neo4j import GraphDatabase
-        from ..config import Config
-        driver = GraphDatabase.driver(Config.NEO4J_URI, auth=(Config.NEO4J_USER, Config.NEO4J_PASSWORD))
-        with driver.session() as session:
+        """Set scope on a promoted LTM entity using the shared driver."""
+        with self._manager._driver.session() as session:
             session.run("MATCH (e:Entity {uuid: $uuid}) SET e.scope = $scope",
                        uuid=uuid, scope=scope)
-        driver.close()
+

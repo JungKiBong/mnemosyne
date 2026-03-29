@@ -20,6 +20,8 @@ Endpoints:
   POST   /api/security/encrypt/scope       — Encrypt all memories in scope
   GET    /api/security/encrypt/status      — Encryption statistics
   POST   /api/security/rotate              — Key rotation (planned)
+
+Production-grade: try/except on all handlers (DEF-H03 fix).
 """
 
 import logging
@@ -47,24 +49,32 @@ def _get_encryption():
 @security_bp.route('/principals', methods=['POST'])
 def register_principal():
     """Register a new principal (user/agent/team)."""
-    data = request.get_json(force=True)
-    rbac = _get_rbac()
-    result = rbac.register_principal(
-        principal_id=data.get('principal_id', ''),
-        name=data.get('name', ''),
-        principal_type=data.get('type', 'user'),
-        roles=data.get('roles', ['reader']),
-        team_id=data.get('team_id', ''),
-    )
-    return jsonify(result)
+    try:
+        data = request.get_json(force=True)
+        rbac = _get_rbac()
+        result = rbac.register_principal(
+            principal_id=data.get('principal_id', ''),
+            name=data.get('name', ''),
+            principal_type=data.get('type', 'user'),
+            roles=data.get('roles', ['reader']),
+            team_id=data.get('team_id', ''),
+        )
+        return jsonify(result)
+    except Exception as e:
+        logger.exception("Failed to register principal")
+        return jsonify({"error": str(e)}), 500
 
 
 @security_bp.route('/principals', methods=['GET'])
 def list_principals():
     """List all principals."""
-    rbac = _get_rbac()
-    ptype = request.args.get('type')
-    return jsonify({"principals": rbac.list_principals(ptype)})
+    try:
+        rbac = _get_rbac()
+        ptype = request.args.get('type')
+        return jsonify({"principals": rbac.list_principals(ptype)})
+    except Exception as e:
+        logger.exception("Failed to list principals")
+        return jsonify({"error": str(e)}), 500
 
 
 # ──────────────────────────────────────────
@@ -74,22 +84,30 @@ def list_principals():
 @security_bp.route('/check', methods=['POST'])
 def check_permission():
     """Check if a principal has permission for an action."""
-    data = request.get_json(force=True)
-    rbac = _get_rbac()
-    result = rbac.check_permission(
-        principal_id=data.get('principal_id', ''),
-        action=data.get('action', ''),
-        memory_scope=data.get('scope', 'personal'),
-        memory_owner=data.get('owner', ''),
-    )
-    return jsonify(result)
+    try:
+        data = request.get_json(force=True)
+        rbac = _get_rbac()
+        result = rbac.check_permission(
+            principal_id=data.get('principal_id', ''),
+            action=data.get('action', ''),
+            memory_scope=data.get('scope', 'personal'),
+            memory_owner=data.get('owner', ''),
+        )
+        return jsonify(result)
+    except Exception as e:
+        logger.exception("Failed to check permission")
+        return jsonify({"error": str(e)}), 500
 
 
 @security_bp.route('/roles', methods=['GET'])
 def role_matrix():
     """Get the role-permission matrix."""
-    rbac = _get_rbac()
-    return jsonify({"roles": rbac.get_role_matrix()})
+    try:
+        rbac = _get_rbac()
+        return jsonify({"roles": rbac.get_role_matrix()})
+    except Exception as e:
+        logger.exception("Failed to get role matrix")
+        return jsonify({"error": str(e)}), 500
 
 
 # ──────────────────────────────────────────
@@ -99,9 +117,9 @@ def role_matrix():
 @security_bp.route('/keys', methods=['POST'])
 def generate_key():
     """Generate a new API key."""
-    data = request.get_json(force=True)
-    rbac = _get_rbac()
     try:
+        data = request.get_json(force=True)
+        rbac = _get_rbac()
         result = rbac.generate_api_key(
             owner_id=data.get('owner_id', 'admin'),
             name=data.get('name', 'New Key'),
@@ -113,78 +131,101 @@ def generate_key():
         return jsonify(result)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        logger.exception("Failed to generate API key")
+        return jsonify({"error": str(e)}), 500
 
 
 @security_bp.route('/keys', methods=['GET'])
 def list_keys():
     """List API keys (hashes only, not actual keys)."""
-    rbac = _get_rbac()
-    owner_id = request.args.get('owner_id')
-    return jsonify({"keys": rbac.list_api_keys(owner_id)})
+    try:
+        rbac = _get_rbac()
+        owner_id = request.args.get('owner_id')
+        return jsonify({"keys": rbac.list_api_keys(owner_id)})
+    except Exception as e:
+        logger.exception("Failed to list API keys")
+        return jsonify({"error": str(e)}), 500
 
 
 @security_bp.route('/keys/verify', methods=['POST'])
 def verify_key():
     """Verify an API key and return its metadata (scopes, roles, etc)."""
-    data = request.get_json(force=True)
-    raw_key = data.get('api_key', '')
-    if not raw_key:
-        return jsonify({"valid": False, "error": "api_key missing"}), 400
-    
-    rbac = _get_rbac()
-    principal = rbac.validate_api_key(raw_key)
-    if principal:
-        return jsonify({"valid": True, "principal": principal})
-    
-    return jsonify({"valid": False, "error": "Invalid or revoked API key"}), 401
+    try:
+        data = request.get_json(force=True)
+        raw_key = data.get('api_key', '')
+        if not raw_key:
+            return jsonify({"valid": False, "error": "api_key missing"}), 400
+
+        rbac = _get_rbac()
+        principal = rbac.validate_api_key(raw_key)
+        if principal:
+            return jsonify({"valid": True, "principal": principal})
+
+        return jsonify({"valid": False, "error": "Invalid or revoked API key"}), 401
+    except Exception as e:
+        logger.exception("Failed to verify API key")
+        return jsonify({"error": str(e)}), 500
 
 
 @security_bp.route('/keys/<key_hash>', methods=['DELETE'])
 def revoke_key(key_hash):
     """Revoke an API key."""
-    rbac = _get_rbac()
-    return jsonify(rbac.revoke_api_key(key_hash))
+    try:
+        rbac = _get_rbac()
+        return jsonify(rbac.revoke_api_key(key_hash))
+    except Exception as e:
+        logger.exception("Failed to revoke API key %s", key_hash)
+        return jsonify({"error": str(e)}), 500
 
 
 @security_bp.route('/keys/<key_hash>/renew', methods=['POST'])
 def renew_key(key_hash):
     """Renew (extend) an API key's expiration."""
-    data = request.get_json(force=True)
-    extend_days = int(data.get('extend_days', 30))
-    rbac = _get_rbac()
-    result = rbac.renew_api_key(key_hash, extend_days)
-    if "error" in result:
-        return jsonify(result), 400
-    return jsonify(result)
+    try:
+        data = request.get_json(force=True)
+        extend_days = int(data.get('extend_days', 30))
+        rbac = _get_rbac()
+        result = rbac.renew_api_key(key_hash, extend_days)
+        if "error" in result:
+            return jsonify(result), 400
+        return jsonify(result)
+    except Exception as e:
+        logger.exception("Failed to renew API key %s", key_hash)
+        return jsonify({"error": str(e)}), 500
 
 
 @security_bp.route('/rate-limit-stats', methods=['GET'])
 def rate_limit_stats():
     """Get rate limiting statistics per API key."""
-    rbac = _get_rbac()
-    keys = rbac.list_api_keys()
-    stats = []
-    for k in keys:
-        days_left = None
-        if k.get("expires_at"):
-            from datetime import datetime, timezone
-            try:
-                exp = datetime.fromisoformat(k["expires_at"])
-                if exp.tzinfo is None:
-                    exp = exp.replace(tzinfo=timezone.utc)
-                days_left = (exp - datetime.now(timezone.utc)).days
-            except Exception:
-                pass
-        stats.append({
-            "name": k.get("name", "Unknown"),
-            "key_hash": (k.get("key_hash", ""))[:16],
-            "rate_limit": k.get("rate_limit", 100),
-            "usage_count": k.get("usage_count", 0),
-            "last_used": k.get("last_used"),
-            "days_until_expiry": days_left,
-            "active": True,
-        })
-    return jsonify({"keys": stats, "global_mcp_limit": 60})
+    try:
+        rbac = _get_rbac()
+        keys = rbac.list_api_keys()
+        stats = []
+        for k in keys:
+            days_left = None
+            if k.get("expires_at"):
+                from datetime import datetime, timezone
+                try:
+                    exp = datetime.fromisoformat(k["expires_at"])
+                    if exp.tzinfo is None:
+                        exp = exp.replace(tzinfo=timezone.utc)
+                    days_left = (exp - datetime.now(timezone.utc)).days
+                except Exception:
+                    pass
+            stats.append({
+                "name": k.get("name", "Unknown"),
+                "key_hash": (k.get("key_hash", ""))[:16],
+                "rate_limit": k.get("rate_limit", 100),
+                "usage_count": k.get("usage_count", 0),
+                "last_used": k.get("last_used"),
+                "days_until_expiry": days_left,
+                "active": True,
+            })
+        return jsonify({"keys": stats, "global_mcp_limit": 60})
+    except Exception as e:
+        logger.exception("Failed to get rate limit stats")
+        return jsonify({"error": str(e)}), 500
 
 
 # ──────────────────────────────────────────
@@ -194,68 +235,92 @@ def rate_limit_stats():
 @security_bp.route('/encrypt', methods=['POST'])
 def encrypt_memory():
     """Encrypt a specific memory."""
-    data = request.get_json(force=True)
-    enc = _get_encryption()
-    result = enc.encrypt_memory(
-        memory_uuid=data.get('uuid', ''),
-        fields=data.get('fields'),  # None = all encryptable
-        encrypted_by=data.get('encrypted_by', 'admin'),
-    )
-    return jsonify(result)
+    try:
+        data = request.get_json(force=True)
+        enc = _get_encryption()
+        result = enc.encrypt_memory(
+            memory_uuid=data.get('uuid', ''),
+            fields=data.get('fields'),  # None = all encryptable
+            encrypted_by=data.get('encrypted_by', 'admin'),
+        )
+        return jsonify(result)
+    except Exception as e:
+        logger.exception("Failed to encrypt memory")
+        return jsonify({"error": str(e)}), 500
 
 
 @security_bp.route('/decrypt', methods=['POST'])
 def decrypt_memory():
     """Decrypt a memory (returns plaintext, does NOT persist)."""
-    data = request.get_json(force=True)
-    enc = _get_encryption()
-    result = enc.decrypt_memory(
-        memory_uuid=data.get('uuid', ''),
-        requesting_principal=data.get('principal', 'admin'),
-    )
-    return jsonify(result)
+    try:
+        data = request.get_json(force=True)
+        enc = _get_encryption()
+        result = enc.decrypt_memory(
+            memory_uuid=data.get('uuid', ''),
+            requesting_principal=data.get('principal', 'admin'),
+        )
+        return jsonify(result)
+    except Exception as e:
+        logger.exception("Failed to decrypt memory")
+        return jsonify({"error": str(e)}), 500
 
 
 @security_bp.route('/encrypt/remove', methods=['POST'])
 def remove_encryption():
     """Remove encryption from a memory permanently."""
-    data = request.get_json(force=True)
-    enc = _get_encryption()
-    result = enc.remove_encryption(
-        memory_uuid=data.get('uuid', ''),
-        removed_by=data.get('removed_by', 'admin'),
-    )
-    return jsonify(result)
+    try:
+        data = request.get_json(force=True)
+        enc = _get_encryption()
+        result = enc.remove_encryption(
+            memory_uuid=data.get('uuid', ''),
+            removed_by=data.get('removed_by', 'admin'),
+        )
+        return jsonify(result)
+    except Exception as e:
+        logger.exception("Failed to remove encryption")
+        return jsonify({"error": str(e)}), 500
 
 
 @security_bp.route('/encrypt/scope', methods=['POST'])
 def encrypt_scope():
     """Encrypt all memories in a scope."""
-    data = request.get_json(force=True)
-    scope = data.get('scope', '')
-    if not scope:
-        return jsonify({"error": "scope is required"}), 400
+    try:
+        data = request.get_json(force=True)
+        scope = data.get('scope', '')
+        if not scope:
+            return jsonify({"error": "scope is required"}), 400
 
-    enc = _get_encryption()
-    result = enc.encrypt_scope(
-        scope=scope,
-        encrypted_by=data.get('encrypted_by', 'admin'),
-    )
-    return jsonify(result)
+        enc = _get_encryption()
+        result = enc.encrypt_scope(
+            scope=scope,
+            encrypted_by=data.get('encrypted_by', 'admin'),
+        )
+        return jsonify(result)
+    except Exception as e:
+        logger.exception("Failed to encrypt scope")
+        return jsonify({"error": str(e)}), 500
 
 
 @security_bp.route('/encrypt/status', methods=['GET'])
 def encryption_status():
     """Get encryption statistics."""
-    enc = _get_encryption()
-    return jsonify(enc.get_encryption_status())
+    try:
+        enc = _get_encryption()
+        return jsonify(enc.get_encryption_status())
+    except Exception as e:
+        logger.exception("Failed to get encryption status")
+        return jsonify({"error": str(e)}), 500
 
 
 @security_bp.route('/rotate', methods=['POST'])
 def key_rotation():
     """Plan or execute key rotation."""
-    data = request.get_json(force=True)
-    enc = _get_encryption()
-    scope = data.get('scope')
-    result = enc.rotate_keys(scope)
-    return jsonify(result)
+    try:
+        data = request.get_json(force=True)
+        enc = _get_encryption()
+        scope = data.get('scope')
+        result = enc.rotate_keys(scope)
+        return jsonify(result)
+    except Exception as e:
+        logger.exception("Failed to rotate keys")
+        return jsonify({"error": str(e)}), 500

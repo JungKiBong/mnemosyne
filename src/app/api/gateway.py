@@ -26,17 +26,19 @@ from flask import Blueprint, request, jsonify
 logger = logging.getLogger('mirofish.gateway')
 
 def log_execution(source: str, status: str, details: dict):
-    """Log external workflow executions (e.g., n8n, NiFi) to Neo4j."""
+    """Log external workflow executions (e.g., n8n, NiFi) to Neo4j.
+    
+    Reuses the shared MemoryPipeline's driver to avoid creating
+    a new Neo4j connection per webhook call (DEF-C03 fix).
+    """
     try:
-        from ..config import Config
-        from neo4j import GraphDatabase
-        driver = GraphDatabase.driver(Config.NEO4J_URI, auth=(Config.NEO4J_USER, Config.NEO4J_PASSWORD))
+        pipeline = _get_pipeline()
+        driver = pipeline._manager._driver
         with driver.session() as session:
             session.run(
                 "CREATE (e:ExecutionLog {source: $source, status: $status, timestamp: datetime(), details: $details})",
                 source=source, status=status, details=json.dumps(details, ensure_ascii=False)
             )
-        driver.close()
     except Exception as e:
         logger.error(f"Failed to log execution: {e}")
 

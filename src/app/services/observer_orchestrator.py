@@ -16,6 +16,7 @@ from ..utils.llm_client import LLMClient
 from ..storage.hybrid_storage import HybridStorage
 from .observer_agent import ObserverAgent, ObserverType
 from .graph_memory_updater import AgentActivity
+from ..storage.orchestration_storage import OrchestrationStorage
 from .orchestrator_service import OrchestratorService
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,9 @@ class ObserverOrchestrator:
 
     A single OrchestratorService instance is shared across all agents
     to avoid creating multiple Neo4j driver connections.
+    
+    Accepts optional shared_storage to reuse the app-level
+    OrchestrationStorage singleton (DEF-M02 fix).
     """
 
     def __init__(
@@ -35,14 +39,15 @@ class ObserverOrchestrator:
         graph_id: str,
         llm_client: LLMClient,
         batch_size: int = 5,
+        shared_orchestration_storage: Optional[OrchestrationStorage] = None,
     ):
         self.storage = storage
         self.graph_id = graph_id
         self.llm_client = llm_client
         self._running = False
 
-        # Single shared service instance (one Neo4j driver for all agents)
-        self.orchestrator_svc = OrchestratorService()
+        # Use provided shared storage, or create a new one
+        self.orchestrator_svc = OrchestratorService(storage=shared_orchestration_storage)
         self.session_id: Optional[str] = None
 
         # Create the 3 parallel observers, sharing the service

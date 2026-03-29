@@ -106,6 +106,7 @@ class ContentFingerprint:
                           If None, uses Config to create one.
         """
         self._driver = neo4j_driver
+        self._owns_driver = neo4j_driver is None  # Only close if we created it
 
     @property
     def driver(self):
@@ -117,6 +118,7 @@ class ContentFingerprint:
                 Config.NEO4J_URI,
                 auth=(Config.NEO4J_USER, Config.NEO4J_PASSWORD)
             )
+            self._owns_driver = True
         return self._driver
 
     @staticmethod
@@ -308,6 +310,7 @@ class ContentFingerprint:
         return results
 
     def close(self):
-        """Close Neo4j driver if we own it."""
-        if self._driver:
+        """Close Neo4j driver only if we created it (not shared)."""
+        if self._owns_driver and self._driver:
             self._driver.close()
+            self._driver = None

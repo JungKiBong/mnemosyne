@@ -379,10 +379,15 @@ class ReportConsoleLogger:
 
             self._file_handler.close()
             self._file_handler = None
-    
-    def __del__(self):
-        """Ensure file handler is closed during destructor"""
+
+    def __enter__(self):
+        """Context manager support for safe resource cleanup."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Ensure file handler is closed when exiting context."""
         self.close()
+        return False
 
 
 class ReportStatus(str, Enum):

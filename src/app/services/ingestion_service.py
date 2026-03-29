@@ -61,6 +61,7 @@ class DataIngestionService:
         self.chunk_overlap = chunk_overlap
         self.adapters: List[SourceAdapter] = []
         self._stream_threads: Dict[str, threading.Thread] = {}
+        self._stream_stop_events: Dict[str, threading.Event] = {}
         self._register_default_adapters()
 
         # Lazy-initialized Phase pipeline components
@@ -340,15 +341,23 @@ class DataIngestionService:
             config = kwargs.get('config', {})
             adapter.connect(config)
 
+        stop_event = threading.Event()
+        self._stream_stop_events[source_ref] = stop_event
+
         def stream_worker():
             try:
                 for result in adapter.ingest_stream(source_ref, **kwargs):
+                    if stop_event.is_set():
+                        break
                     if result.text:
                         self.storage.add_text(graph_id, result.text)
                     if result.entities or result.relations:
                         self._inject_pre_extracted(graph_id, result)
             except Exception as e:
-                logger.error("Stream worker error for %s: %s", source_ref, e)
+                if not stop_event.is_set():
+                    logger.error("Stream worker error for %s: %s", source_ref, e)
+            finally:
+                logger.info("Stream worker exited: %s", source_ref)
 
         thread = threading.Thread(target=stream_worker, daemon=True, name=f"stream-{source_ref}")
         thread.start()
@@ -357,13 +366,19 @@ class DataIngestionService:
         return source_ref
 
     def stop_stream(self, source_ref: str):
-        """Stop a running stream."""
+        """Stop a running stream gracefully (DEF-M01 fix)."""
+        stop_event = self._stream_stop_events.pop(source_ref, None)
+        if stop_event:
+            stop_event.set()
+
         if source_ref in self._stream_threads:
             adapter = self.find_adapter(source_ref)
             if isinstance(adapter, StreamSourceAdapter):
                 adapter.disconnect()
-            # Daemon thread will exit when disconnected
-            del self._stream_threads[source_ref]
+            # Wait briefly for thread to exit
+            thread = self._stream_threads.pop(source_ref, None)
+            if thread and thread.is_alive():
+                thread.join(timeout=5)
             logger.info("Stream stopped: %s", source_ref)
 
     def active_streams(self) -> List[str]:
@@ -418,14 +433,21 @@ class DataIngestionService:
         - Typed, weighted edges with descriptions
 
         Uses MERGE to avoid duplicating nodes on repeated ingestion.
+        Reuses self.storage's existing Neo4j driver (DEF-C02 fix).
         """
-        from neo4j import GraphDatabase
-        from ..config import Config
-
-        driver = GraphDatabase.driver(
-            Config.NEO4J_URI,
-            auth=(Config.NEO4J_USER, Config.NEO4J_PASSWORD)
-        )
+        # Access the underlying Neo4j driver from the storage backend
+        driver = getattr(self.storage, '_driver', None)
+        if driver is None:
+            # Fallback: if storage doesn't expose _driver directly
+            from neo4j import GraphDatabase
+            from ..config import Config
+            driver = GraphDatabase.driver(
+                Config.NEO4J_URI,
+                auth=(Config.NEO4J_USER, Config.NEO4J_PASSWORD)
+            )
+            _owns_driver = True
+        else:
+            _owns_driver = False
 
         try:
             with driver.session() as session:
@@ -490,5 +512,16 @@ class DataIngestionService:
                     knowledge_graph.node_count, knowledge_graph.edge_count, graph_id
                 )
         finally:
-            driver.close()
+            if _owns_driver:
+                driver.close()
+
+    def close(self):
+        """Release resources held by lazy-initialized components (DEF-H01 fix)."""
+        if self._fingerprint_manager is not None:
+            try:
+                self._fingerprint_manager.close()
+            except Exception:
+                pass
+            self._fingerprint_manager = None
+
 
