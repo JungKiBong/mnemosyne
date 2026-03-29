@@ -70,6 +70,17 @@
     .timeline-icon.create { background: rgba(74,125,255,0.15); }
     .timeline-icon.rollback { background: rgba(234,179,8,0.15); }
     .timeline-icon.edit { background: rgba(6,182,212,0.15); }
+    .timeline-icon.denied { background: rgba(239,68,68,0.2); }
+    .timeline-icon.rate_limit { background: rgba(249,115,22,0.2); }
+    .timeline-icon.renew { background: rgba(74,125,255,0.15); }
+
+    /* Rate Limit Gauge */
+    .rl-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+    .rl-card:hover { border-color: var(--blue); }
+    .rl-name { font-size: 13px; font-weight: 600; margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rl-bar-track { width: 100%; height: 8px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden; }
+    .rl-bar-fill { height: 100%; border-radius: 4px; transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+    .rl-meta { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--text3); font-family: 'JetBrains Mono', monospace; }
     .timeline-body { flex: 1; min-width: 0; }
     .timeline-title { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .timeline-meta { font-size: 11px; color: var(--text3); margin-top: 3px; }
@@ -189,6 +200,9 @@
           <option value="create">✨ 생성</option>
           <option value="rollback">🔄 롤백</option>
           <option value="edit">✏️ 수정</option>
+          <option value="denied">🚫 접근거부</option>
+          <option value="rate_limit">⚡ Rate Limit</option>
+          <option value="renew">🔄 키 갱신</option>
         </select>
         <input type="text" id="filter-search" placeholder="기억 이름 검색..." oninput="filterActivity()">
       </div>
@@ -222,6 +236,51 @@
         <div class="chart-container">
           <canvas id="salience-chart" height="200"></canvas>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Rate Limiting Stats ═══ -->
+  <div style="margin-top:24px">
+    <div class="panel">
+      <div class="panel-header">
+        <h2>⚡ Rate Limiting & API Key Usage</h2>
+        <span id="rl-refresh-label" style="font-size:11px;color:var(--text3)">Auto-refresh: 10s</span>
+      </div>
+      <div class="panel-body" style="padding:20px">
+        <!-- Summary Row -->
+        <div class="stats-row" style="margin-bottom:16px">
+          <div class="stat-card">
+            <div class="label">🔑 Active Keys</div>
+            <div class="value" id="rl-active-keys">0</div>
+            <div class="sub">Rate-limited API keys</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">📊 Total Calls</div>
+            <div class="value" id="rl-total-calls" style="color:var(--cyan)">0</div>
+            <div class="sub">Cumulative usage</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">⚡ MCP Limit</div>
+            <div class="value" id="rl-mcp-limit" style="color:var(--orange)">60</div>
+            <div class="sub">requests/min (global)</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">⚠️ Near-Limit Keys</div>
+            <div class="value" id="rl-near-limit" style="color:var(--red)">0</div>
+            <div class="sub">>80% rate limit usage</div>
+          </div>
+        </div>
+
+        <!-- Usage Chart -->
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:12px">📊 Per-Key Usage vs Rate Limit</div>
+          <canvas id="rate-limit-chart" height="160"></canvas>
+        </div>
+
+        <!-- Key Gauge Cards -->
+        <div style="font-size:13px;font-weight:600;margin-bottom:10px">🔑 Key-Level Gauges</div>
+        <div id="rl-gauges" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px"></div>
       </div>
     </div>
   </div>
@@ -440,9 +499,128 @@ async function executeRollback() {
 
 // ── Helpers ──
 function getIcon(type) {
-  const icons = { boost: '💪', decay: '📉', create: '✨', rollback: '🔄', edit: '✏️', archive: '📦' };
+  const icons = {
+    boost: '💪', decay: '📉', create: '✨', rollback: '🔄',
+    edit: '✏️', archive: '📦', denied: '🚫', rate_limit: '⚡', renew: '🔄'
+  };
   return icons[type] || '📝';
 }
+
+// ═══ Rate Limiting Stats ═══
+let rlChart = null;
+
+async function loadRateLimitStats() {
+  try {
+    const res = await fetch('/api/security/rate-limit-stats');
+    if (!res.ok) return;
+    const data = await res.json();
+    const keys = data.keys || [];
+
+    // Summary stats
+    document.getElementById('rl-active-keys').textContent = keys.length;
+    const totalCalls = keys.reduce((s, k) => s + (k.usage_count || 0), 0);
+    document.getElementById('rl-total-calls').textContent = totalCalls.toLocaleString();
+    document.getElementById('rl-mcp-limit').textContent = data.global_mcp_limit || 60;
+
+    // Near-limit keys (simulated: usage_count / rate_limit as rough gauge)
+    // In real prod, you'd track per-minute windows; here we just show the data
+    const nearLimit = keys.filter(k => k.days_until_expiry !== null && k.days_until_expiry <= 3).length;
+    document.getElementById('rl-near-limit').textContent = nearLimit;
+
+    // Bar Chart
+    renderRLChart(keys);
+
+    // Gauge Cards
+    renderRLGauges(keys);
+  } catch (e) {
+    console.warn('Rate limit stats unavailable:', e);
+    document.getElementById('rl-active-keys').textContent = '—';
+  }
+}
+
+function renderRLChart(keys) {
+  const ctx = document.getElementById('rate-limit-chart').getContext('2d');
+  if (rlChart) rlChart.destroy();
+
+  const labels = keys.map(k => k.name || k.key_hash);
+  const usage = keys.map(k => k.usage_count || 0);
+  const limits = keys.map(k => k.rate_limit || 100);
+
+  rlChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Usage (calls)',
+          data: usage,
+          backgroundColor: usage.map((u, i) => {
+            const pct = limits[i] > 0 ? u / limits[i] : 0;
+            if (pct > 0.8) return 'rgba(239,68,68,0.7)';
+            if (pct > 0.5) return 'rgba(249,115,22,0.7)';
+            return 'rgba(74,125,255,0.7)';
+          }),
+          borderRadius: 6,
+        },
+        {
+          label: 'Rate Limit (/min)',
+          data: limits,
+          backgroundColor: 'rgba(139,92,246,0.15)',
+          borderColor: 'rgba(139,92,246,0.4)',
+          borderWidth: 1,
+          borderRadius: 6,
+        },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#8888a0', font: { size: 11 } } } },
+      scales: {
+        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#555568' } },
+        x: { grid: { display: false }, ticks: { color: '#555568', font: { size: 11 } } }
+      }
+    }
+  });
+}
+
+function renderRLGauges(keys) {
+  const container = document.getElementById('rl-gauges');
+  if (!keys.length) {
+    container.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:12px">No active API keys.</div>';
+    return;
+  }
+
+  container.innerHTML = keys.map(k => {
+    const usage = k.usage_count || 0;
+    const limit = k.rate_limit || 100;
+    const pct = Math.min(100, Math.round((usage / limit) * 100));
+    const barColor = pct > 80 ? 'var(--red)' : pct > 50 ? 'var(--orange)' : 'var(--blue)';
+
+    let expiryLabel = '∞';
+    if (k.days_until_expiry !== null) {
+      expiryLabel = k.days_until_expiry <= 0 ? '<span style="color:var(--red)">EXPIRED</span>'
+        : k.days_until_expiry <= 7 ? `<span style="color:var(--orange)">${k.days_until_expiry}d</span>`
+        : `${k.days_until_expiry}d`;
+    }
+
+    return `
+      <div class="rl-card">
+        <div class="rl-name" title="${k.name}">🔑 ${k.name}</div>
+        <div class="rl-bar-track">
+          <div class="rl-bar-fill" style="width:${pct}%;background:${barColor}"></div>
+        </div>
+        <div class="rl-meta">
+          <span>${usage.toLocaleString()}/${limit}/min</span>
+          <span>Expiry: ${expiryLabel}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// Auto-refresh rate limit stats
+loadRateLimitStats();
+setInterval(loadRateLimitStats, 10000);
 
 function formatTime(ts) {
   if (!ts) return '?';

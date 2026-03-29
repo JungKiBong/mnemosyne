@@ -146,6 +146,47 @@ def revoke_key(key_hash):
     return jsonify(rbac.revoke_api_key(key_hash))
 
 
+@security_bp.route('/keys/<key_hash>/renew', methods=['POST'])
+def renew_key(key_hash):
+    """Renew (extend) an API key's expiration."""
+    data = request.get_json(force=True)
+    extend_days = int(data.get('extend_days', 30))
+    rbac = _get_rbac()
+    result = rbac.renew_api_key(key_hash, extend_days)
+    if "error" in result:
+        return jsonify(result), 400
+    return jsonify(result)
+
+
+@security_bp.route('/rate-limit-stats', methods=['GET'])
+def rate_limit_stats():
+    """Get rate limiting statistics per API key."""
+    rbac = _get_rbac()
+    keys = rbac.list_api_keys()
+    stats = []
+    for k in keys:
+        days_left = None
+        if k.get("expires_at"):
+            from datetime import datetime, timezone
+            try:
+                exp = datetime.fromisoformat(k["expires_at"])
+                if exp.tzinfo is None:
+                    exp = exp.replace(tzinfo=timezone.utc)
+                days_left = (exp - datetime.now(timezone.utc)).days
+            except Exception:
+                pass
+        stats.append({
+            "name": k.get("name", "Unknown"),
+            "key_hash": (k.get("key_hash", ""))[:16],
+            "rate_limit": k.get("rate_limit", 100),
+            "usage_count": k.get("usage_count", 0),
+            "last_used": k.get("last_used"),
+            "days_until_expiry": days_left,
+            "active": True,
+        })
+    return jsonify({"keys": stats, "global_mcp_limit": 60})
+
+
 # ──────────────────────────────────────────
 # Encryption
 # ──────────────────────────────────────────
