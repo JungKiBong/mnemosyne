@@ -35,6 +35,12 @@ class NodeType(str, Enum):
     DECISION = "decision"       # Decision, conclusion, resolution
     TASK = "task"               # Action item, to-do, assignment
     AGENT = "agent"             # Simulation agent, AI persona
+    
+    # Phase 3: Orchestration Blackboard Additions
+    SESSION = "session"         # Agent execution session / overarching loop
+    CODE_UPDATE = "code_update" # Pull Request / builder code modification
+    REVIEW = "review"           # Expert feedback / review node
+    ERROR_LOG = "error_log"     # Exception / Sandbox error traces
 
 
 # ──────────────────────────────────────────
@@ -72,9 +78,15 @@ class EdgeType(str, Enum):
     DECIDED_BY = "decided_by"       # Decision made by
     ASSIGNED_TO = "assigned_to"     # Task assigned to person
 
-    # Data flow (0.6–0.8)
+    # Data flow & Validation (0.6–0.9)
     SOURCED_FROM = "sourced_from"   # Data originates from
     VALIDATES = "validates"         # Confirms / verifies
+
+    # Phase 3: Orchestration & Execution (0.7-1.0)
+    DEPENDS_ON = "depends_on"       # Task execution dependency
+    RESOLVES = "resolves"           # Fixes or completes (CodeUpdate -> Task)
+    REJECTS = "rejects"             # Disapproves (Review -> CodeUpdate)
+    ENCOUNTERS = "encounters"       # Faces issue (Task -> ErrorLog)
 
 
 # Default weights for each edge type
@@ -95,6 +107,10 @@ EDGE_WEIGHTS: Dict[EdgeType, float] = {
     EdgeType.ASSIGNED_TO: 0.7,
     EdgeType.SOURCED_FROM: 0.6,
     EdgeType.VALIDATES: 0.8,
+    EdgeType.DEPENDS_ON: 0.9,
+    EdgeType.RESOLVES: 1.0,
+    EdgeType.REJECTS: 0.8,
+    EdgeType.ENCOUNTERS: 0.9,
 }
 
 # Edge category groupings (for UI filtering)
@@ -105,6 +121,7 @@ EDGE_CATEGORIES: Dict[str, List[EdgeType]] = {
     "semantic": [EdgeType.RELATED_TO, EdgeType.SIMILAR_TO, EdgeType.ELABORATES],
     "behavioral": [EdgeType.CREATED_BY, EdgeType.DECIDED_BY, EdgeType.ASSIGNED_TO],
     "data_flow": [EdgeType.SOURCED_FROM, EdgeType.VALIDATES],
+    "orchestration": [EdgeType.DEPENDS_ON, EdgeType.RESOLVES, EdgeType.REJECTS, EdgeType.ENCOUNTERS],
 }
 
 
