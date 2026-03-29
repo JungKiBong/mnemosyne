@@ -135,6 +135,7 @@ select option { background: var(--bg-1); color: var(--text-0); }
     <a href="/">🏠 Dashboard</a>
     <a href="/memory">🧠 Memory</a>
     <a href="/memory/synaptic">🌐 Synaptic</a>
+    <a href="/rbac.html">Access Control</a>
     <a href="/memory/history">📜 Audit</a>
     <a href="/maturity">🌱 Maturity</a>
     <a href="/workflows">⚙️ Workflows</a>
@@ -148,7 +149,14 @@ select option { background: var(--bg-1); color: var(--text-0); }
     <div class="sidebar-section">
       <h3>🔍 Graph Query</h3>
       <div class="input-group">
-        <label>Cypher Query Engine</label>
+        <label>Cypher Query Engine 
+          <select id="savedQueries" style="margin-top:4px; margin-bottom:4px; padding:4px;" onchange="if(this.value) { document.getElementById('cypherInput').value = this.value; }">
+            <option value="">-- Load Saved Query --</option>
+            <option value="MATCH (n)-[r]->(m) RETURN n, type(r) as type, m LIMIT 300">Default Graph View</option>
+            <option value="MATCH (s:StagingEntity)-[r]->(m) RETURN s, type(r) as type, m LIMIT 100">🔍 Preview Staging Entities (GitOps)</option>
+            <option value="MATCH (n:MemoryRevision) RETURN n LIMIT 50">🛡️ View Memory Audit Trail</option>
+          </select>
+        </label>
         <textarea id="cypherInput">MATCH (n)-[r]->(m) RETURN n, type(r) as type, m LIMIT 300</textarea>
       </div>
       <button class="btn btn-primary" onclick="runQuery()">▶ Execute Query</button>

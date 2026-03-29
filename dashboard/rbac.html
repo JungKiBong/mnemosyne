@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Mories — Access Control & Scopes</title>
+  <link rel="stylesheet" href="/theme.css">
+  <style>
+    :root {
+      --bg: #030305;
+      --bg-surface: #0a0a0f;
+      --bg-card: rgba(10, 10, 15, 0.7);
+      --border: rgba(255, 255, 255, 0.08);
+      --text: #f8f8f8;
+      --text-muted: #a0a0b0;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --cyan: #06b6d4;
+      --red: #ef4444;
+      --purple: #8b5cf6;
+      --green: #10b981;
+      --radius: 12px;
+      --mono: 'JetBrains Mono', monospace;
+    }
+    
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--text); line-height:1.6; display:flex; flex-direction:column; height:100vh; overflow:hidden;}
+    a { color:var(--cyan); text-decoration:none; }
+    
+    .navbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 32px; background: var(--bg-surface); border-bottom: 1px solid var(--border);
+      flex-shrink:0;
+    }
+    .nav-brand { font-size: 1.2rem; font-weight: 700; color: #fff; display:flex; align-items:center; gap:12px; }
+    .nav-brand span { 
+      background: linear-gradient(135deg, var(--accent), var(--cyan)); 
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .badge { padding: 4px 10px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); }
+    .nav-links { display: flex; gap: 24px; font-size: 0.9rem; font-weight: 500; }
+    .nav-links a { color: var(--text-muted); transition: color 0.2s; position:relative;}
+    .nav-links a.active { color:#fff; }
+    .nav-links a:hover { color:#fff; }
+    .nav-links a.active::after { content:''; position:absolute; bottom:-4px; left:0; right:0; height:2px; background:var(--cyan); box-shadow:0 0 8px var(--cyan); }
+
+    .main { display: flex; flex: 1; overflow: hidden; }
+
+    .sidebar { width: 280px; background: var(--bg-surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto;}
+    .sidebar-section { padding: 24px; border-bottom: 1px solid var(--border); }
+    .sidebar-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 16px; font-weight: 700; }
+    .menu-item { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; color:var(--text); cursor:pointer; transition:all 0.2s; margin-bottom:4px; font-size:0.9rem;}
+    .menu-item:hover { background:rgba(255,255,255,0.05); }
+    .menu-item.active { background:rgba(59,130,246,0.15); color:#60a5fa; }
+    
+    .content { flex: 1; padding: 32px; overflow-y: auto; background: var(--bg); position:relative;}
+    
+    /* Panels */
+    .panel { display:none; max-width:1000px; margin:0 auto; animation:fadeIn 0.3s ease;}
+    .panel.active { display:block; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(10px);} to {opacity:1; transform:translateY(0);} }
+    
+    .header-box { margin-bottom:32px; }
+    .header-box h2 { font-size:1.8rem; font-weight:700; margin-bottom:8px; }
+    .header-box p { color:var(--text-muted); font-size:0.95rem; }
+    
+    .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+    .card h3 { font-size:1.1rem; margin-bottom:16px; font-weight:600; display:flex; align-items:center; justify-content:space-between;}
+    
+    /* Forms */
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px; font-weight: 500; }
+    .form-group input, .form-group select { width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.5); border: 1px solid var(--border); border-radius: 8px; color: #fff; font-family:var(--mono); font-size:0.85rem; outline:none; transition:border-color 0.2s;}
+    .form-group input:focus, .form-group select:focus { border-color: var(--accent); box-shadow:0 0 0 2px rgba(59,130,246,0.2); }
+    
+    .checkbox-group { display:flex; gap:16px; margin-top:8px;}
+    .checkbox-label { display:flex; align-items:center; gap:6px; font-size:0.85rem; cursor:pointer;}
+    .checkbox-label input { width:auto; margin:0;}
+    
+    .btn { background: linear-gradient(135deg, var(--accent), var(--purple)); color: #fff; border: none; padding: 10px 20px; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(139,92,246,0.4); }
+    
+    /* Tables */
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left; }
+    th { padding: 12px 16px; color: var(--text-muted); border-bottom: 1px solid var(--border); font-weight: 600; text-transform:uppercase; letter-spacing:1px; font-size:0.75rem;}
+    td { padding: 12px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    .table-row:hover { background: rgba(255,255,255,0.02); }
+    
+    .hashtext { font-family: var(--mono); color: var(--cyan); }
+    
+    .tag { display:inline-block; padding:2px 8px; border-radius:4px; font-size:0.75rem; font-family:var(--mono); background:rgba(255,255,255,0.1); margin-right:4px;}
+    .tag.scope-personal { background:rgba(16,185,129,0.15); color:#34d399; }
+    .tag.scope-tribal { background:rgba(59,130,246,0.15); color:#60a5fa; }
+    .tag.scope-social { background:rgba(139,92,246,0.15); color:#a78bfa; }
+    .tag.role-admin { background:rgba(239,68,68,0.15); color:#f87171; border:1px solid rgba(239,68,68,0.3);}
+    
+    /* Notification */
+    .notif { padding:12px 16px; border-radius:8px; margin-bottom:16px; font-size:0.85rem; display:none;}
+    .notif.success { background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.2); color:#34d399; display:block;}
+    .notif.error { background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.2); color:#f87171; display:block;}
+    
+  </style>
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <div class="navbar">
+    <div class="nav-brand">
+      <span>Mories</span> <div class="badge">Security & RBAC</div>
+    </div>
+    <div class="nav-links">
+      <a href="/">Dashboard</a>
+      <a href="/graph.html">Graph Explorer</a>
+      <a href="/memory.html">Memory Matrix</a>
+      <a href="/workflows.html">Workflows</a>
+      <a href="/api.html">API Hub</a>
+      <a href="/rbac.html" class="active">Access Control</a>
+    </div>
+    <div class="theme-toggle-container" id="themeToggleContainer"></div>
+  </div>
+
+  <div class="main">
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-title">Memory Scopes</div>
+        <div class="menu-item active" onclick="switchPanel('panel-personal', this)">
+          Personal Memory
+        </div>
+        <div class="menu-item" onclick="switchPanel('panel-tribal', this)">
+          Tribe (Group) Management
+        </div>
+        <div class="menu-item" onclick="switchPanel('panel-org', this)">
+          Organization (Social)
+        </div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-title">Security Settings</div>
+        <div class="menu-item" onclick="switchPanel('panel-keys', this)">
+          API Keys (Principals)
+        </div>
+        <div class="menu-item" onclick="switchPanel('panel-audit', this)">
+          Audit Trail
+        </div>
+      </div>
+    </div>
+
+    <!-- CONTENT -->
+    <div class="content">
+    
+      <!-- PANEL: Personal Memory -->
+      <div id="panel-personal" class="panel active">
+        <div class="header-box">
+          <h2>Personal Memory Scope</h2>
+          <p>Control the memories owned strictly by your principal ID. Personal memories operate under the `personal` scope and are invisible to other agents or users unless explicitly shared.</p>
+        </div>
+        
+        <div class="card">
+          <h3>My Principal Identity</h3>
+          <div class="form-group">
+            <label>Current Acting Principal</label>
+            <input type="text" value="user:antigravity_agent" readonly style="color:var(--text-muted); border-color:transparent;">
+          </div>
+          <p style="font-size:0.85rem; color:var(--text-muted);">This identity restricts memory writes and reads to nodes where you are set as the `owner`.</p>
+        </div>
+      </div>
+      
+      <!-- PANEL: Tribal Management -->
+      <div id="panel-tribal" class="panel">
+        <div class="header-box">
+          <h2>Tribe (Group) Management</h2>
+          <p>As a Tribe Administrator, you can view and manage context shared within your designated team (e.g., Development Team, Marketing).</p>
+        </div>
+        
+        <div class="card">
+          <h3>Tribal Access Policy</h3>
+          <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:16px;">Tribal memories (`scope: tribal`) are shared across all principals possessing the exact matching `team_id`.</p>
+          <div class="form-group">
+            <label>My Target Tribe ID</label>
+            <input type="text" id="tribeTargetId" placeholder="e.g. dev-team-alpha">
+          </div>
+          <button class="btn" style="background:#374151;">Scan Tribal Memories</button>
+        </div>
+      </div>
+      
+      <!-- PANEL: API Keys -->
+      <div id="panel-keys" class="panel">
+        <div class="header-box">
+          <h2>API Keys & RBAC</h2>
+          <p>Generate Service Account or User tokens with precise role alignments (Reader, Writer, Admin) and constrained scopes.</p>
+        </div>
+        
+        <div id="key-notif" class="notif"></div>
+        
+        <div class="card">
+          <h3>Generate New Key</h3>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+            <div class="form-group">
+              <label>Owner ID (Principal)</label>
+              <input type="text" id="newKeyOwner" placeholder="e.g. agent:system">
+            </div>
+            <div class="form-group">
+              <label>Key Name / Description</label>
+              <input type="text" id="newKeyName" placeholder="e.g. CI/CD Readonly Token">
+            </div>
+          </div>
+          
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+            <div class="form-group">
+              <label>Roles</label>
+              <div class="checkbox-group">
+                <label class="checkbox-label"><input type="checkbox" id="roleReader" checked disabled> Reader</label>
+                <label class="checkbox-label"><input type="checkbox" id="roleWriter" checked> Writer</label>
+                <label class="checkbox-label"><input type="checkbox" id="roleAdmin"> Admin</label>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Allowed Scopes</label>
+              <div class="checkbox-group">
+                <label class="checkbox-label"><input type="checkbox" id="scopePersonal" checked> personal</label>
+                <label class="checkbox-label"><input type="checkbox" id="scopeTribal"> tribal</label>
+                <label class="checkbox-label"><input type="checkbox" id="scopeGlobal"> global</label>
+              </div>
+            </div>
+          </div>
+          
+          <button class="btn" onclick="generateKey()">Create API Key</button>
+        </div>
+        
+        <div class="card">
+          <h3>Active API Keys</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Key Hash</th>
+                <th>Name / Owner</th>
+                <th>Roles</th>
+                <th>Scopes</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="keysTableBody">
+              <!-- Rendered dynamically -->
+              <tr><td colspan="5" style="text-align:center; color:var(--text-muted); font-size:0.8rem;">Loading keys...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="/theme.js"></script>
+  <script>
+    function switchPanel(panelId, menuItem) {
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
+      document.getElementById(panelId).classList.add('active');
+      menuItem.classList.add('active');
+      
+      if(panelId === 'panel-keys') loadKeys();
+    }
+    
+    function showNotif(msg, isError=false) {
+      const el = document.getElementById('key-notif');
+      el.className = 'notif ' + (isError ? 'error' : 'success');
+      el.innerText = msg;
+      setTimeout(() => { el.className = 'notif'; }, 5000);
+    }
+    
+    async function loadKeys() {
+      try {
+        const res = await fetch('/api/security/keys');
+        const data = await res.json();
+        const tbody = document.getElementById('keysTableBody');
+        tbody.innerHTML = '';
+        
+        if(!data.keys || data.keys.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">No generated keys found.</td></tr>';
+          return;
+        }
+        
+        data.keys.forEach(k => {
+          const rolesHtml = k.roles.map(r => `<span class="tag ${r==='admin'?'role-admin':''}">${r}</span>`).join('');
+          const scopesHtml = k.allowed_scopes.map(s => `<span class="tag scope-${s}">${s}</span>`).join('');
+          
+          tbody.innerHTML += `
+            <tr class="table-row">
+              <td class="hashtext">${k.key_hash.substring(0, 16)}...</td>
+              <td>${k.name}<br><span style="font-size:0.75rem; color:var(--text-muted)">${k.owner}</span></td>
+              <td>${rolesHtml}</td>
+              <td>${scopesHtml}</td>
+              <td><button class="badge" style="background:rgba(239,68,68,0.1); color:#f87171; border:none; cursor:pointer;" onclick="revokeKey('${k.key_hash}')">Revoke</button></td>
+            </tr>
+          `;
+        });
+      } catch (e) {
+        showNotif('Failed to load keys: ' + e, true);
+      }
+    }
+    
+    async function generateKey() {
+      const owner_id = document.getElementById('newKeyOwner').value || 'admin';
+      const name = document.getElementById('newKeyName').value || 'New Key';
+      
+      let roles = ['reader'];
+      if(document.getElementById('roleWriter').checked) roles.push('writer');
+      if(document.getElementById('roleAdmin').checked) roles.push('admin');
+      
+      let scopes = [];
+      if(document.getElementById('scopePersonal').checked) scopes.push('personal');
+      if(document.getElementById('scopeTribal').checked) scopes.push('tribal');
+      if(document.getElementById('scopeGlobal').checked) scopes.push('global');
+      
+      try {
+        const res = await fetch('/api/security/keys', {
+          method: 'POST',
+          body: JSON.stringify({ owner_id, name, roles, allowed_scopes: scopes })
+        });
+        const data = await res.json();
+        if(data.error) throw new Error(data.error);
+        
+        showNotif(`Successfully created key: ${data.api_key} (Copy this now, it won't be shown again!)`);
+        loadKeys();
+      } catch (e) {
+        showNotif('Error: ' + e.message, true);
+      }
+    }
+    
+    async function revokeKey(hash) {
+      if(!confirm('Are you sure you want to revoke this API key?')) return;
+      try {
+        await fetch('/api/security/keys/' + hash, { method: 'DELETE' });
+        showNotif('Key revoked successfully.');
+        loadKeys();
+      } catch(e) {
+        showNotif('Revoke failed: ' + e.message, true);
+      }
+    }
+  </script>
+</body>
+</html>
