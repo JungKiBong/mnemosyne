@@ -1,0 +1,192 @@
+{
+  "name": "Mories Observer Orchestration",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "minutes", "minutesInterval": 5 }]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.MORIES_MCP_URL }}/mcp/call",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"mories_search\",\n    \"arguments\": {\n      \"query\": \"active task in progress\",\n      \"status\": \"in_progress\",\n      \"limit\": 10\n    }\n  },\n  \"id\": 1\n}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "search-active-tasks",
+      "name": "Search Active Tasks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "id": "has-results",
+              "leftValue": "={{ $json.result.results.length }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ]
+        }
+      },
+      "id": "has-tasks",
+      "name": "Has Active Tasks?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "result.results",
+        "options": {}
+      },
+      "id": "split-tasks",
+      "name": "Split Tasks",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.MORIES_MCP_URL }}/mcp/call",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"mories_detail\",\n    \"arguments\": {\n      \"uuid\": \"{{ $json.uuid }}\",\n      \"include_relations\": true\n    }\n  },\n  \"id\": 2\n}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "get-task-detail",
+      "name": "Get Task Detail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "id": "is-high-priority",
+              "leftValue": "={{ $json.result.node.properties.priority }}",
+              "rightValue": 3,
+              "operator": { "type": "number", "operation": "lte" }
+            }
+          ]
+        }
+      },
+      "id": "priority-check",
+      "name": "High Priority?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1340, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AGENT_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"task_uuid\": \"{{ $json.result.node.uuid }}\",\n  \"task_name\": \"{{ $json.result.node.name }}\",\n  \"priority\": \"{{ $json.result.node.properties.priority }}\",\n  \"related_memories\": {{ JSON.stringify($json.result.relations || []) }},\n  \"source\": \"mories-n8n-orchestration\"\n}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "dispatch-to-agent",
+      "name": "Dispatch to Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, 100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.MORIES_MCP_URL }}/mcp/call",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"mories_update_status\",\n    \"arguments\": {\n      \"uuid\": \"{{ $('Get Task Detail').item.json.result.node.uuid }}\",\n      \"status\": \"completed\"\n    }\n  },\n  \"id\": 3\n}",
+        "options": {}
+      },
+      "id": "mark-complete",
+      "name": "Mark Task Complete",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 100]
+    },
+    {
+      "parameters": {
+        "keepOnlySet": false,
+        "values": {
+          "string": [
+            {
+              "name": "log",
+              "value": "=No active tasks found at {{ $now }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "no-tasks-log",
+      "name": "No Tasks (Log)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [900, 400]
+    }
+  ],
+  "connections": {
+    "Every 5 Minutes": {
+      "main": [[{ "node": "Search Active Tasks", "type": "main", "index": 0 }]]
+    },
+    "Search Active Tasks": {
+      "main": [[{ "node": "Has Active Tasks?", "type": "main", "index": 0 }]]
+    },
+    "Has Active Tasks?": {
+      "main": [
+        [{ "node": "Split Tasks", "type": "main", "index": 0 }],
+        [{ "node": "No Tasks (Log)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Split Tasks": {
+      "main": [[{ "node": "Get Task Detail", "type": "main", "index": 0 }]]
+    },
+    "Get Task Detail": {
+      "main": [[{ "node": "High Priority?", "type": "main", "index": 0 }]]
+    },
+    "High Priority?": {
+      "main": [
+        [{ "node": "Dispatch to Agent", "type": "main", "index": 0 }],
+        [{ "node": "No Tasks (Log)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Dispatch to Agent": {
+      "main": [[{ "node": "Mark Task Complete", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "meta": {
+    "instanceId": "mories-phase4",
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "1.0.0",
+  "triggerCount": 1,
+  "tags": ["mories", "orchestration", "phase4"]
+}

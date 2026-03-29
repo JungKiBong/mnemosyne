@@ -81,6 +81,7 @@ class MemoryPipeline:
             "auto_promoted": 0,
             "discarded": 0,
             "duplicates_skipped": 0,
+            "task_aligned": 0,
             "items": [],
         }
 
@@ -127,6 +128,7 @@ class MemoryPipeline:
             f"Pipeline processed: {source_ref} → "
             f"{result['stm_created']} STM, "
             f"{result['auto_promoted']} promoted, "
+            f"{result['task_aligned']} task-aligned, "
             f"{result['discarded']} discarded"
         )
         return result
@@ -164,13 +166,19 @@ class MemoryPipeline:
         # Auto decision
         if auto_promote and salience >= self._manager.config.auto_promote_threshold:
             promote_result = self._manager.stm_promote(item.id, graph_id=graph_id)
-            if promote_result.get("ltm_uuid"):
-                self._set_scope(promote_result["ltm_uuid"], scope)
+            ltm_uuid = promote_result.get("ltm_uuid")
+            aligned_tasks = []
+            if ltm_uuid:
+                self._set_scope(ltm_uuid, scope)
+                self._tag_with_graph_id(ltm_uuid, graph_id)
+                # Task-Memory Alignment: auto-link to related active tasks
+                aligned_tasks = self._align_to_tasks(ltm_uuid, content, graph_id)
             return {
                 "content": content[:60],
                 "action": "auto_promoted",
                 "salience": salience,
-                "ltm_uuid": promote_result.get("ltm_uuid"),
+                "ltm_uuid": ltm_uuid,
+                "task_aligned": len(aligned_tasks),
             }
         elif salience <= self._manager.config.auto_discard_threshold:
             self._manager.stm_discard(item.id)
@@ -293,7 +301,7 @@ class MemoryPipeline:
         return chunks[:50]  # cap
 
     def _set_scope(self, uuid: str, scope: str):
-        """Set scope on a promoted LTM node. Uses manager's existing driver."""
+        """Set scope on a promoted LTM node. Uses manager\'s existing driver."""
         try:
             storage = self._manager._storage
             if hasattr(storage, 'driver') and storage.driver:
@@ -306,3 +314,87 @@ class MemoryPipeline:
                 logger.warning("No driver available for _set_scope, skipping scope=%s for uuid=%s", scope, uuid)
         except Exception as e:
             logger.warning("Failed to set scope for %s: %s", uuid, e)
+
+    def _tag_with_graph_id(self, uuid: str, graph_id: str):
+        """Tag a promoted LTM node with its origin graph_id."""
+        if not graph_id:
+            return
+        try:
+            storage = self._manager._storage
+            if hasattr(storage, 'driver') and storage.driver:
+                with storage.driver.session() as session:
+                    session.run(
+                        "MATCH (e:Entity {uuid: $uuid}) SET e.graph_id = $graph_id",
+                        uuid=uuid, graph_id=graph_id,
+                    )
+        except Exception as e:
+            logger.warning("Failed to tag graph_id for %s: %s", uuid, e)
+
+    # ──────────────────────────────────────────
+    # Phase 4-2: Task-Memory Alignment
+    # ──────────────────────────────────────────
+
+    def _align_to_tasks(self, memory_uuid: str, content: str, graph_id: str) -> list:
+        """
+        Auto-create RELATES_TO_TASK relationships from a new memory to
+        active task nodes whose keywords overlap with the memory content.
+
+        Strategy:
+          1. Find active task nodes in the same graph (status = in_progress/pending)
+          2. Score keyword overlap against memory content
+          3. Create RELATES_TO_TASK edge if similarity > threshold
+
+        Returns list of linked task UUIDs.
+        """
+        linked = []
+        try:
+            storage = self._manager._storage
+            if not (hasattr(storage, 'driver') and storage.driver):
+                return linked
+
+            # 1. Fetch candidate active tasks
+            candidate_cypher = """
+            MATCH (t:Entity)
+            WHERE t.entity_type IN ['task', 'project']
+              AND t.status IN ['pending', 'in_progress']
+              AND (t.graph_id = $graph_id OR $graph_id = '')
+            RETURN t.uuid AS uuid, t.name AS name,
+                   COALESCE(t.summary, t.description, t.name) AS body
+            LIMIT 20
+            """
+            with storage.driver.session() as session:
+                tasks = list(session.run(candidate_cypher, graph_id=graph_id))
+
+            # 2. Score keyword overlap
+            content_words = set(re.findall(r'[\w가-힣]{3,}', content.lower()))
+            for task in tasks:
+                task_words = set(re.findall(r'[\w가-힣]{3,}', (task['body'] or '').lower()))
+                if not task_words:
+                    continue
+                overlap = len(content_words & task_words) / max(len(task_words), 1)
+                if overlap >= 0.15:  # 15% word overlap threshold
+                    # 3. Create relationship
+                    rel_cypher = """
+                    MATCH (m:Entity {uuid: $mem_uuid})
+                    MATCH (t:Entity {uuid: $task_uuid})
+                    MERGE (m)-[r:RELATES_TO_TASK]->(t)
+                    ON CREATE SET r.created_at = datetime(),
+                                  r.overlap_score = $score
+                    ON MATCH SET  r.updated_at = datetime()
+                    RETURN r
+                    """
+                    with storage.driver.session() as session:
+                        session.run(
+                            rel_cypher,
+                            mem_uuid=memory_uuid,
+                            task_uuid=task['uuid'],
+                            score=round(overlap, 3),
+                        )
+                    linked.append(task['uuid'])
+                    logger.debug(
+                        "Task-Memory aligned: %s → %s (overlap=%.2f)",
+                        memory_uuid[:8], task['uuid'][:8], overlap,
+                    )
+        except Exception as e:
+            logger.warning("Task-Memory alignment failed: %s", e)
+        return linked
