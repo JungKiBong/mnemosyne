@@ -99,6 +99,8 @@ class StructuralExtractor:
             "json": self._extract_json,
             "yaml": self._extract_yaml,
             "html": self._extract_html,
+            "python": self._extract_python,
+            "code": self._extract_code,
             "plain": self._extract_plain,
         }
 
@@ -150,6 +152,10 @@ class StructuralExtractor:
             ".json": "json", ".jsonl": "json",
             ".yaml": "yaml", ".yml": "yaml",
             ".html": "html", ".htm": "html",
+            ".py": "python",
+            ".js": "code", ".ts": "code", ".jsx": "code", ".tsx": "code",
+            ".java": "code", ".cpp": "code", ".c": "code", ".cs": "code",
+            ".go": "code", ".rs": "code", ".rb": "code", ".php": "code",
             ".txt": "plain",
         }
         for ext, stype in ext_map.items():
@@ -354,6 +360,110 @@ class StructuralExtractor:
                                 text, re.IGNORECASE):
             skeleton.metadata[f"meta:{meta.group(1)}"] = meta.group(2)[:200]
 
+        return skeleton
+
+    def _extract_python(self, source_ref: str, text: str) -> StructuralSkeleton:
+        """Extract structure from Python code using AST."""
+        import ast
+        skeleton = StructuralSkeleton(source_ref=source_ref, source_type="python")
+        
+        try:
+            tree = ast.parse(text)
+        except SyntaxError:
+            # Fallback to plain text if syntax error
+            return self._extract_plain(source_ref, text)
+            
+        lines = text.split("\n")
+        sections = []
+        
+        def visit_node(node, level, parent_name=""):
+            for child in getattr(node, "body", []):
+                if isinstance(child, ast.ClassDef):
+                    name = f"class {child.name}"
+                    full_name = f"{parent_name}.{name}" if parent_name else name
+                    docstring = ast.get_docstring(child) or ""
+                    preview = docstring[:200] if docstring else f"Class {child.name} definition"
+                    sections.append(SectionInfo(
+                        name=full_name, level=level,
+                        line_range=(child.lineno, getattr(child, "end_lineno", child.lineno)),
+                        content_preview=preview
+                    ))
+                    visit_node(child, level + 1, full_name)
+                    
+                elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    prefix = "async def" if isinstance(child, ast.AsyncFunctionDef) else "def"
+                    name = f"{prefix} {child.name}"
+                    full_name = f"{parent_name}.{name}" if parent_name else name
+                    docstring = ast.get_docstring(child) or ""
+                    preview = docstring[:200] if docstring else f"Function {child.name} definition"
+                    sections.append(SectionInfo(
+                        name=full_name, level=level,
+                        line_range=(child.lineno, getattr(child, "end_lineno", child.lineno)),
+                        content_preview=preview
+                    ))
+                    visit_node(child, level + 1, full_name)
+                    
+        visit_node(tree, 1)
+        sections.sort(key=lambda s: s.line_range[0] if s.line_range else 0)
+        skeleton.sections = sections
+        
+        mod_doc = ast.get_docstring(tree)
+        if mod_doc:
+            skeleton.metadata["module_docstring"] = mod_doc[:200]
+            
+        imports = []
+        for node in tree.body:
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    imports.append(alias.name)
+            elif isinstance(node, ast.ImportFrom):
+                module = node.module or ""
+                for alias in node.names:
+                    imports.append(f"{module}.{alias.name}")
+        if imports:
+            skeleton.metadata["imports"] = imports[:20]
+            
+        return skeleton
+
+    def _extract_code(self, source_ref: str, text: str) -> StructuralSkeleton:
+        """Extract generic code structure using simple block detection Regex."""
+        skeleton = StructuralSkeleton(source_ref=source_ref, source_type="code")
+        lines = text.split("\n")
+        sections = []
+        
+        pattern = re.compile(
+            r"^\s*(?:(?:public|private|protected|export|default|static|async)\s+)*"
+            r"(?:class|interface|type|struct|function)\s+([A-Za-z0-9_]+)|"
+            r"^\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z0-9_]+)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>",
+            re.MULTILINE
+        )
+        
+        for match in pattern.finditer(text):
+            name = match.group(1) or match.group(2)
+            if not name:
+                continue
+                
+            block_start = text.count("\n", 0, match.start()) + 1
+            line_str = lines[block_start - 1]
+            
+            indent = len(line_str) - len(line_str.lstrip())
+            level = 1 if indent == 0 else 2
+            
+            kind = "Block"
+            if "class " in line_str: kind = "class"
+            elif "interface " in line_str: kind = "interface"
+            elif "function" in line_str or "=>" in line_str: kind = "function"
+            elif "struct " in line_str: kind = "struct"
+            
+            fullname = f"{kind} {name}"
+            
+            sections.append(SectionInfo(
+                name=fullname, level=level,
+                line_range=(block_start, block_start), 
+                content_preview=line_str[:200]
+            ))
+            
+        skeleton.sections = sections
         return skeleton
 
     def _extract_plain(self, source_ref: str, text: str) -> StructuralSkeleton:

@@ -768,7 +768,7 @@ class GraphToolsService:
         self,
         graph_id: str,
         simulation_requirement: str,
-        limit: int = 30
+        limit: int = 2000
     ) -> Dict[str, Any]:
         """Get simulation-related context information"""
         logger.info(f"Getting simulation context: {simulation_requirement[:50]}...")
@@ -848,7 +848,7 @@ class GraphToolsService:
             search_result = self.search_graph(
                 graph_id=graph_id,
                 query=sub_query,
-                limit=15,
+                limit=150,
                 scope="edges"
             )
 
@@ -863,7 +863,7 @@ class GraphToolsService:
         main_search = self.search_graph(
             graph_id=graph_id,
             query=query,
-            limit=20,
+            limit=200,
             scope="edges"
         )
         for fact in main_search.facts:
@@ -990,7 +990,7 @@ Return the sub-questions as a JSON list."""
         graph_id: str,
         query: str,
         include_expired: bool = True,
-        limit: int = 50
+        limit: int = 500
     ) -> PanoramaResult:
         """
         [PanoramaSearch - Breadth Search]
@@ -1062,7 +1062,7 @@ Return the sub-questions as a JSON list."""
         self,
         graph_id: str,
         query: str,
-        limit: int = 10
+        limit: int = 100
     ) -> SearchResult:
         """
         [QuickSearch - Simple Search]

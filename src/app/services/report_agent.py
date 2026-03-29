@@ -1177,7 +1177,7 @@ class ReportAgent:
             total_edges=context.get('graph_statistics', {}).get('total_edges', 0),
             entity_types=list(context.get('graph_statistics', {}).get('entity_types', {}).keys()),
             total_entities=context.get('total_entities', 0),
-            related_facts_json=json.dumps(context.get('related_facts', [])[:10], ensure_ascii=False, indent=2),
+            related_facts_json=json.dumps(context.get('related_facts', [])[:200], ensure_ascii=False, indent=2),
         )
 
         try:
@@ -1271,8 +1271,8 @@ class ReportAgent:
         if previous_sections:
             previous_parts = []
             for sec in previous_sections:
-                # Maximum 4000 characters per section
-                truncated = sec[:4000] + "..." if len(sec) > 4000 else sec
+                # Maximum 20000 characters per section to provide rich history
+                truncated = sec[:20000] + "..." if len(sec) > 20000 else sec
                 previous_parts.append(truncated)
             previous_content = "\n\n---\n\n".join(previous_parts)
         else:
@@ -1796,15 +1796,25 @@ class ReportAgent:
         
         chat_history = chat_history or []
         
+        from src.app.utils.context_window_manager import ContextWindowManager
+
         # GetalreadygenerateReportcontent
         report_content = ""
         try:
             report = ReportManager.get_report_by_simulation(self.simulation_id)
             if report and report.markdown_content:
-                # limitReportlength，avoid overly long context
-                report_content = report.markdown_content[:15000]
-                if len(report.markdown_content) > 15000:
-                    report_content += "\n\n... [reportcontenthasTruncate] ..."
+                # Use ContextWindowManager instead of hardcoded 15000 character limit
+                # We allocate up to 50,000 tokens specifically for the report_content itself 
+                # to leave plenty of room (65K+ tokens) for the injected massive subgraph contexts from tools.
+                cwm = ContextWindowManager(max_tokens=54000, safety_margin=4000)
+                estimated_tokens = cwm.estimate_tokens(report.markdown_content)
+                if estimated_tokens > cwm.available_tokens:
+                    # Truncate string proportionally
+                    allowed_chars = int(len(report.markdown_content) * (cwm.available_tokens / estimated_tokens))
+                    report_content = report.markdown_content[:allowed_chars] + "\n\n... [report content truncated by ContextWindowManager] ..."
+                else:
+                    report_content = report.markdown_content
+
         except Exception as e:
             logger.warning(f"getreportcontentfailed: {e}")
         
@@ -1859,7 +1869,7 @@ class ReportAgent:
                 result = self._execute_tool(call["name"], call.get("parameters", {}))
                 tool_results.append({
                     "tool": call["name"],
-                    "result": result[:1500]  # limitresultlength
+                    "result": result[:200000]  # Increased for TurboQuant Phase 2
                 })
                 tool_calls_made.append(call)
             
