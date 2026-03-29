@@ -57,6 +57,3 @@ references/MiroFish-Offline/
 references/supermemory/
 src/.encryption_key
 data/ingest/repos/
-uploads/
-data/gitlab/
-docker-compose.gitlab.yml

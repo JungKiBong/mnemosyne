@@ -7,139 +7,89 @@
 <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 <style>
 :root {
-  --bg-0: #030305;
-  --bg-1: #0a0a0f;
+  --bg-0: #0a0a0f;
+  --bg-1: #12121a;
   --bg-2: #16161f;
-  --border: rgba(255, 255, 255, 0.08);
-  --text-0: #f8f8f8;
-  --text-1: #a0a0b0;
-  --text-2: #6a6a7a;
-  --accent-blue: #3b82f6;
-  --accent-purple: #a855f7;
-  --accent-green: #10b981;
+  --border: #2a2a3a;
+  --text-0: #e8e8f0;
+  --text-1: #8888a0;
+  --text-2: #555568;
+  --accent-blue: #4a7dff;
+  --accent-purple: #8b5cf6;
+  --accent-green: #22c55e;
   --accent-cyan: #06b6d4;
   --accent-orange: #f97316;
-  --radius: 16px;
-  --glass: rgba(10, 10, 15, 0.6);
+  --radius: 12px;
 }
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family:'Inter',system-ui,sans-serif; background:var(--bg-0); color:var(--text-0); height:100vh; display:flex; flex-direction:column; overflow:hidden; }
-a { color:var(--accent-cyan); text-decoration:none; transition: color 0.3s; }
-a:hover { color:#fff; text-shadow: 0 0 8px rgba(6,182,212,0.6); }
+a { color:var(--accent-cyan); text-decoration:none; }
+a:hover { text-decoration:underline; }
 
 /* Header */
-.header { 
-  padding: 16px 32px; display:flex; align-items:center; gap:20px; 
-  border-bottom:1px solid var(--border); background:var(--glass); 
-  backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px); 
-  z-index:100; flex-shrink:0; box-shadow: 0 4px 30px rgba(0,0,0,0.5);
-}
-.header h1 { font-size:1.3rem; font-weight: 700; background:linear-gradient(135deg,var(--accent-cyan),var(--accent-purple)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; letter-spacing: -0.5px; }
-.badge { padding:4px 12px; border-radius:999px; font-size:.7rem; font-weight:700; letter-spacing:1px; background:rgba(186,230,253,0.1); color:#38bdf8; border: 1px solid rgba(56,189,248,0.2); }
-.nav-links { margin-left:auto; display:flex; gap:24px; font-size:.85rem; font-weight: 500; }
-.nav-links a { color:var(--text-1); position:relative; }
-.nav-links a:hover { color:#fff; text-shadow: none; }
-.nav-links a::after { content:''; position:absolute; left:0; bottom:-4px; width:0%; height:2px; background:var(--accent-cyan); transition: width 0.3s ease; }
-.nav-links a:hover::after { width:100%; box-shadow: 0 0 8px var(--accent-cyan); }
+.header { padding:16px 24px; display:flex; align-items:center; gap:16px; border-bottom:1px solid var(--border); background:rgba(22,22,31,0.7); backdrop-filter:blur(10px); z-index:100; flex-shrink:0; }
+.header h1 { font-size:1.2rem; background:linear-gradient(135deg,var(--accent-purple),var(--accent-cyan)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+.badge { padding:3px 10px; border-radius:999px; font-size:.7rem; font-weight:600; letter-spacing:.5px; background:rgba(139,92,246,.2); color:#a78bfa; }
+.nav-links { margin-left:auto; display:flex; gap:16px; font-size:.85rem; }
+.nav-links a { color:var(--text-1); transition:color .2s; }
+.nav-links a:hover { color:var(--text-0); text-decoration:none; }
 
 /* Main Layout */
-.layout { display:flex; flex:1; overflow:hidden; position:relative; }
+.layout { display:flex; flex:1; overflow:hidden; }
 
 /* Sidebar */
-.sidebar { 
-  width:360px; background:rgba(10,10,15,0.75); border-right:1px solid var(--border); 
-  display:flex; flex-direction:column; z-index:10; backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
-  box-shadow: 4px 0 24px rgba(0,0,0,0.4);
-}
-.sidebar-section { padding:24px; border-bottom:1px solid var(--border); }
-.sidebar-section h3 { font-size:0.85rem; font-weight: 700; text-transform:uppercase; letter-spacing:1.5px; color:var(--text-0); margin-bottom:16px; display:flex; align-items:center; gap:8px;}
+.sidebar { width:320px; background:var(--bg-1); border-right:1px solid var(--border); display:flex; flex-direction:column; z-index:10; }
+.sidebar-section { padding:20px; border-bottom:1px solid var(--border); }
+.sidebar-section h3 { font-size:0.85rem; text-transform:uppercase; letter-spacing:1px; color:var(--text-1); margin-bottom:12px; }
 
-.input-group { margin-bottom:16px; }
-.input-group label { display:block; font-size:0.75rem; color:var(--text-1); margin-bottom:8px; font-weight:500;}
+.input-group { margin-bottom:12px; }
+.input-group label { display:block; font-size:0.75rem; color:var(--text-1); margin-bottom:6px; }
+input[type="text"], textarea { width:100%; border-radius:6px; border:1px solid var(--border); background:var(--bg-2); color:white; padding:10px; font-size:0.85rem; font-family:inherit; outline:none; transition:border 0.2s; }
+input[type="text"]:focus, textarea:focus { border-color:var(--accent-blue); }
+textarea { height:120px; resize:none; font-family:'JetBrains Mono',monospace; font-size:0.75rem; background:rgba(22,22,31,0.5); backdrop-filter:blur(4px); }
 
-input[type="text"], textarea, select { 
-  width:100%; border-radius:8px; border:1px solid rgba(255,255,255,0.1); 
-  background:rgba(0,0,0,0.4); color:white; padding:12px; font-size:0.85rem; 
-  font-family:inherit; outline:none; transition:all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
-}
-input[type="text"]:focus, textarea:focus, select:focus { 
-  border-color:var(--accent-blue); background:rgba(0,0,0,0.6);
-  box-shadow:0 0 0 3px rgba(59,130,246,0.2), inset 0 0 20px rgba(59,130,246,0.05); 
-}
-textarea { height:120px; resize:none; font-family:'JetBrains Mono',monospace; font-size:0.75rem; line-height:1.5;}
+select.select-modern, input.input-modern { width:100%; border-radius:8px; border:1px solid var(--border); background:rgba(22,22,31,0.5); color:white; padding:10px; font-size:0.85rem; font-family:inherit; outline:none; transition:all 0.2s; backdrop-filter:blur(4px); margin-bottom: 8px; }
+select.select-modern:focus, input.input-modern:focus { border-color:var(--accent-purple); box-shadow:0 0 0 2px rgba(139,92,246,0.2); }
+select.select-modern option { background:var(--bg-1); }
 
-select option { background: var(--bg-1); color: var(--text-0); }
-
-.btn { 
-  width:100%; padding:12px; border-radius:8px; border:none; cursor:pointer; 
-  font-size:0.85rem; font-weight:600; transition:all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
-  display:flex; justify-content:center; align-items:center; gap:8px; position:relative; overflow:hidden;
-}
-.btn::before {
-  content: ''; position: absolute; top:0; left:-100%; width:100%; height:100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-  transition:all 0.4s;
-}
-.btn:hover::before { left: 100%; }
-
-.btn-primary { 
-  background:linear-gradient(135deg,var(--accent-blue),var(--accent-purple)); 
-  color:white; box-shadow:0 4px 15px rgba(168,85,247,0.3); border: 1px solid rgba(255,255,255,0.1);
-}
-.btn-primary:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(168,85,247,0.5); }
+.btn { width:100%; padding:10px; border-radius:8px; border:none; cursor:pointer; font-size:0.85rem; font-weight:600; transition:all 0.2s; display:flex; justify-content:center; align-items:center; gap:8px; }
+.btn-primary { background:linear-gradient(135deg,var(--accent-blue),var(--accent-purple)); color:white; box-shadow:0 4px 12px rgba(74,125,255,0.2); }
+.btn-primary:hover { opacity:0.9; transform:translateY(-1px); }
 
 /* Node Details */
-#node-details { padding:24px; overflow-y:auto; flex:1; font-size:0.85rem; line-height:1.6; color:var(--text-1); }
-.detail-title { color:white; font-size:1.1rem; font-weight:700; margin-bottom:16px; word-break:break-word; text-shadow: 0 2px 4px rgba(0,0,0,0.5);}
-.detail-meta { margin-bottom:20px; padding:16px; background:rgba(0,0,0,0.3); border-radius:12px; border:1px solid rgba(255,255,255,0.05); }
-.detail-row { display:flex; margin-bottom:8px; align-items:baseline;}
+#node-details { padding:20px; overflow-y:auto; flex:1; font-size:0.85rem; line-height:1.5; color:var(--text-1); }
+.detail-title { color:white; font-size:1rem; font-weight:600; margin-bottom:12px; word-break:break-word; }
+.detail-meta { margin-bottom:16px; padding:10px; background:var(--bg-2); border-radius:8px; border:1px solid var(--border); }
+.detail-row { display:flex; margin-bottom:6px; }
 .detail-row:last-child { margin-bottom:0; }
-.detail-label { width:85px; color:var(--text-2); font-size:0.7rem; font-family:'JetBrains Mono',monospace; text-transform:uppercase; letter-spacing:1px;}
-.detail-val { flex:1; color:var(--accent-cyan); word-break:break-all; font-weight:500;}
-.detail-summary { background:rgba(0,0,0,0.3); padding:16px; border-radius:12px; white-space:pre-wrap; border:1px solid rgba(255,255,255,0.05); font-size:0.8rem; color: #d4d4d8;}
+.detail-label { width:80px; color:var(--text-2); font-size:0.75rem; font-family:'JetBrains Mono',monospace; }
+.detail-val { flex:1; color:var(--accent-cyan); word-break:break-all; }
+.detail-summary { background:var(--bg-2); padding:12px; border-radius:8px; white-space:pre-wrap; border:1px solid var(--border); }
 
 /* Graph Container */
-#network { flex:1; height:100%; position:relative; background: radial-gradient(circle at center, #13131f 0%, #030305 100%); }
-.legend { 
-  position:absolute; bottom:32px; left:32px; background:var(--glass); 
-  backdrop-filter:blur(24px); padding:20px; border-radius:16px; 
-  border:1px solid var(--border); z-index:10; box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-}
-.legend-item { display:flex; align-items:center; gap:12px; margin-bottom:12px; font-size:0.8rem; font-weight:500; color:var(--text-0); }
+#network { flex:1; height:100%; position:relative; background:#050508; }
+.legend { position:absolute; bottom:24px; left:24px; background:rgba(22,22,31,0.8); backdrop-filter:blur(10px); padding:16px; border-radius:12px; border:1px solid var(--border); z-index:10; }
+.legend-item { display:flex; align-items:center; gap:8px; margin-bottom:8px; font-size:0.8rem; color:var(--text-1); }
 .legend-item:last-child { margin-bottom:0; }
-.legend-dot { width:14px; height:14px; border-radius:50%; border:2px solid; box-shadow: 0 0 10px currentColor;}
+.legend-dot { width:12px; height:12px; border-radius:50%; border:2px solid; }
 
-/* Loader */
-.loading-overlay { 
-  position:absolute; inset:0; background:rgba(3,3,5,0.8); display:none; 
-  justify-content:center; align-items:center; z-index:50; color:white; font-weight:600; 
-  backdrop-filter:blur(8px); flex-direction:column; gap:20px;
-}
-.loading-overlay.active { display:flex; }
-.spinner { 
-  width:48px; height:48px; border:3px solid rgba(255,255,255,0.1); 
-  border-top-color:var(--accent-cyan); border-right-color:var(--accent-purple);
-  border-radius:50%; animation:spin 1s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite; 
-  box-shadow: 0 0 20px rgba(6,182,212,0.4);
-}
+.loading-overlay { position:absolute; inset:0; background:rgba(10,10,15,0.7); display:none; justify-content:center; align-items:center; z-index:50; color:white; font-weight:600; backdrop-filter:blur(4px); }
+.loading-overlay.active { display:flex; flex-direction:column; gap:16px; }
+.spinner { width:32px; height:32px; border:3px solid var(--border); border-top-color:var(--accent-cyan); border-radius:50%; animation:spin 1s linear infinite; }
 @keyframes spin { to { transform:rotate(360deg); } }
 </style>
-  <link rel="stylesheet" href="/theme.css">
 </head>
 <body>
 
 <div class="header">
-  <h1>🕸️ Knowledge Graph & Neural Explorer</h1>
-  <span class="badge">Mories Core</span>
+  <h1>🕸️ Knowledge Graph & Synaptic Visualizer</h1>
+  <span class="badge">MiroFish × Neo4j</span>
   <div class="nav-links">
     <a href="/">🏠 Dashboard</a>
     <a href="/memory">🧠 Memory</a>
-    <a href="/memory/synaptic">🌐 Synaptic</a>
-    <a href="/rbac.html">Access Control</a>
+    <a href="/synaptic">🌐 Synaptic</a>
     <a href="/memory/history">📜 Audit</a>
     <a href="/maturity">🌱 Maturity</a>
-    <a href="/workflows">⚙️ Workflows</a>
-    <a href="/api-explorer">📡 API</a>
   </div>
 </div>
 
@@ -149,14 +99,7 @@ select option { background: var(--bg-1); color: var(--text-0); }
     <div class="sidebar-section">
       <h3>🔍 Graph Query</h3>
       <div class="input-group">
-        <label>Cypher Query Engine 
-          <select id="savedQueries" style="margin-top:4px; margin-bottom:4px; padding:4px;" onchange="if(this.value) { document.getElementById('cypherInput').value = this.value; }">
-            <option value="">-- Load Saved Query --</option>
-            <option value="MATCH (n)-[r]->(m) RETURN n, type(r) as type, m LIMIT 300">Default Graph View</option>
-            <option value="MATCH (s:StagingEntity)-[r]->(m) RETURN s, type(r) as type, m LIMIT 100">🔍 Preview Staging Entities (GitOps)</option>
-            <option value="MATCH (n:MemoryRevision) RETURN n LIMIT 50">🛡️ View Memory Audit Trail</option>
-          </select>
-        </label>
+        <label>Cypher Query</label>
         <textarea id="cypherInput">MATCH (n)-[r]->(m) RETURN n, type(r) as type, m LIMIT 300</textarea>
       </div>
       <button class="btn btn-primary" onclick="runQuery()">▶ Execute Query</button>
@@ -164,28 +107,25 @@ select option { background: var(--bg-1); color: var(--text-0); }
     
     <div class="sidebar-section">
       <h3>🌌 Clustering & Filtration</h3>
-      <label style="font-size:0.75rem; color:var(--text-1); margin-bottom:8px; display:block; font-weight:500;">Semantic Keyword Filter</label>
-      <input type="text" id="semanticFilter" placeholder="Type to instantly filter items..." oninput="applySemanticFilter()" />
+      <label style="font-size:0.75rem; color:var(--text-1); margin-bottom:6px; display:block;">Semantic Filtering</label>
+      <input type="text" id="semanticFilter" placeholder="Filter nodes by keyword..." oninput="applySemanticFilter()" class="input-modern" />
       
-      <label style="font-size:0.75rem; color:var(--text-1); margin-top:16px; margin-bottom:8px; display:block; font-weight:500;">Intelligent Node Clustering</label>
-      <select id="clusterOption" onchange="applyClustering()">
-        <option value="none">No Clustering (Raw Nodes)</option>
-        <option value="scope">By Scope (Personal/Social)</option>
-        <option value="hub">By Hub Size (Network Core)</option>
-        <option value="agent">By Agent Assigment</option>
+      <label style="font-size:0.75rem; color:var(--text-1); margin-top:8px; margin-bottom:6px; display:block;">Smart Clustering</label>
+      <select id="clusterOption" onchange="applyClustering()" class="select-modern">
+        <option value="none">No Clustering (Raw Graph)</option>
+        <option value="scope">Cluster by Scope (Personal/Social)</option>
+        <option value="hub">Cluster by Hub Size (Compact view)</option>
       </select>
 
-      <div style="margin-top:24px;"></div>
-      <button class="btn" style="background:linear-gradient(135deg,rgba(34,197,94,0.2),rgba(6,182,212,0.2)); color:var(--accent-green); border:1px solid rgba(34,197,94,0.3);" onclick="loadAgents()">
-        🧬 Overlay Synaptic Agents
-      </button>
-      <p style="font-size:0.7rem; color:var(--text-2); line-height:1.5; margin-top:8px;">Superimposes agents on the active neural map, drawing dynamic bridges to their respective memories.</p>
+      <h3 style="margin-top:20px;">🤖 Agents</h3>
+      <button class="btn btn-primary" style="background:#22c55e; margin-bottom:10px;" onclick="loadAgents()">🧬 Overlay Agents Network</button>
+      <p style="font-size:0.75rem; color:var(--text-2); line-height:1.4;">Active agents and their shared memories via Synaptic Bridge will be highlighted.</p>
     </div>
 
     <div id="node-details">
-      <div style="text-align:center; color:var(--text-2); margin-top:60px; display:flex; flex-direction:column; align-items:center; gap:12px;">
-        <span style="font-size:3rem; opacity:0.5; filter:drop-shadow(0 0 10px rgba(6,182,212,0.2)); animation: float 3s ease-in-out infinite;">✦</span>
-        <span style="max-width:200px; font-weight:500;">Select a node from the map to view its neural snapshot.</span>
+      <div style="text-align:center; color:var(--text-2); margin-top:40px;">
+        <span style="font-size:2rem; display:block; margin-bottom:10px;">👆</span>
+        Select a node to view its memory, agent scope, and access metrics.
       </div>
     </div>
   </div>
@@ -194,55 +134,54 @@ select option { background: var(--bg-1); color: var(--text-0); }
   <div id="network">
     <div class="loading-overlay" id="loading">
       <div class="spinner"></div>
-      <div style="letter-spacing:1px; text-transform:uppercase; font-size:12px; color:var(--accent-cyan);">Synchronizing Neural Map...</div>
+      <div>Loading Neural Map...</div>
     </div>
     <div class="legend">
-      <div class="legend-item"><div class="legend-dot" style="background:rgba(59,130,246,0.3); border-color:#3b82f6; color:#3b82f6"></div> Personal Memory</div>
-      <div class="legend-item"><div class="legend-dot" style="background:rgba(16,185,129,0.3); border-color:#10b981; color:#10b981"></div> Social/Tribal Memory</div>
-      <div class="legend-item"><div class="legend-dot" style="background:rgba(249,115,22,0.3); border-color:#f97316; color:#f97316"></div> Entity / Revision</div>
-      <div class="legend-item"><div class="legend-dot" style="background:rgba(168,85,247,0.4); border-color:#a855f7; color:#a855f7"></div> Synaptic Agent Node</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(74,125,255,0.2); border-color:#4a7dff;"></div> Memory (Personal)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(34,197,94,0.2); border-color:#22c55e;"></div> Memory (Social/Tribal)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(249,115,22,0.2); border-color:#f97316;"></div> Revision / Metadata</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(139,92,246,0.3); border-color:#8b5cf6;"></div> Synaptic Agent</div>
     </div>
   </div>
 </div>
 
 <script>
-const API_BASE = '/api';
-
 let network = null;
 const nodesData = new vis.DataSet();
 const edgesData = new vis.DataSet();
 
+// Configuration for visually stunning network
 const displayOptions = {
   nodes: {
-    shape: 'dot', size: 18,
-    font: { color: '#f8f8f8', size: 12, face: 'Inter', strokeWidth: 4, strokeColor: 'rgba(3,3,5,0.8)' },
-    borderWidth: 2, shadow: { enabled: true, color: 'rgba(0,190,255,0.3)', size: 15, x: 0, y: 0 }
+    shape: 'dot', size: 16,
+    font: { color: '#e8e8f0', size: 12, face: 'Inter', strokeWidth: 3, strokeColor: '#0a0a0f' },
+    borderWidth: 2, shadow: { enabled: true, color: 'rgba(0,0,0,0.5)', size: 10, x: 0, y: 0 }
   },
   edges: {
-    width: 2, color: { color: 'rgba(255,255,255,0.1)', highlight: '#06b6d4', hover: '#a855f7' },
+    width: 1.5, color: { color: '#2a2a3a', highlight: '#06b6d4', hover: '#4a7dff' },
     smooth: { type: 'continuous', roundness: 0.5 },
-    font: { color: '#8888a0', size: 10, strokeWidth: 0, align: 'top' },
-    arrows: { to: { enabled: true, scaleFactor: 0.4 } }
+    font: { color: '#555568', size: 10, strokeWidth: 0, align: 'top' },
+    arrows: { to: { enabled: true, scaleFactor: 0.5 } }
   },
   physics: {
     enabled: true, solver: 'forceAtlas2Based',
-    forceAtlas2Based: { gravitationalConstant: -70, centralGravity: 0.015, springLength: 120, springConstant: 0.05, damping: 0.5 },
-    stabilization: { iterations: 200 }
+    forceAtlas2Based: { gravitationalConstant: -60, centralGravity: 0.01, springLength: 100, springConstant: 0.08, damping: 0.4 },
+    stabilization: { iterations: 150 }
   },
-  interaction: { hover: true, tooltipDelay: 200, zoomSpeed: 0.6 }
+  interaction: { hover: true, tooltipDelay: 200, zoomSpeed: 0.5 }
 };
 
 // Map backend color logic
 function getNodeStyle(nodeData) {
-  let bg = 'rgba(59,130,246,0.3)'; let border = '#3b82f6';
+  let bg = 'rgba(74,125,255,0.2)'; let border = '#4a7dff';
   if(nodeData.role) { // Agent
-    bg = 'rgba(168,85,247,0.4)'; border = '#a855f7';
+    bg = 'rgba(139,92,246,0.5)'; border = '#8b5cf6';
   } else if(nodeData.revision_id) { // Revision
-    bg = 'rgba(249,115,22,0.3)'; border = '#f97316';
+    bg = 'rgba(249,115,22,0.2)'; border = '#f97316';
   } else if(nodeData.scope === 'social' || nodeData.scope === 'global') {
-    bg = 'rgba(16,185,129,0.3)'; border = '#10b981';
+    bg = 'rgba(34,197,94,0.2)'; border = '#22c55e';
   }
-  return { background: bg, border: border, highlight: { background: border, border: '#fff' }, hover: { background: border, border: '#fff' } };
+  return { background: bg, border: border, highlight: { background: border, border: '#fff' } };
 }
 
 function getNodeLabel(data) {
@@ -317,7 +256,7 @@ async function runQuery() {
   toggleLoader(true);
   const cypher = document.getElementById('cypherInput').value;
   try {
-    const res = await fetch(`${API_BASE}/query`, {
+    const res = await fetch('/api/query', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cypher })
     });
@@ -334,7 +273,7 @@ async function runQuery() {
 async function loadAgents() {
   toggleLoader(true);
   try {
-    const res = await fetch(`${API_BASE}/memory/synaptic/agents`);
+    const res = await fetch('/api/memory/synaptic/agents');
     const agents = await res.json();
     
     // Add central bridge node
@@ -410,7 +349,6 @@ function applySemanticFilter() {
   if (!searchTerm) {
     // Reset highlights
     nodesData.forEach(n => {
-      // Restore original opacity by re-applying the style
       nodesData.update({ id: n.id, hidden: false });
     });
     return;
@@ -418,9 +356,7 @@ function applySemanticFilter() {
   
   nodesData.forEach(n => {
     const label = (n.label || '').toLowerCase();
-    const rawData = JSON.stringify(n.raw || {}).toLowerCase(); // Also search in raw data
-    const isMatch = label.includes(searchTerm) || rawData.includes(searchTerm);
-    // Instead of hiding them, we can lower opacity for unmatched, but hidden is safer for performance in huge graphs
+    const isMatch = label.includes(searchTerm);
     nodesData.update({ id: n.id, hidden: !isMatch });
   });
 }
@@ -450,10 +386,9 @@ function applyClustering() {
         id: 'cluster_social_',
         borderWidth: 3,
         shape: 'database',
-        color: { background: 'rgba(16,185,129,0.3)', border: '#10b981' },
-        label: 'Social Memory Cluster\\n(Dbl-click to expand)',
-        font: { color: '#ffffff', size: 14 },
-        size: 30
+        color: { background: 'rgba(34,197,94,0.3)', border: '#22c55e' },
+        label: 'Social Scope Cluster',
+        font: { color: '#ffffff', size: 14 }
       }
     };
     network.cluster(clusterOptionsByData);
@@ -466,44 +401,26 @@ function applyClustering() {
         id: 'cluster_personal_',
         borderWidth: 3,
         shape: 'database',
-        color: { background: 'rgba(59,130,246,0.3)', border: '#3b82f6' },
-        label: 'Personal Memory Cluster\\n(Dbl-click to expand)',
-        font: { color: '#ffffff', size: 14 },
-        size: 30
+        color: { background: 'rgba(74,125,255,0.3)', border: '#4a7dff' },
+        label: 'Personal Scope Cluster',
+        font: { color: '#ffffff', size: 14 }
       }
     };
     network.cluster(clusterOptionsByDataPers);
   } else if (opt === 'hub') {
     const clusterOptionsByHubsize = {
       processProperties: function (clusterOptions, childNodes, childEdges) {
-        clusterOptions.label = "Data Hub (" + childNodes.length + " nodes)\\n(Dbl-click)";
+        clusterOptions.label = "Hub (" + childNodes.length + " nodes)";
         clusterOptions.color = { background: 'rgba(249,115,22,0.3)', border: '#f97316' };
         return clusterOptions;
       },
       clusterNodeProperties: {
         borderWidth: 3,
-        shape: 'hexagon',
-        font: { color: '#ffffff', size: 14 },
-        size: 35
+        shape: 'box',
+        font: { color: '#ffffff', size: 14 }
       }
     };
     network.clusterByHubsize(undefined, clusterOptionsByHubsize);
-  } else if (opt === 'agent') {
-    const clusterOptionsByAgent = {
-      joinCondition: function (childOptions) {
-        return childOptions.raw && childOptions.raw.role && childOptions.raw.role.toLowerCase().includes('agent');
-      },
-      clusterNodeProperties: {
-        id: 'cluster_agents_',
-        borderWidth: 3,
-        shape: 'star',
-        color: { background: 'rgba(168,85,247,0.3)', border: '#a855f7' },
-        label: 'Agents Cluster',
-        font: { color: '#ffffff', size: 14 },
-        size: 40
-      }
-    };
-    network.cluster(clusterOptionsByAgent);
   }
 }
 
@@ -512,6 +429,5 @@ document.addEventListener('DOMContentLoaded', () => {
   runQuery(); // Load default graph
 });
 </script>
-<script src="/theme.js"></script>
 </body>
 </html>

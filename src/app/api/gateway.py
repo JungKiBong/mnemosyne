@@ -72,20 +72,15 @@ def require_api_key(f):
             return jsonify({"error": "API key required (X-API-Key header or api_key param)"}), 401
 
         rbac = _get_rbac()
-        from ..security.memory_rbac import RateLimitExceeded, ApiKeyExpired
-        try:
-            principal = rbac.validate_api_key(api_key)
-            if not principal:
-                return jsonify({"error": "Invalid API key"}), 403
-        except ApiKeyExpired as e:
-            return jsonify({"error": str(e)}), 403
-        except RateLimitExceeded as e:
-            return jsonify({"error": str(e)}), 429
+        principal = rbac.validate_api_key(api_key)
+        if not principal:
+            return jsonify({"error": "Invalid API key"}), 403
 
         # Attach principal to request context
         request._gateway_principal = principal
         return f(*args, **kwargs)
     return decorated
+
 
 # ──────────────────────────────────────────
 # n8n Webhook Gateway
@@ -112,15 +107,9 @@ def n8n_webhook():
     api_key = data.get('api_key') or request.headers.get('X-API-Key', '')
     if api_key:
         rbac = _get_rbac()
-        from ..security.memory_rbac import RateLimitExceeded, ApiKeyExpired
-        try:
-            principal = rbac.validate_api_key(api_key)
-            if not principal:
-                return jsonify({"error": "Invalid API key"}), 403
-        except ApiKeyExpired as e:
-            return jsonify({"error": str(e)}), 403
-        except RateLimitExceeded as e:
-            return jsonify({"error": str(e)}), 429
+        principal = rbac.validate_api_key(api_key)
+        if not principal:
+            return jsonify({"error": "Invalid API key"}), 403
     # Allow unauthenticated if RBAC is not enforced (dev mode)
 
     content = data.get('content', '')
@@ -169,14 +158,8 @@ def nifi_gateway():
     api_key = request.headers.get('X-API-Key', '')
     if api_key:
         rbac = _get_rbac()
-        from ..security.memory_rbac import RateLimitExceeded, ApiKeyExpired
-        try:
-            if not rbac.validate_api_key(api_key):
-                return jsonify({"error": "Invalid API key"}), 403
-        except ApiKeyExpired as e:
-            return jsonify({"error": str(e)}), 403
-        except RateLimitExceeded as e:
-            return jsonify({"error": str(e)}), 429
+        if not rbac.validate_api_key(api_key):
+            return jsonify({"error": "Invalid API key"}), 403
 
     # Extract NiFi metadata from headers
     nifi_uuid = request.headers.get('X-NiFi-FlowFile-UUID', '')
@@ -232,14 +215,8 @@ def spark_gateway():
     api_key = data.get('api_key') or request.headers.get('X-API-Key', '')
     if api_key:
         rbac = _get_rbac()
-        from ..security.memory_rbac import RateLimitExceeded, ApiKeyExpired
-        try:
-            if not rbac.validate_api_key(api_key):
-                return jsonify({"error": "Invalid API key"}), 403
-        except ApiKeyExpired as e:
-            return jsonify({"error": str(e)}), 403
-        except RateLimitExceeded as e:
-            return jsonify({"error": str(e)}), 429
+        if not rbac.validate_api_key(api_key):
+            return jsonify({"error": "Invalid API key"}), 403
 
     records = data.get('records', [])
     if not records:
@@ -362,131 +339,6 @@ def batch_ingest():
             totals["errors"] += 1
 
     return jsonify(totals)
-
-
-# ──────────────────────────────────────────
-# GitOps & HITL Webhooks
-# ──────────────────────────────────────────
-
-@gateway_bp.route('/github-merge', methods=['POST'])
-def github_merge_webhook():
-    """
-    Webhook for GitHub/GitLab PR merges.
-    When a PR is merged, promote corresponding `(:StagingEntity)` to `(:Entity)`.
-    """
-    payload = request.json or {}
-    
-    is_merged = False
-    pr_id = None
-    approved_by = "unknown_system"
-    
-    if "pull_request" in payload:  # GitHub
-        action = payload.get("action")
-        pr = payload.get("pull_request", {})
-        if action == "closed" and pr.get("merged") is True:
-            is_merged = True
-            pr_id = str(pr.get("number"))
-            approved_by = pr.get("merged_by", {}).get("login", "unknown_user")
-            
-    elif "object_attributes" in payload:  # GitLab
-        attrs = payload.get("object_attributes", {})
-        if attrs.get("state") == "merged":
-            is_merged = True
-            pr_id = str(attrs.get("iid"))
-            approved_by = payload.get("user", {}).get("username", "unknown_user")
-            
-    if not is_merged:
-        return jsonify({"status": "ignored", "reason": "Not a merge event"}), 200
-        
-    pr_ref = f"PR-{pr_id}" if pr_id else "Manual"
-    
-    try:
-        from ..config import Config
-        from neo4j import GraphDatabase
-        driver = GraphDatabase.driver(Config.NEO4J_URI, auth=(Config.NEO4J_USER, Config.NEO4J_PASSWORD))
-        
-        with driver.session() as session:
-            # Promote StagingEntity to Entity
-            promote_query = """
-                MATCH (s:StagingEntity)
-                WITH s
-                REMOVE s:StagingEntity
-                SET s:Entity, s.status = 'active', s.last_updated = datetime(), s.approved_by = $approved_by, s.approved_via = $pr_ref
-                
-                CREATE (r:MemoryRevision {
-                    entity_id: s.id,
-                    old_value: 'staged',
-                    new_value: 'promoted',
-                    changed_by: $approved_by,
-                    reason: 'GitOps Merge ' + $pr_ref,
-                    timestamp: datetime()
-                })
-                CREATE (s)-[:HAS_REVISION]->(r)
-                RETURN count(s) as promoted_count
-            """
-            result = session.run(promote_query, approved_by=approved_by, pr_ref=pr_ref).data()
-            count = result[0]['promoted_count'] if result else 0
-            
-            # Simple relationship approval
-            promote_rel_query = """
-                MATCH ()-[r:STAGING_RELATIONSHIP]->()
-                SET r.approved = true, r.approved_by = $approved_by, r.approved_via = $pr_ref
-                RETURN count(r) as rel_count
-            """
-            rel_result = session.run(promote_rel_query, approved_by=approved_by, pr_ref=pr_ref).data()
-            rel_count = rel_result[0]['rel_count'] if rel_result else 0
-            
-        driver.close()
-        logger.info(f"GitOps Merge Processed: {count} StagingEntities promoted by {approved_by} via {pr_ref}")
-        return jsonify({"status": "success", "promoted_entities": count, "promoted_relationships": rel_count})
-        
-    except Exception as e:
-        logger.error(f"Failed to process Github merge: {e}")
-        return jsonify({"error": str(e)}), 500
-
-
-@gateway_bp.route('/staging/approve', methods=['POST'])
-@require_api_key
-def manual_staging_approve():
-    """Fallback manual approval endpoint (Phase 5)."""
-    payload = request.json or {}
-    node_ids = payload.get("node_ids", [])
-    
-    if not node_ids:
-        return jsonify({"error": "node_ids array required"}), 400
-        
-    principal = getattr(request, '_gateway_principal', {})
-    approved_by = principal.get('name', 'admin_manual')
-    
-    try:
-        from ..config import Config
-        from neo4j import GraphDatabase
-        driver = GraphDatabase.driver(Config.NEO4J_URI, auth=(Config.NEO4J_USER, Config.NEO4J_PASSWORD))
-        
-        with driver.session() as session:
-            query = """
-                UNWIND $node_ids AS node_id
-                MATCH (s:StagingEntity {id: node_id})
-                REMOVE s:StagingEntity
-                SET s:Entity, s.status = 'active', s.last_updated = datetime(), s.approved_by = $approved_by, s.approved_via = 'Manual Fallback'
-                
-                CREATE (r:MemoryRevision {
-                    entity_id: s.id,
-                    old_value: 'staged',
-                    new_value: 'promoted',
-                    changed_by: $approved_by,
-                    reason: 'Manual Staging Approval',
-                    timestamp: datetime()
-                })
-                CREATE (s)-[:HAS_REVISION]->(r)
-                RETURN count(s) as count
-            """
-            res = session.run(query, node_ids=node_ids, approved_by=approved_by).data()
-            count = res[0]['count'] if res else 0
-        driver.close()
-        return jsonify({"status": "success", "promoted_count": count})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 
 # ──────────────────────────────────────────

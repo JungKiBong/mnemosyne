@@ -157,10 +157,6 @@ def create_app(config_class=Config):
     from .api.settings import settings_bp
     app.register_blueprint(settings_bp)
 
-    # Workflow Gallery API (n8n workflow JSON serving)
-    from .api.workflows import workflow_bp
-    app.register_blueprint(workflow_bp, url_prefix='/api/workflows')
-
     # Start Memory Scheduler (background thread)
     try:
         from .services.memory_scheduler import start_scheduler

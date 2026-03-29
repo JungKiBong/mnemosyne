@@ -132,16 +132,9 @@ def verify_key():
         return jsonify({"valid": False, "error": "api_key missing"}), 400
     
     rbac = _get_rbac()
-    from ..security.memory_rbac import RateLimitExceeded, ApiKeyExpired
-    
-    try:
-        principal = rbac.validate_api_key(raw_key)
-        if principal:
-            return jsonify({"valid": True, "principal": principal})
-    except ApiKeyExpired as e:
-        return jsonify({"valid": False, "error": str(e)}), 403
-    except RateLimitExceeded as e:
-        return jsonify({"valid": False, "error": str(e)}), 429
+    principal = rbac.validate_api_key(raw_key)
+    if principal:
+        return jsonify({"valid": True, "principal": principal})
     
     return jsonify({"valid": False, "error": "Invalid or revoked API key"}), 401
 
@@ -151,45 +144,6 @@ def revoke_key(key_hash):
     """Revoke an API key."""
     rbac = _get_rbac()
     return jsonify(rbac.revoke_api_key(key_hash))
-
-
-@security_bp.route('/keys/<key_hash>/extend', methods=['POST'])
-def extend_key(key_hash):
-    """Extend an API key's expiration."""
-    data = request.get_json(force=True, silent=True) or {}
-    days_to_extend = int(data.get('days', 30))
-    rbac = _get_rbac()
-    res = rbac.extend_api_key(key_hash, additional_days=days_to_extend)
-    if res.get("status") == "error":
-        return jsonify(res), 400
-    return jsonify(res)
-
-
-# ──────────────────────────────────────────
-# Security Audit & Admin
-# ──────────────────────────────────────────
-
-@security_bp.route('/events', methods=['GET'])
-def list_security_events():
-    """Retrieve security audit events (Audit Trail Feed)."""
-    rbac = _get_rbac()
-    limit = int(request.args.get('limit', 50))
-    events = rbac.get_security_events(limit=limit)
-    return jsonify({"events": events})
-
-@security_bp.route('/keys/<key_hash>/rate_limit', methods=['PUT'])
-def update_key_rate_limit(key_hash):
-    """Dynamically update rate limit for an API key."""
-    data = request.get_json(force=True, silent=True) or {}
-    new_limit = data.get('rate_limit')
-    if new_limit is None:
-        return jsonify({"error": "rate_limit is required"}), 400
-    
-    rbac = _get_rbac()
-    res = rbac.update_api_key_rate_limit(key_hash, int(new_limit))
-    if res.get("status") == "error":
-        return jsonify(res), 400
-    return jsonify(res)
 
 
 # ──────────────────────────────────────────

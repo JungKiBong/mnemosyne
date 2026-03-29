@@ -31,10 +31,6 @@
 7. **컨텍스트 길이 모니터링 경고**:
    - AI 에이전트는 대화 트리가 지나치게 길어져 맥락이 희미해지기 전, 사용자에게 능동적으로 "새로운 대화 세션 생성"을 제안하고 그 시점까지의 핸드오버와 기억을 정리해야 함.
 
-## 3. 완료된 백로그 (Completed Backlog)
-- ✅ Graph Viewer 상의 대규모 노드 군집화(Clustering) 및 시맨틱 필터기 도입 완료. (동적 `API_BASE` 연동 및 통합)
-- ✅ 만료 임박 API 키/토큰 갱신 관리자 전용 UI 패널 설계 및 연동 완료 (Mories 대시보드의 Audit, Security 패널).
-
-## 4. 다음 단계 제안 (Next Phase Suggestions)
-- **프론트엔드 성능 최적화 (Web Worker 등 활용)**: 수만 건의 노드가 렌더링될 때의 지연 현상(Vis.js) 방지를 위해 물리 연산(Physics) 오프로딩 도입 검토.
-- **n8n / Dify 워크플로우와의 양방향 제어 연동**: Mories Memory Dashboard에서 직접 이벤트를 발생시키거나 워크플로우를 트리거할 수 있는 Action Hook 시스템 설계.
+## 3. 남아있는 백로그 및 다음 단계 (Next Steps)
+- Graph Viewer 상의 대규모 노드 군집화(Clustering) 및 시맨틱 필터기 도입.
+- 만료 임박 API 키/토큰 갱신 관리자 전용 UI 패널 설계 및 연동.

@@ -96,7 +96,6 @@ a:hover{text-decoration:underline}
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/theme.css">
 </head>
 <body>
 
@@ -104,14 +103,13 @@ a:hover{text-decoration:underline}
 <div class="topbar">
   <h1>🧠 Mories</h1>
   <div class="nav">
-    <a href="/">🏠 Dashboard</a>
-    <a href="/graph">🕸️ Graph Explorer</a>
-    <a href="/memory">🧠 Memory</a>
-    <a href="/memory/synaptic">🌐 Synaptic</a>
-    <a href="/memory/history">📜 Audit</a>
-    <a href="/maturity">🌱 Maturity</a>
-    <a href="/api-explorer">📡 API Explorer</a>
-    <a href="/workflows" class="active">⚙️ Workflows</a>
+    <a href="/">Dashboard</a>
+    <a href="/graph">Graph Explorer</a>
+    <a href="/memory">Memory</a>
+    <a href="/memory/synaptic">Synaptic</a>
+    <a href="/maturity">Maturity</a>
+    <a href="/api-docs">API Explorer</a>
+    <a href="/workflows" class="active">Workflows</a>
   </div>
 </div>
 
@@ -218,7 +216,7 @@ a:hover{text-decoration:underline}
 </div>
 
 <script>
-const BASE = '';
+const BASE = window.location.origin;
 
 // Workflow metadata enrichment
 const WORKFLOW_META = {
@@ -242,7 +240,7 @@ let currentWfFile = null;
 
 async function loadWorkflows() {
   try {
-    const resp = await fetch(`${BASE}/api/workflows/list`);
+    const resp = await fetch(`${BASE}/api/workflows`);
     const data = await resp.json();
     allWorkflows = data.workflows || [];
     document.getElementById('totalCount').textContent = allWorkflows.length;
@@ -367,6 +365,5 @@ document.getElementById('modal').addEventListener('click', e => { if (e.target =
 // Init
 loadWorkflows();
 </script>
-<script src="/theme.js"></script>
 </body>
 </html>
