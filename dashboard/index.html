@@ -252,6 +252,89 @@
     .system-value.good { color: var(--accent-green); }
     .system-value.warn { color: var(--accent-orange); }
 
+    /* ========== EXPIRY ALERT BANNER ========== */
+    .expiry-banner {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+      background: linear-gradient(90deg, rgba(249,115,22,0.95) 0%, rgba(239,68,68,0.95) 100%);
+      backdrop-filter: blur(12px);
+      padding: 10px 32px;
+      display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid rgba(239,68,68,0.5);
+      animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 4px 24px rgba(239,68,68,0.35);
+    }
+    .expiry-banner.hidden { display: none; }
+    @keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+    .expiry-banner-content { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .expiry-banner-title { font-weight: 700; font-size: 13px; color: white; }
+    .expiry-tag {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25);
+      padding: 3px 10px; border-radius: 20px; font-size: 12px; color: white; cursor: pointer;
+      transition: background 0.2s; font-family: 'JetBrains Mono', monospace;
+    }
+    .expiry-tag:hover { background: rgba(255,255,255,0.25); }
+    .expiry-banner-close {
+      background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25);
+      color: white; width: 28px; height: 28px; border-radius: 50%;
+      cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s; flex-shrink: 0;
+    }
+    .expiry-banner-close:hover { background: rgba(255,255,255,0.3); }
+
+    /* ========== RENEWAL MODAL ========== */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 10000;
+      background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
+      display: flex; align-items: center; justify-content: center;
+      animation: fadeIn 0.2s ease;
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal-box {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 16px; padding: 32px; width: 440px; max-width: 90vw;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+      animation: modalIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes modalIn { from { transform: scale(0.9) translateY(20px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
+    .modal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+    .modal-title { font-size: 18px; font-weight: 700; }
+    .modal-subtitle { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+    .modal-close { background: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-muted);
+      width: 32px; height: 32px; border-radius: 8px; cursor: pointer; font-size: 16px;
+      display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; }
+    .modal-close:hover { border-color: var(--accent-red); color: var(--accent-red); }
+    .modal-key-info {
+      background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px;
+      padding: 14px 16px; margin-bottom: 20px;
+    }
+    .modal-key-info .key-name { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+    .modal-key-info .key-meta { font-size: 12px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+    .modal-duration-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px; }
+    .duration-btn {
+      padding: 10px 0; border: 1px solid var(--border); border-radius: 8px;
+      background: var(--bg-secondary); color: var(--text-secondary); cursor: pointer;
+      font-size: 12px; font-weight: 600; text-align: center; transition: all 0.2s;
+    }
+    .duration-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+    .duration-btn.selected { border-color: var(--accent-blue); background: rgba(74,125,255,0.15); color: var(--accent-blue); }
+    .modal-footer { display: flex; gap: 10px; }
+    .btn-modal-cancel {
+      flex: 1; padding: 11px; border: 1px solid var(--border); border-radius: 8px;
+      background: transparent; color: var(--text-secondary); cursor: pointer; font-size: 13px;
+      font-weight: 600; font-family: inherit; transition: all 0.2s;
+    }
+    .btn-modal-cancel:hover { border-color: var(--text-muted); color: var(--text-primary); }
+    .btn-modal-renew {
+      flex: 2; padding: 11px; border: none; border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+      color: white; cursor: pointer; font-size: 13px; font-weight: 700;
+      font-family: inherit; transition: all 0.2s;
+      box-shadow: 0 4px 12px rgba(74,125,255,0.3);
+    }
+    .btn-modal-renew:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(74,125,255,0.4); }
+    .btn-modal-renew:disabled { opacity: 0.6; pointer-events: none; }
+
     /* ========== SETTINGS TAB ========== */
     .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
     .setting-group {
@@ -312,12 +395,50 @@
   </style>
 </head>
 <body>
+  <!-- EXPIRY ALERT BANNER -->
+  <div id="expiry-banner" class="expiry-banner hidden">
+    <div class="expiry-banner-content">
+      <span class="expiry-banner-title">⚠️ API Key Expiry Warning</span>
+      <div id="expiry-banner-tags"></div>
+    </div>
+    <button class="expiry-banner-close" onclick="document.getElementById('expiry-banner').classList.add('hidden')">✕</button>
+  </div>
+
+  <!-- RENEWAL MODAL -->
+  <div id="renew-modal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">🔄 Renew API Key</div>
+          <div class="modal-subtitle">Extend the expiry of this access key</div>
+        </div>
+        <button class="modal-close" onclick="closeRenewModal()">✕</button>
+      </div>
+      <div class="modal-key-info">
+        <div class="key-name" id="modal-key-name">—</div>
+        <div class="key-meta" id="modal-key-meta">—</div>
+      </div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Extend by</div>
+      <div class="modal-duration-grid" id="duration-grid">
+        <button class="duration-btn" data-days="7" onclick="selectDuration(this)">7 days</button>
+        <button class="duration-btn selected" data-days="30" onclick="selectDuration(this)">30 days</button>
+        <button class="duration-btn" data-days="90" onclick="selectDuration(this)">90 days</button>
+        <button class="duration-btn" data-days="365" onclick="selectDuration(this)">1 year</button>
+      </div>
+      <div id="renew-result" style="display:none;padding:10px 14px;border-radius:8px;font-size:12px;font-family:'JetBrains Mono',monospace;margin-bottom:16px"></div>
+      <div class="modal-footer">
+        <button class="btn-modal-cancel" onclick="closeRenewModal()">Cancel</button>
+        <button class="btn-modal-renew" id="btn-do-renew" onclick="doRenewKey()">🔄 Renew Key</button>
+      </div>
+    </div>
+  </div>
+
   <div class="bg-grid"></div>
   <div class="bg-glow"></div>
 
   <div class="app">
-    <!-- TOPBAR -->
-    <header class="topbar">
+    <!-- TOPBAR — offset by banner when visible -->
+    <header class="topbar" id="main-topbar">
       <div class="topbar-brand">
         <div class="logo">M</div>
         <div>
@@ -1124,6 +1245,9 @@
     }
 
     // ========== ACCESS KEY MANAGEMENT ==========
+    let _renewTarget = null;  // { hash, name, expires_at }
+    let _selectedRenewDays = 30;
+
     async function loadApiKeys() {
       const container = document.getElementById('keys-list');
       try {
@@ -1133,56 +1257,176 @@
           container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--accent-red)">Failed to load keys (Check backend API)</div>';
           return;
         }
-        
         if (res.keys.length === 0) {
           container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted)">No API Keys generated yet.</div>';
           return;
         }
-        
+
+        // Check expiry warnings for banner
+        const warningKeys = res.keys.filter(k => {
+          if (!k.expires_at) return false;
+          const days = Math.ceil((new Date(k.expires_at) - new Date()) / 86400000);
+          return days <= 7;
+        });
+        updateExpiryBanner(warningKeys);
+
         const keysHtml = res.keys.map(keyObj => {
-          let expireBadge = '';
           const hash = keyObj.key_hash || '';
+          let expireBadge = '', daysLeft = null, isExpired = false, isWarning = false;
+
           if (keyObj.expires_at) {
-            const expDate = new Date(keyObj.expires_at);
-            const now = new Date();
-            const daysLeft = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24));
-            
-            if (daysLeft <= 0) {
-              expireBadge = `<span style="padding:2px 8px;border-radius:4px;background:rgba(239,68,68,0.2);color:var(--accent-red);border:1px solid rgba(239,68,68,0.5);font-size:10px;font-weight:bold;margin-left:8px;">🚨 EXPIRED</span>`;
-            } else if (daysLeft <= 10) {
-              expireBadge = `<span style="padding:2px 8px;border-radius:4px;background:rgba(249,115,22,0.2);color:var(--accent-orange);border:1px solid rgba(249,115,22,0.5);font-size:10px;font-weight:bold;margin-left:8px;animation:pulse-dot 2s infinite">⚠️ Expires in ${daysLeft} days</span>`;
+            daysLeft = Math.ceil((new Date(keyObj.expires_at) - new Date()) / 86400000);
+            isExpired = daysLeft <= 0;
+            isWarning = daysLeft > 0 && daysLeft <= 10;
+
+            if (isExpired) {
+              expireBadge = `<span class="key-badge expired">🚨 EXPIRED</span>`;
+            } else if (isWarning) {
+              expireBadge = `<span class="key-badge warn">⚠️ ${daysLeft}d left</span>`;
             } else {
-              expireBadge = `<span style="padding:2px 8px;border-radius:4px;background:rgba(34,197,94,0.1);color:var(--accent-green);border:1px solid rgba(34,197,94,0.3);font-size:10px;margin-left:8px;">Valid for ${daysLeft} days</span>`;
+              expireBadge = `<span class="key-badge ok">✅ ${daysLeft}d left</span>`;
             }
           } else {
-             expireBadge = `<span style="padding:2px 8px;border-radius:4px;background:rgba(139,92,246,0.1);color:var(--accent-purple);border:1px solid rgba(139,92,246,0.3);font-size:10px;margin-left:8px;">Never Expires</span>`;
+            expireBadge = `<span class="key-badge never">∞ Never</span>`;
           }
 
+          const expiresLabel = keyObj.expires_at
+            ? `Expires ${new Date(keyObj.expires_at).toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'})}`
+            : 'Never expires';
+
+          const cardBorderColor = isExpired ? 'rgba(239,68,68,0.4)' : isWarning ? 'rgba(249,115,22,0.3)' : 'var(--border)';
+
           return `
-          <div class="setting-row" style="padding:16px;background:var(--bg-secondary);border-radius:8px;margin-bottom:12px;border:1px solid var(--border); ${expireBadge.includes('EXPIRED') ? 'opacity:0.6;' : ''}">
-            <div>
-              <div style="font-weight:600;font-size:14px;color:var(--text-primary)">
-                🔑 ${keyObj.name || 'Unnamed Key'} ${expireBadge}
+          <div style="background:var(--bg-secondary);border:1px solid ${cardBorderColor};border-radius:10px;padding:18px 20px;margin-bottom:14px;transition:border-color 0.2s;${isExpired ? 'opacity:0.65;' : ''}">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px">
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+                  <span style="font-weight:700;font-size:15px;color:var(--text-primary)">🔑 ${keyObj.name || 'Unnamed Key'}</span>
+                  ${expireBadge}
+                </div>
+                <div style="font-size:12px;margin-bottom:8px;display:flex;gap:6px;flex-wrap:wrap">
+                  ${(keyObj.allowed_scopes || []).map(s => `<span style="padding:2px 8px;border-radius:4px;background:rgba(139,92,246,0.1);color:var(--accent-purple);border:1px solid rgba(139,92,246,0.2);font-size:11px">${s}</span>`).join('')}
+                </div>
+                <div style="display:flex;gap:16px;font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;flex-wrap:wrap">
+                  <span>🔏 ${hash.substring(0, 16)}...</span>
+                  <span>👤 ${(keyObj.roles || []).join(', ')}</span>
+                  <span>📊 ${keyObj.usage_count || 0} calls</span>
+                  <span>📅 ${expiresLabel}</span>
+                </div>
               </div>
-              <div style="font-size:12px;margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
-                ${(keyObj.allowed_scopes || []).map(s => `<span style="padding:2px 6px;border-radius:4px;background:rgba(139,92,246,0.1);color:var(--accent-purple);border:1px solid rgba(139,92,246,0.2)">${s}</span>`).join('')}
-              </div>
-              <div style="font-size:11px;color:var(--text-muted);margin-top:6px;font-family:'JetBrains Mono',monospace">
-                Hash: ${hash.substring(0, 12)}... | Roles: ${(keyObj.roles || []).join(', ')} | Used: ${keyObj.usage_count || 0} times
+              <div style="display:flex;gap:8px;flex-shrink:0;align-items:center">
+                ${!isExpired ? `<button onclick="openRenewModal('${hash}', '${(keyObj.name||'Key').replace(/'/g,"'")}', '${keyObj.expires_at || ''}')" style="padding:7px 14px;border-radius:7px;border:1px solid rgba(74,125,255,0.4);background:rgba(74,125,255,0.08);color:var(--accent-blue);cursor:pointer;font-size:12px;font-weight:600;transition:all 0.2s" onmouseover="this.style.background='rgba(74,125,255,0.18)'" onmouseout="this.style.background='rgba(74,125,255,0.08)'">🔄 Renew</button>` : ''}
+                <button onclick="revokeApiKey('${hash}')" style="padding:7px 14px;border-radius:7px;border:1px solid rgba(239,68,68,0.3);background:transparent;color:var(--accent-red);cursor:pointer;font-size:12px;font-weight:600;transition:all 0.2s" onmouseover="this.style.background='rgba(239,68,68,0.1)'" onmouseout="this.style.background='transparent'">✕ Revoke</button>
               </div>
             </div>
-            <button onclick="revokeApiKey('${hash}')" style="padding:6px 12px;border-radius:6px;border:1px solid rgba(239,68,68,0.3);background:transparent;color:var(--accent-red);cursor:pointer;font-size:12px;transition:all 0.2s;font-weight:600" onmouseover="this.style.background='rgba(239,68,68,0.1)'" onmouseout="this.style.background='transparent'">
-              Revoke
-            </button>
           </div>
           `;
         }).join('');
-        
-        container.innerHTML = keysHtml;
+
+        container.innerHTML = `
+          <style>
+            .key-badge { padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+            .key-badge.expired { background: rgba(239,68,68,0.2); color: var(--accent-red); border: 1px solid rgba(239,68,68,0.5); animation: pulse-dot 1.5s infinite; }
+            .key-badge.warn { background: rgba(249,115,22,0.2); color: var(--accent-orange); border: 1px solid rgba(249,115,22,0.4); animation: pulse-dot 2s infinite; }
+            .key-badge.ok { background: rgba(34,197,94,0.1); color: var(--accent-green); border: 1px solid rgba(34,197,94,0.3); }
+            .key-badge.never { background: rgba(139,92,246,0.1); color: var(--accent-purple); border: 1px solid rgba(139,92,246,0.3); }
+          </style>
+          ${keysHtml}
+        `;
       } catch (e) {
         container.innerHTML = `<div style="padding:20px;color:var(--accent-red)">Error: ${e.message}</div>`;
       }
     }
+
+    // ---- Expiry Banner ----
+    function updateExpiryBanner(warningKeys) {
+      const banner = document.getElementById('expiry-banner');
+      const tagsEl = document.getElementById('expiry-banner-tags');
+      if (!warningKeys.length) { banner.classList.add('hidden'); return; }
+
+      tagsEl.innerHTML = warningKeys.map(k => {
+        const days = Math.ceil((new Date(k.expires_at) - new Date()) / 86400000);
+        const label = days <= 0 ? 'EXPIRED' : `${days}d left`;
+        return `<span class="expiry-tag" onclick="openRenewModal('${k.key_hash}', '${(k.name||'Key').replace(/'/g,"'")}', '${k.expires_at}'); document.getElementById('expiry-banner').classList.add('hidden');">
+          🔑 ${k.name || 'Unnamed'} · <strong>${label}</strong> — Click to renew
+        </span>`;
+      }).join('');
+      banner.classList.remove('hidden');
+    }
+
+    // ---- Renewal Modal ----
+    function openRenewModal(hash, name, expiresAt) {
+      _renewTarget = { hash, name, expiresAt };
+      _selectedRenewDays = 30;
+      document.getElementById('modal-key-name').textContent = '🔑 ' + name;
+      const expLabel = expiresAt
+        ? `Current expiry: ${new Date(expiresAt).toLocaleDateString('en-US', {month:'long',day:'numeric',year:'numeric'})}`
+        : 'Currently: Never expires';
+      document.getElementById('modal-key-meta').textContent = expLabel;
+      document.querySelectorAll('.duration-btn').forEach(btn => {
+        btn.classList.toggle('selected', parseInt(btn.dataset.days) === 30);
+      });
+      document.getElementById('renew-result').style.display = 'none';
+      document.getElementById('btn-do-renew').disabled = false;
+      document.getElementById('btn-do-renew').textContent = '🔄 Renew Key';
+      document.getElementById('renew-modal').classList.remove('hidden');
+    }
+
+    function closeRenewModal() {
+      document.getElementById('renew-modal').classList.add('hidden');
+      _renewTarget = null;
+    }
+
+    function selectDuration(btn) {
+      document.querySelectorAll('.duration-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      _selectedRenewDays = parseInt(btn.dataset.days);
+    }
+
+    async function doRenewKey() {
+      if (!_renewTarget) return;
+      const btn = document.getElementById('btn-do-renew');
+      const resultDiv = document.getElementById('renew-result');
+      btn.disabled = true;
+      btn.textContent = '⏳ Renewing...';
+
+      try {
+        const res = await fetch(`${API_BASE}/security/keys/${_renewTarget.hash}/renew`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ extend_days: _selectedRenewDays })
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+          const newExpiry = new Date(data.new_expires_at || Date.now() + _selectedRenewDays * 86400000);
+          resultDiv.style.cssText = 'display:block;padding:10px 14px;border-radius:8px;font-size:12px;font-family:"JetBrains Mono",monospace;margin-bottom:16px;background:rgba(34,197,94,0.12);color:var(--accent-green);border:1px solid rgba(34,197,94,0.2)';
+          resultDiv.textContent = `✅ Renewed! New expiry: ${newExpiry.toLocaleDateString('en-US', {month:'long',day:'numeric',year:'numeric'})}`;
+          btn.textContent = '✅ Done';
+          setTimeout(() => {
+            closeRenewModal();
+            loadApiKeys();
+          }, 1800);
+        } else {
+          // Graceful fallback: simulate renewal if backend doesn't support it yet
+          const simExpiry = new Date(Date.now() + _selectedRenewDays * 86400000);
+          resultDiv.style.cssText = 'display:block;padding:10px 14px;border-radius:8px;font-size:12px;font-family:"JetBrains Mono",monospace;margin-bottom:16px;background:rgba(249,115,22,0.12);color:var(--accent-orange);border:1px solid rgba(249,115,22,0.2)';
+          resultDiv.textContent = `⚠️ ${data.error || 'Renew endpoint not yet implemented — use revoke + regenerate for now.'}`;
+          btn.textContent = '🔄 Renew Key';
+          btn.disabled = false;
+        }
+      } catch (e) {
+        resultDiv.style.cssText = 'display:block;padding:10px 14px;border-radius:8px;font-size:12px;font-family:"JetBrains Mono",monospace;margin-bottom:16px;background:rgba(239,68,68,0.12);color:var(--accent-red);border:1px solid rgba(239,68,68,0.2)';
+        resultDiv.textContent = `❌ Error: ${e.message}`;
+        btn.textContent = '🔄 Renew Key';
+        btn.disabled = false;
+      }
+    }
+
+    // Close modal on overlay click
+    document.getElementById('renew-modal').addEventListener('click', function(e) {
+      if (e.target === this) closeRenewModal();
+    });
 
     async function createApiKey() {
       const name = document.getElementById('new-key-name').value || 'New Key';
