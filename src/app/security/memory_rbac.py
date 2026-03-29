@@ -357,47 +357,6 @@ class MemoryRBAC:
         self._api_keys.pop(key_hash, None)
         return {"status": "revoked", "key_hash": key_hash[:16] + "..."}
 
-    def renew_api_key(self, key_hash: str, extend_days: int = 30) -> Dict[str, Any]:
-        """Renew (extend) an API key's expiration.
-
-        Args:
-            key_hash: The hash of the key to renew.
-            extend_days: Number of days to extend from now (1-3650).
-
-        Returns:
-            Dict with new_expires_at or error.
-        """
-        from datetime import timedelta
-
-        if extend_days < 1 or extend_days > 3650:
-            return {"error": "extend_days must be between 1 and 3650"}
-
-        now = datetime.now(timezone.utc)
-        new_expires = (now + timedelta(days=extend_days)).isoformat()
-
-        with self._driver.session() as session:
-            result = session.run("""
-                MATCH (k:ApiKey {key_hash: $hash, active: true})
-                SET k.expires_at = $new_exp,
-                    k.renewed_at = $now
-                RETURN k.name AS name, k.expires_at AS expires_at
-            """, hash=key_hash, new_exp=new_expires, now=now.isoformat()).single()
-
-        if not result:
-            return {"error": "Key not found or already revoked"}
-
-        # Update in-memory cache
-        if key_hash in self._api_keys:
-            self._api_keys[key_hash]["expires_at"] = new_expires
-
-        logger.info(f"API key '{result['name']}' renewed: expires {new_expires}")
-        return {
-            "status": "renewed",
-            "name": result["name"],
-            "new_expires_at": new_expires,
-            "extended_days": extend_days,
-        }
-
     def list_api_keys(self, owner_id: str = None) -> List[Dict[str, Any]]:
         """List API keys (without showing the actual key)."""
         owner_filter = "AND k.owner_id = $owner" if owner_id else ""

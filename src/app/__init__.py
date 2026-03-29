@@ -153,29 +153,6 @@ def create_app(config_class=Config):
     from .api.graphs import graphs_bp
     app.register_blueprint(graphs_bp)
 
-    # Orchestration Blackboard API (Phase 3)
-    from .api.orchestration import orchestration_bp
-    app.register_blueprint(orchestration_bp, url_prefix='/api/orchestration')
-
-    # Initialize shared OrchestrationStorage singleton (Fix: avoid per-request driver creation)
-    try:
-        from .storage.orchestration_storage import OrchestrationStorage
-        orch_storage = OrchestrationStorage()
-        app.extensions['orchestration_storage'] = orch_storage
-        if should_log_startup:
-            logger.info("OrchestrationStorage singleton initialized (shared driver)")
-
-        import atexit
-        def _close_orch_storage():
-            try:
-                orch_storage.close()
-            except Exception:
-                pass
-        atexit.register(_close_orch_storage)
-    except Exception as e:
-        logger.warning("OrchestrationStorage init failed (non-critical): %s", e)
-        app.extensions['orchestration_storage'] = None
-
     # Settings API (Runtime LLM/Embedding configuration)
     from .api.settings import settings_bp
     app.register_blueprint(settings_bp)
@@ -212,10 +189,6 @@ def create_app(config_class=Config):
         @app.route('/memory/synaptic')
         def serve_synaptic():
             return send_from_directory(os.path.abspath(dashboard_dir), 'synaptic.html')
-
-        @app.route('/orchestration')
-        def serve_orchestration():
-            return send_from_directory(os.path.abspath(dashboard_dir), 'orchestration.html')
 
         @app.route('/api-docs')
         @app.route('/api-explorer')

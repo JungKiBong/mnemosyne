@@ -539,13 +539,9 @@ const API_REGISTRY = {
   ],
 
   "Data Ingestion": [
-    { id:"ingest_post", method:"POST", path:"/api/ingest", name:"Ingest (NER)", desc:"텍스트/문서를 기존 NER 파이프라인으로 인제스트합니다.",
+    { id:"ingest_post", method:"POST", path:"/api/ingest", name:"Ingest Text", desc:"텍스트/문서를 지식 그래프에 인제스트합니다.",
       body: '{"content":"분석할 텍스트...","source":"manual","graph_id":"project-1"}' },
-    { id:"ingest_hybrid", method:"POST", path:"/api/ingest/hybrid", name:"Hybrid Ingest (2-Phase)", desc:"2-Phase 하이브리드 파이프라인: Phase 1 구조 추출 → Phase 2 LLM 의미 보강. 핑거프린트 기반 증분 업데이트 지원.",
-      body: '{"graph_id":"project-1","source_ref":"/path/to/file.pdf","incremental":true,"enrich":true,"also_run_ner":true}' },
     { id:"ingest_batch", method:"POST", path:"/api/ingest/batch", name:"Batch Ingest", desc:"여러 문서를 일괄 인제스트합니다." },
-    { id:"ingest_fingerprints", method:"GET", path:"/api/ingest/fingerprints", name:"List Fingerprints", desc:"저장된 콘텐츠 핑거프린트 목록을 조회합니다. 증분 업데이트 추적용." },
-    { id:"ingest_fingerprint_del", method:"DELETE", path:"/api/ingest/fingerprint", name:"Delete Fingerprint", desc:"특정 소스의 핑거프린트를 삭제하여 전체 재처리를 강제합니다. ?source_ref=..." },
     { id:"ingest_streams", method:"GET", path:"/api/ingest/streams", name:"List Streams", desc:"활성 스트리밍 인제스트 목록을 조회합니다." },
   ],
 
@@ -599,10 +595,6 @@ const API_REGISTRY = {
       params:[{name:"api_key",type:"string",required:true,desc:"검증할 API 키 원문"}] },
     { id:"sec_keys_revoke", method:"DELETE", path:"/api/security/keys/{key_hash}", name:"Revoke API Key", desc:"API 키를 해시로 즉시 폐기합니다.",
       params:[{name:"key_hash",type:"string",required:true,desc:"키 SHA-256 해시"}] },
-    { id:"sec_keys_renew", method:"POST", path:"/api/security/keys/{key_hash}/renew", name:"Renew API Key", desc:"만료된 또는 만료 임박한 API 키의 유효기간을 연장합니다. 현재 시점부터 extend_days만큼 새로운 만료일을 설정합니다.",
-      body: '{"extend_days":30}',
-      params:[{name:"key_hash",type:"string",required:true,desc:"키 SHA-256 해시"},{name:"extend_days",type:"int",required:false,desc:"연장 기간 (일, 기본:30, 범위:1-3650)"}] },
-    { id:"sec_rate_limit_stats", method:"GET", path:"/api/security/rate-limit-stats", name:"Rate Limit Stats", desc:"모든 활성 API 키의 Rate Limit 설정값, 누적 사용량, 만료까지 남은 일수를 집계합니다. 실시간 대시보드 시각화에 사용됩니다." },
     { id:"sec_encrypt", method:"POST", path:"/api/security/encrypt", name:"Encrypt Memory", desc:"특정 기억을 필드 레벨에서 암호화합니다.",
       body: '{"uuid":"memory-uuid","fields":null,"encrypted_by":"admin"}' },
     { id:"sec_decrypt", method:"POST", path:"/api/security/decrypt", name:"Decrypt Memory", desc:"암호화된 기억을 복호화하여 반환합니다 (DB 미변경).",

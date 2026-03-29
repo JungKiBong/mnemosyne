@@ -7,8 +7,6 @@ from .graph_builder import GraphBuilderService
 from .text_processor import TextProcessor
 from .entity_reader import EntityReader, EntityNode, FilteredEntities
 from .oasis_profile_generator import OasisProfileGenerator, OasisAgentProfile
-from .structural_extractor import StructuralExtractor, StructuralSkeleton
-from .semantic_enricher import SemanticEnricher
 from .simulation_manager import SimulationManager, SimulationState, SimulationStatus
 from .simulation_config_generator import (
     SimulationConfigGenerator,
@@ -48,9 +46,6 @@ __all__ = [
     'FilteredEntities',
     'OasisProfileGenerator',
     'OasisAgentProfile',
-    'StructuralExtractor',
-    'StructuralSkeleton',
-    'SemanticEnricher',
     'SimulationManager',
     'SimulationState',
     'SimulationStatus',
@@ -75,4 +70,3 @@ __all__ = [
     'CommandType',
     'CommandStatus',
 ]
-

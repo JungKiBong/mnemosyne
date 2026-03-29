@@ -4,7 +4,6 @@ Observer Agent - Extract cognitive memory from agent activity logs.
 import logging
 import threading
 import json
-import traceback
 from enum import Enum
 from typing import Dict, Any, List, Optional
 from queue import Queue, Empty
@@ -12,7 +11,6 @@ from queue import Queue, Empty
 from ..utils.llm_client import LLMClient
 from ..storage.hybrid_storage import HybridStorage
 from .graph_memory_updater import AgentActivity
-from .orchestrator_service import OrchestratorService
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +25,6 @@ class ObserverAgent:
     """
     Sub-agent that monitors simulation activities and extracts cognitive memories.
     Results are saved to Supermemory via HybridStorage.
-    Uses OrchestratorService to formally log operations on the Neo4j Blackboard.
     """
 
     def __init__(self,
@@ -35,11 +32,10 @@ class ObserverAgent:
                  llm_client: LLMClient,
                  storage: HybridStorage,
                  graph_id: str,
-                 batch_size: int = 5,
-                 orchestrator_svc: Optional['OrchestratorService'] = None):
+                 batch_size: int = 5):
         self.observer_type = observer_type
         self.llm_client = llm_client
-        self.storage = storage
+        self.storage = storage  # Must be HybridStorage for SM access
         self.graph_id = graph_id
         self.batch_size = batch_size
 
@@ -47,11 +43,7 @@ class ObserverAgent:
         self._running = False
         self._thread: Optional[threading.Thread] = None
 
-        # Shared with ObserverOrchestrator (no extra driver created)
-        self.session_id: Optional[str] = None
-        self.orchestrator_svc = orchestrator_svc
-
-        logger.info("Initialized ObserverAgent: %s for %s", self.observer_type.value, graph_id)
+        logger.info(f"Initialized ObserverAgent: {self.observer_type.value} for {graph_id}")
 
     def start(self):
         if self._running:
@@ -105,29 +97,7 @@ class ObserverAgent:
             
         logs_text = "\n".join(log_lines)
         
-        task_assigned = False
-        task_id = None
-        
-        # 1. Blackboard Register Task
-        try:
-            if self.session_id and self.orchestrator_svc:
-                task_id = self.orchestrator_svc.queue_task(
-                    graph_id=self.graph_id,
-                    session_id=self.session_id,
-                    name=f"Extract Insights ({self.observer_type.value.capitalize()})",
-                    description=logs_text,
-                    context_uuids=[]
-                )
-                self.orchestrator_svc.mark_task_in_progress(
-                    graph_id=self.graph_id,
-                    task_id=task_id,
-                    agent_id=f"Observer_{self.observer_type.value}"
-                )
-                task_assigned = True
-        except Exception as e:
-            logger.warning("Failed to queue task on blackboard: %s", e)
-        
-        # 2. Execution logic
+        # Determine prompt based on observer type
         system_prompt = self._get_system_prompt()
         user_prompt = f"Activity Logs:\n{logs_text}\n\nExtract insights based on your role. Return a JSON array."
         
@@ -162,26 +132,8 @@ class ObserverAgent:
                         )
                         logger.debug(f"Observer ({self.observer_type.value}) extracted for {agent_name}: {text_insight}")
 
-            # 3. Blackboard Mark Complete
-            if task_assigned and task_id:
-                self.orchestrator_svc.complete_task(
-                    graph_id=self.graph_id,
-                    task_id=task_id,
-                    message=f"Extracted {len(insights)} insights."
-                )
-
         except Exception as e:
             logger.error(f"Failed to process batch in Observer ({self.observer_type.value}): {e}")
-            tb = traceback.format_exc()
-            
-            # 3b. Blackboard Mark Error
-            if task_assigned and task_id:
-                self.orchestrator_svc.block_task_with_error(
-                    graph_id=self.graph_id,
-                    task_id=task_id,
-                    error_msg=str(e),
-                    traceback_text=tb
-                )
 
     def _get_system_prompt(self) -> str:
         base = (
@@ -209,4 +161,3 @@ class ObserverAgent:
             )
         
         return base
-

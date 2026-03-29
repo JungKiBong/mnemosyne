@@ -46,18 +46,13 @@ class MemoryPipeline:
         entities: List[Dict[str, Any]] = None,
         metadata: Dict[str, Any] = None,
         auto_promote: bool = True,
-        incremental: bool = False,
     ) -> Dict[str, Any]:
         """
         Process ingestion output through memory pipeline.
 
-        1. (Optional) Fingerprint check for incremental mode
-        2. Chunk text → STM items
-        3. Evaluate salience (rule-based, with node type awareness)
-        4. Auto-promote high-salience items
-
-        Args:
-            incremental: If True, check fingerprint first and skip unchanged content
+        1. Chunk text → STM items
+        2. Evaluate salience (rule-based)
+        3. Auto-promote high-salience items
         """
         result = {
             "source": source_ref,
@@ -67,29 +62,7 @@ class MemoryPipeline:
             "discarded": 0,
             "duplicates_skipped": 0,
             "items": [],
-            "incremental_status": "disabled",
         }
-
-        # ── Incremental check ──
-        if incremental and text:
-            fp_manager = None
-            try:
-                from ..utils.fingerprint import ContentFingerprint
-                # Reuse MemoryManager's existing Neo4j driver (DEF-H02 fix)
-                fp_manager = ContentFingerprint(neo4j_driver=self._manager._driver)
-                content_hash = ContentFingerprint.hash_text(text)
-                diff = fp_manager.compare(source_ref, content_hash, {})
-                result["incremental_status"] = diff.summary()
-
-                if diff.is_unchanged:
-                    logger.info("MemoryPipeline: source unchanged, skipping: %s", source_ref)
-                    return result
-
-                # Save new fingerprint
-                fp_manager.save(source_ref, content_hash, {})
-            except Exception as e:
-                logger.warning("Fingerprint check failed (continuing): %s", e)
-                result["incremental_status"] = f"error: {e}"
 
         # Determine scope from source type
         scope = self._infer_scope(source_ref, metadata or {})
@@ -275,8 +248,10 @@ class MemoryPipeline:
         return chunks[:50]  # cap
 
     def _set_scope(self, uuid: str, scope: str):
-        """Set scope on a promoted LTM entity using the shared driver."""
-        with self._manager._driver.session() as session:
+        from neo4j import GraphDatabase
+        from ..config import Config
+        driver = GraphDatabase.driver(Config.NEO4J_URI, auth=(Config.NEO4J_USER, Config.NEO4J_PASSWORD))
+        with driver.session() as session:
             session.run("MATCH (e:Entity {uuid: $uuid}) SET e.scope = $scope",
                        uuid=uuid, scope=scope)
-
+        driver.close()
