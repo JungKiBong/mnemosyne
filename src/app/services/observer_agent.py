@@ -35,22 +35,23 @@ class ObserverAgent:
                  llm_client: LLMClient,
                  storage: HybridStorage,
                  graph_id: str,
-                 batch_size: int = 5):
+                 batch_size: int = 5,
+                 orchestrator_svc: Optional['OrchestratorService'] = None):
         self.observer_type = observer_type
         self.llm_client = llm_client
-        self.storage = storage  # Must be HybridStorage for SM access
+        self.storage = storage
         self.graph_id = graph_id
         self.batch_size = batch_size
 
         self._queue: Queue = Queue()
         self._running = False
         self._thread: Optional[threading.Thread] = None
-        
-        # Will be set by Orchestrator
-        self.session_id: Optional[str] = None
-        self.orchestrator_svc = OrchestratorService()
 
-        logger.info(f"Initialized ObserverAgent: {self.observer_type.value} for {graph_id}")
+        # Shared with ObserverOrchestrator (no extra driver created)
+        self.session_id: Optional[str] = None
+        self.orchestrator_svc = orchestrator_svc
+
+        logger.info("Initialized ObserverAgent: %s for %s", self.observer_type.value, graph_id)
 
     def start(self):
         if self._running:
@@ -109,7 +110,7 @@ class ObserverAgent:
         
         # 1. Blackboard Register Task
         try:
-            if self.session_id:
+            if self.session_id and self.orchestrator_svc:
                 task_id = self.orchestrator_svc.queue_task(
                     graph_id=self.graph_id,
                     session_id=self.session_id,
@@ -118,8 +119,8 @@ class ObserverAgent:
                     context_uuids=[]
                 )
                 self.orchestrator_svc.mark_task_in_progress(
-                    graph_id=self.graph_id, 
-                    task_id=task_id, 
+                    graph_id=self.graph_id,
+                    task_id=task_id,
                     agent_id=f"Observer_{self.observer_type.value}"
                 )
                 task_assigned = True
