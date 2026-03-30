@@ -210,7 +210,7 @@ a { color: var(--accent); text-decoration: none; }
 
     <div class="stats-bar">
       <div class="stat-item"><div class="stat-dot" style="background:var(--green)"></div> <span id="statEndpoints">0</span> endpoints</div>
-      <div class="stat-item"><div class="stat-dot" style="background:var(--cyan)"></div> <span id="statMcp">4</span> MCP tools</div>
+      <div class="stat-item"><div class="stat-dot" style="background:var(--cyan)"></div> <span id="statMcp">8</span> MCP tools</div>
     </div>
   </aside>
 
@@ -333,26 +333,53 @@ a { color: var(--accent); text-decoration: none; }
           <span class="method-badge method-POST">MCP</span>
           <h2>MCP Tools for Agents</h2>
         </div>
-        <div class="ep-desc">
+      <div class="ep-desc">
           MCP (Model Context Protocol) 도구는 AI 에이전트가 Mories의 기억을 직접 조작할 수 있게 해주는 JSON-RPC 인터페이스입니다.<br>
-          <strong>엔드포인트:</strong> <code>POST /api/mcp</code> | 프로토콜: JSON-RPC 2.0
+          <strong>엔드포인트:</strong> <code>POST /api/mcp</code> | 프로토콜: JSON-RPC 2.0 | <strong>버전:</strong> <code>v0.7.0</code> (8개 도구)
+          <div style="margin-top:10px;padding:10px 14px;background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.2);border-radius:8px;font-size:12px;color:var(--text-dim)">
+            🏗️ <strong>Phase 4 아키텍처</strong>: Mories=기억 저장·검색, n8n=오케스트레이션 — <a href="/guide#7-n8n" style="color:var(--cyan)">n8n 워크플로우 연동 가이드 →</a>
+          </div>
         </div>
       </div>
 
       <div class="mcp-section">
-        <h3>🔧 Available MCP Tools</h3>
+        <h3>🔧 Available MCP Tools <span style="font-family:var(--mono);font-size:11px;font-weight:400;color:var(--text-muted);background:var(--bg-surface);padding:2px 8px;border-radius:4px;margin-left:6px;">v0.7.0 · 8 tools</span></h3>
 
         <div class="mcp-tool">
           <h4>mories_search</h4>
-          <p>지식 그래프에서 벡터 유사도 + 키워드 기반으로 기억을 검색합니다. 검색된 기억은 자동으로 Retrieval Boost됩니다.</p>
+          <p>지식 그래프에서 Compact Index 형식으로 기억을 검색합니다 (Layer 1 — 토큰 효율 최적화). <code>status</code> 필터로 작업 상태 기반 검색도 지원합니다.</p>
           <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">
-            <strong>Params:</strong> query (string), graph_id (string), limit (int, default: 10)
+            <strong>Params:</strong> query (string, required), graph_id (string), limit (int, default:10), status (string: pending|in_progress|completed|blocked)
+          </div>
+        </div>
+
+        <div class="mcp-tool">
+          <h4>mories_detail</h4>
+          <p>특정 UUID 노드의 전체 상세 정보를 조회합니다 (Layer 3 — Full Content). 관계(Relations), 이웃 노드 포함.</p>
+          <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">
+            <strong>Params:</strong> uuid (string, required), include_relations (bool, default:true)
+          </div>
+        </div>
+
+        <div class="mcp-tool">
+          <h4>mories_timeline</h4>
+          <p>특정 기억의 시간순 이웃 노드를 탐색합니다 (Layer 2 — Temporal Context). 맥락 재구성에 사용합니다.</p>
+          <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">
+            <strong>Params:</strong> uuid (string, required), direction (before|after|both, default:both), limit (int, default:5)
+          </div>
+        </div>
+
+        <div class="mcp-tool">
+          <h4>mories_update_status ✨ New</h4>
+          <p>기억/태스크 노드의 상태를 업데이트합니다 (경량 Whiteboard). 삭제된 Orchestration Blackboard를 대체하는 Phase 4-1 도구입니다.</p>
+          <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">
+            <strong>Params:</strong> uuid (string, required), status (pending|in_progress|completed|blocked), priority (int, 1=최우선), assigned_to (string)
           </div>
         </div>
 
         <div class="mcp-tool">
           <h4>mories_ingest</h4>
-          <p>텍스트/문서를 지식 그래프에 인제스트합니다. 엔티티 추출 → 관계 구축 → STM 승격 파이프라인을 자동 실행합니다.</p>
+          <p>텍스트/문서를 지식 그래프에 인제스트합니다. 엔티티 추출 → 관계 구축 → STM 승격 → <strong>Task-Memory Alignment</strong>(RELATES_TO_TASK 자동 생성) 파이프라인을 자동 실행합니다.</p>
           <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">
             <strong>Params:</strong> content (string), source (string), graph_id (string), auto_relate (bool)
           </div>
@@ -398,14 +425,15 @@ a { color: var(--accent); text-decoration: none; }
             </div>
             <div class="try-row">
               <label>JSON-RPC Body</label>
-              <textarea id="mcpBody" style="min-height:160px">{
+              <textarea id="mcpBody" style="min-height:200px">{
   "jsonrpc": "2.0",
   "id": 1,
   "method": "tools/call",
   "params": {
     "name": "mories_search",
     "arguments": {
-      "query": "TurboQuant quantization",
+      "query": "Phase 4 orchestration",
+      "status": "in_progress",
       "limit": 5
     }
   }
