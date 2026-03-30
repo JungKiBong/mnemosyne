@@ -64,6 +64,43 @@ def _rate_check():
     _call_timestamps.append(now)
 
 
+def _neo4j_val_to_json(val):
+    """Recursively convert Neo4j-specific types to JSON-serializable Python types.
+
+    Handles:
+      - neo4j.time.DateTime / Date / Time / Duration  → ISO-8601 str
+      - neo4j.spatial.Point                           → {"x":...,"y":...,"z":...}
+      - Neo4j Node / Relationship                     → dict of properties
+      - lists / dicts                                 → recursively processed
+      - Everything else                               → unchanged
+    """
+    # Neo4j temporal types: DateTime, Date, Time, LocalDateTime, LocalTime, Duration
+    type_name = type(val).__name__
+    if type_name in ("DateTime", "Date", "Time", "LocalDateTime", "LocalTime"):
+        return str(val)  # ISO-8601 representation
+    if type_name == "Duration":
+        return str(val)
+    # Neo4j Point spatial type
+    if type_name == "Point":
+        try:
+            d = {"x": val.x, "y": val.y}
+            if hasattr(val, "z") and val.z is not None:
+                d["z"] = val.z
+            return d
+        except Exception:
+            return str(val)
+    # Neo4j Node or Relationship — has .items()
+    if hasattr(val, "items"):
+        return {k: _neo4j_val_to_json(v) for k, v in val.items()}
+    # dict
+    if isinstance(val, dict):
+        return {k: _neo4j_val_to_json(v) for k, v in val.items()}
+    # list / tuple / other iterables (but not strings)
+    if isinstance(val, (list, tuple)) and not isinstance(val, str):
+        return [_neo4j_val_to_json(v) for v in val]
+    return val
+
+
 # ---------------------------------------------------------------------------
 #  Type icons for Semantic Compression
 # ---------------------------------------------------------------------------
@@ -693,16 +730,7 @@ def mories_graph_query(
             columns = result.keys()
             rows = []
             for record in result:
-                row = {}
-                for col in columns:
-                    val = record[col]
-                    # Convert Neo4j node/relationship to dict
-                    if hasattr(val, "items"):
-                        row[col] = dict(val.items())
-                    elif hasattr(val, "__iter__") and not isinstance(val, str):
-                        row[col] = list(val)
-                    else:
-                        row[col] = val
+                row = {col: _neo4j_val_to_json(record[col]) for col in columns}
                 rows.append(row)
 
             return {
