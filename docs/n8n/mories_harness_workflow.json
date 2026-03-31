@@ -1,0 +1,191 @@
+{
+  "name": "Mories Harness Orchestration",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mories-events",
+        "options": {}
+      },
+      "id": "e0b5711b-74a9-49dd-9bba-186e8cb50bc1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [ 250, 300 ],
+      "webhookId": "mories-events"
+    },
+    {
+      "parameters": {
+        "action": "hmac",
+        "type": "SHA256",
+        "value": "={{JSON.stringify($json.body)}}",
+        "dataPropertyName": "generated_signature",
+        "secret": "my-development-secret"
+      },
+      "id": "e0c8bdf9-cc85-4554-b63e-eaebb5ad1e32",
+      "name": "Crypto (Verify Signature)",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [ 460, 300 ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$node[\"Webhook\"].json[\"headers\"][\"x-mories-signature\"]}}",
+              "value2": "={{$json[\"generated_signature\"]}}"
+            }
+          ]
+        }
+      },
+      "id": "7dc11c0f-cf8a-4933-bf9c-29b0be9cf4fd",
+      "name": "Signature Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [ 680, 300 ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "rules": [
+            {
+              "intent": "memory.promoted",
+              "conditions": {
+                "all": [
+                  { "conditions": [ { "value1": "={{$node[\"Webhook\"].json[\"body\"][\"event\"]}}", "value2": "memory.promoted" } ] }
+                ]
+              },
+              "outputKey": "memory.promoted"
+            },
+            {
+              "intent": "memory.decayed",
+              "conditions": {
+                "all": [
+                  { "conditions": [ { "value1": "={{$node[\"Webhook\"].json[\"body\"][\"event\"]}}", "value2": "memory.decayed" } ] }
+                ]
+              },
+              "outputKey": "memory.decayed"
+            },
+            {
+              "intent": "batch_completed",
+              "conditions": {
+                "all": [
+                  { "conditions": [ { "value1": "={{$node[\"Webhook\"].json[\"body\"][\"event\"]}}", "value2": "batch_completed" } ] }
+                ]
+              },
+              "outputKey": "batch_completed"
+            }
+          ]
+        },
+        "fallbackOutput": 3
+      },
+      "id": "e51921f6-ed50-4ba2-8f9f-cfd7af339c9b",
+      "name": "Event Router",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [ 900, 200 ]
+    },
+    {
+      "parameters": {
+        "url": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "text", "value": "=[Mories] Memory Promoted!\nLTM UUID: {{$node[\"Webhook\"].json[\"body\"][\"payload\"][\"ltm_uuid\"]}}\nSalience: {{$node[\"Webhook\"].json[\"body\"][\"payload\"][\"salience\"]}}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "slack-promoted-node",
+      "name": "Alert: Promoted",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [ 1160, 50 ]
+    },
+    {
+      "parameters": {
+        "url": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "text", "value": "=[Mories] Memory Decayed!\nRemoved: {{$node[\"Webhook\"].json[\"body\"][\"payload\"][\"removed_count\"]}}\nWeakened: {{$node[\"Webhook\"].json[\"body\"][\"payload\"][\"weakened_count\"]}}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "slack-decayed-node",
+      "name": "Alert: Decayed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [ 1160, 200 ]
+    },
+    {
+      "parameters": {
+        "url": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "text", "value": "=[Mories] Invalid Signature Detected! Unauthorized webhook event dropped." }
+          ]
+        },
+        "options": {}
+      },
+      "id": "invalid-signature",
+      "name": "Alert: Invalid Signature",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [ 900, 400 ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [ { "node": "Crypto (Verify Signature)", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Crypto (Verify Signature)": {
+      "main": [
+        [ { "node": "Signature Valid?", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Signature Valid?": {
+      "main": [
+        [ { "node": "Event Router", "type": "main", "index": 0 } ],
+        [ { "node": "Alert: Invalid Signature", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Event Router": {
+      "main": [
+        [ { "node": "Alert: Promoted", "type": "main", "index": 0 } ],
+        [ { "node": "Alert: Decayed", "type": "main", "index": 0 } ]
+      ]
+    }
+  },
+  "settings": {
+    "timezone": "Asia/Seoul",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all"
+  }
+}
