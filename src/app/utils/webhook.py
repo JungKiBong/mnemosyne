@@ -145,6 +145,20 @@ class WebhookPublisher:
             'relations_added': relations_added,
         })
 
+    def batch_started(self, job_id: str, source_count: int) -> None:
+        self.publish('batch.started', {
+            'job_id': job_id,
+            'source_count': source_count,
+        })
+
+    def batch_completed(self, job_id: str, success_count: int,
+                        fail_count: int) -> None:
+        self.publish('batch.completed', {
+            'job_id': job_id,
+            'success_count': success_count,
+            'fail_count': fail_count,
+        })
+
     def health_degraded(self, component: str, detail: str) -> None:
         self.publish('health.degraded', {
             'component': component,

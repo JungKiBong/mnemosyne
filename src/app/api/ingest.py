@@ -93,6 +93,63 @@ def ingest_batch():
     return jsonify({"results": results}), 200
 
 
+def _get_task_manager():
+    """Lazy-init Background IngestionTaskManager."""
+    svc = _get_ingestion_service()
+    if svc is None:
+        return None
+    from app.services.ingestion_task_manager import IngestionTaskManager
+    return IngestionTaskManager.get_instance(svc)
+
+
+@ingest_bp.route('/batch/async', methods=['POST'])
+def ingest_batch_async():
+    """
+    Asynchronous batch ingestion from multiple sources.
+
+    Request JSON:
+    {
+        "graph_id": "my_graph",
+        "source_refs": ["/path/a.csv", "/path/b.json"],
+        "options": {}
+    }
+    """
+    data = request.get_json(silent=True) or {}
+    graph_id = data.get('graph_id')
+    source_refs = data.get('source_refs', [])
+
+    if not graph_id or not source_refs:
+        return jsonify({"error": "graph_id and source_refs[] are required"}), 400
+
+    mgr = _get_task_manager()
+    if mgr is None:
+        return jsonify({"error": "Storage backend not initialized"}), 503
+
+    options = data.get('options', {})
+    job_id = mgr.submit_batch(graph_id, source_refs, options)
+    
+    return jsonify({
+        "job_id": job_id,
+        "status": "queued"
+    }), 202
+
+
+@ingest_bp.route('/batch/status/<job_id>', methods=['GET'])
+def get_batch_status(job_id):
+    """
+    Get the status of an asynchronous batch job.
+    """
+    mgr = _get_task_manager()
+    if mgr is None:
+        return jsonify({"error": "Storage backend not initialized"}), 503
+
+    status = mgr.get_status(job_id)
+    if status.get("error"):
+        return jsonify(status), 404
+        
+    return jsonify(status), 200
+
+
 @ingest_bp.route('/stream', methods=['POST'])
 def start_stream():
     """
