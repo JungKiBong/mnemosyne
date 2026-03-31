@@ -7,6 +7,7 @@ Supports Ollama num_ctx parameter to prevent prompt truncation
 import json
 import os
 import re
+import threading
 from typing import Optional, Dict, Any, List
 from openai import OpenAI
 
@@ -15,6 +16,9 @@ from ..config import Config
 
 class LLMClient:
     """LLM Client"""
+
+    _clients: Dict[str, OpenAI] = {}
+    _lock = threading.Lock()
 
     def __init__(
         self,
@@ -30,11 +34,16 @@ class LLMClient:
         if not self.api_key:
             raise ValueError("LLM_API_KEY not configured")
 
-        self.client = OpenAI(
-            api_key=self.api_key,
-            base_url=self.base_url,
-            timeout=timeout,
-        )
+        client_key = f"{self.base_url}_{self.api_key}_{timeout}"
+        
+        with self._lock:
+            if client_key not in self._clients:
+                self._clients[client_key] = OpenAI(
+                    api_key=self.api_key,
+                    base_url=self.base_url,
+                    timeout=timeout,
+                )
+        self.client = self._clients[client_key]
 
         # Ollama context window size — prevents prompt truncation.
         # Read from env OLLAMA_NUM_CTX, default 8192 (Ollama default is only 2048).
@@ -108,13 +117,34 @@ class LLMClient:
             max_tokens=max_tokens,
             response_format={"type": "json_object"}
         )
-        # Clean markdown code block markers
+        
+        # Robust JSON extraction
         cleaned_response = response.strip()
-        cleaned_response = re.sub(r'^```(?:json)?\s*\n?', '', cleaned_response, flags=re.IGNORECASE)
-        cleaned_response = re.sub(r'\n?```\s*$', '', cleaned_response)
-        cleaned_response = cleaned_response.strip()
+        
+        # 1. Remove optional <think> blocks
+        cleaned_response = re.sub(r'<think>[\s\S]*?</think>', '', cleaned_response).strip()
+        
+        # 2. Try to extract markdown JSON block
+        md_match = re.search(r'```(?:json)?\s+([\s\S]*?)\s+```', cleaned_response, re.IGNORECASE)
+        if md_match:
+            cleaned_response = md_match.group(1).strip()
+        else:
+            # 3. Fallback: find first { or [ and last } or ]
+            start_idx = cleaned_response.find('{')
+            array_start = cleaned_response.find('[')
+            
+            if start_idx != -1 and array_start != -1:
+                start_idx = min(start_idx, array_start)
+            elif start_idx == -1:
+                start_idx = array_start
+                
+            if start_idx != -1:
+                end_char = '}' if cleaned_response[start_idx] == '{' else ']'
+                end_idx = cleaned_response.rfind(end_char)
+                if end_idx != -1 and end_idx > start_idx:
+                    cleaned_response = cleaned_response[start_idx:end_idx+1].strip()
 
         try:
             return json.loads(cleaned_response)
         except json.JSONDecodeError:
-            raise ValueError(f"Invalid JSON format from LLM: {cleaned_response}")
+            raise ValueError(f"Invalid JSON format from LLM: {response}")

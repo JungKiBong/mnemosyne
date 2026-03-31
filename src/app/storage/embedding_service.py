@@ -8,10 +8,12 @@ Supports:
   - Custom:  Any OpenAI-compatible /v1/embeddings endpoint
 """
 
+import copy
 import os
 import time
 import logging
-from typing import List, Optional
+import threading
+from typing import List, Optional, Any
 import requests
 
 from ..config import Config
@@ -21,6 +23,9 @@ logger = logging.getLogger('mirofish.embedding')
 
 class EmbeddingService:
     """Generate embeddings using multiple providers."""
+
+    _local_models: dict[str, Any] = {}
+    _local_models_lock = threading.Lock()
 
     def __init__(
         self,
@@ -43,9 +48,24 @@ class EmbeddingService:
         # Build endpoint URL based on provider
         if self.provider == 'ollama':
             self._embed_url = f"{self.base_url}/api/embed"
+        elif self.provider == 'local':
+            self._embed_url = "local"
         else:
             # OpenAI-compatible: openai, vllm, azure, together, etc.
             self._embed_url = f"{self.base_url}/v1/embeddings"
+            
+        # Load local model securely if provider is local
+        if self.provider == 'local':
+            with self._local_models_lock:
+                if self.model not in self._local_models:
+                    try:
+                        from sentence_transformers import SentenceTransformer
+                        logger.info(f"Loading local embedding model: {self.model}")
+                        self._local_models[self.model] = SentenceTransformer(self.model)
+                    except ImportError:
+                        raise EmbeddingError("sentence-transformers package is required for local embeddings. Run `pip install sentence-transformers`")
+                    except Exception as e:
+                        raise EmbeddingError(f"Failed to load local model {self.model}: {e}")
 
         # API key (needed for non-Ollama providers)
         self._api_key = os.environ.get('EMBEDDING_API_KEY') or os.environ.get('LLM_API_KEY', '')
@@ -120,6 +140,12 @@ class EmbeddingService:
         model_lower = self.model.lower()
         if 'nomic' in model_lower:
             return 768
+        elif 'minilm' in model_lower:
+            return 384
+        elif 'bge-m3' in model_lower:
+            return 1024
+        elif 'bge-large' in model_lower:
+            return 1024
         elif 'text-embedding-3-small' in model_lower:
             return 1536
         elif 'text-embedding-3-large' in model_lower:
@@ -132,8 +158,22 @@ class EmbeddingService:
         """Route to the correct provider implementation."""
         if self.provider == 'ollama':
             return self._request_ollama(texts)
+        elif self.provider == 'local':
+            return self._request_local(texts)
         else:
             return self._request_openai_compat(texts)
+
+    def _request_local(self, texts: List[str]) -> List[List[float]]:
+        """Sentence-Transformers local endpoint."""
+        try:
+            model = self._local_models.get(self.model)
+            if not model:
+                raise EmbeddingError("Local model not loaded")
+                
+            embeddings = model.encode(texts, convert_to_numpy=True)
+            return [vec.tolist() for vec in embeddings]
+        except Exception as e:
+            raise EmbeddingError(f"Local embedding failed: {e}") from e
 
     def _request_ollama(self, texts: List[str]) -> List[List[float]]:
         """Ollama /api/embed endpoint."""
