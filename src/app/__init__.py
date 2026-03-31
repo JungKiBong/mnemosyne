@@ -42,6 +42,10 @@ def create_app(config_class=Config):
     # Enable CORS
     CORS(app, resources={r"/api/*": {"origins": "*"}})
 
+    # Initialize Rate Limiter
+    from .utils.limiter import limiter
+    limiter.init_app(app)
+
     # --- Initialize Storage singleton (DI via app.extensions) ---
     storage_backend = app.config.get('STORAGE_BACKEND', 'neo4j').lower()
     

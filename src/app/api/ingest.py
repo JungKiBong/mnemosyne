@@ -10,6 +10,7 @@ GET /api/ingest/streams  — list active streams
 import os
 import logging
 from flask import Blueprint, request, jsonify, current_app
+from ..utils.limiter import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ def _get_ingestion_service():
 
 
 @ingest_bp.route('', methods=['POST'])
+@limiter.limit("50 per minute")
 def ingest():
     """
     One-shot data ingestion.
@@ -103,6 +105,7 @@ def _get_task_manager():
 
 
 @ingest_bp.route('/batch/async', methods=['POST'])
+@limiter.limit("10 per minute")
 def ingest_batch_async():
     """
     Asynchronous batch ingestion from multiple sources.

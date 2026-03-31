@@ -71,13 +71,13 @@ cd /Users/jungkibong/Projects/tmp/mirofish-supermemory
 git push origin main
 ```
 
-### [TASK-2] n8n 워크플로우 실용화 (1.5h)
+### [TASK-2] n8n 워크플로우 실용화 (1.5h) - ✅ 완료
 - Webhook Publisher(`src/app/utils/webhook.py`)가 발행하는 이벤트를 n8n이 실제 소비
 - 대상 이벤트:
   - `memory.promoted` → n8n → Slack/알림
   - `memory.decayed` → n8n → 주간 리포트
   - `health.degraded` → n8n → 장애 알림
-- 설정: `.env`에서 `WEBHOOK_ENABLED=true`, `WEBHOOK_URL=http://n8n:5678/webhook/...`
+- `docs/n8n/` 에 워크플로우 템플릿과 문서 추가 완료
 
 ### [TASK-3] MCP 서버 패키징 고도화 (2h)
 - `mcp_server/` 디렉터리에 서버 코드 이미 존재
@@ -89,14 +89,13 @@ git push origin main
 - 현재 `scope` 필드(`personal`, `tribal`, `social`, `global`)만 있음
 - `tenant_id` 포함 Neo4j 쿼리 레이어 추가 필요
 
-### [TASK-5] 배치 인제스천 API (2h)
-- `POST /api/ingest/batch` — CSV, JSON, YAML 다건 동시 처리
-- 어댑터는 이미 준비됨 (`src/app/adapters/structured_adapters.py`)
-- REST API 라우트 + 비동기 처리 로직 추가 필요
+### [TASK-5] 배치 인제스천 API (2h) - ✅ 완료
+- `POST /api/ingest/batch/async` — 비동기 멀티스레드 기반 배치 처리 구현
+- Background Worker (ThreadPoolExecutor) 및 n8n Webhook 연동 완료
 
-### [TASK-6] 보안 강화 (2h)
-- Rate Limiting (flask-limiter 또는 미들웨어)
-- CORS 프로덕션 설정
+### [TASK-6] 보안 강화 (2h) - ✅ 완료
+- Rate Limiting (Flask-Limiter) 도입 완료 (`/api/ingest` 계열에 리미트 적용)
+- CORS 프로덕션 등 추가 점검 필요
 - API Key 자동 회전 UI (`src/app/security/memory_encryption.py` 참조)
 
 ---
