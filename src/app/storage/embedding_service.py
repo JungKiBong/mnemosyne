@@ -11,6 +11,7 @@ Supports:
 import os
 import time
 import logging
+import threading
 from typing import List, Optional
 import requests
 
@@ -50,8 +51,9 @@ class EmbeddingService:
         # API key (needed for non-Ollama providers)
         self._api_key = os.environ.get('EMBEDDING_API_KEY') or os.environ.get('LLM_API_KEY', '')
 
-        # In-memory cache
+        # In-memory cache with thread-safety lock
         self._cache: dict[str, List[float]] = {}
+        self._cache_lock = threading.Lock()
         self._cache_max_size = 2000
 
     def _detect_provider(self) -> str:
@@ -61,10 +63,8 @@ class EmbeddingService:
             return 'ollama'
         elif 'openai.com' in url:
             return 'openai'
-        elif 'anthropic' in url:
-            return 'openai'  # Use OpenAI-compatible endpoint
         else:
-            # Default: try OpenAI-compatible for any other URL
+            # Default: OpenAI-compatible for any other URL (vLLM, LM Studio, etc.)
             return 'openai'
 
     def embed(self, text: str) -> List[float]:
@@ -74,9 +74,11 @@ class EmbeddingService:
 
         text = text.strip()
 
-        # Check cache
-        if text in self._cache:
-            return self._cache[text]
+        # Check cache (thread-safe)
+        with self._cache_lock:
+            cached = self._cache.get(text)
+        if cached is not None:
+            return cached
 
         vectors = self._request_embeddings([text])
         vector = vectors[0]
@@ -94,8 +96,10 @@ class EmbeddingService:
 
         for i, text in enumerate(texts):
             text = text.strip() if text else ""
-            if text in self._cache:
-                results[i] = self._cache[text]
+            with self._cache_lock:
+                cached = self._cache.get(text)
+            if cached is not None:
+                results[i] = cached
             elif text:
                 uncached_indices.append(i)
                 uncached_texts.append(text)
@@ -231,12 +235,13 @@ class EmbeddingService:
         raise EmbeddingError(f"Embedding failed after {self.max_retries} retries: {last_error}")
 
     def _cache_put(self, text: str, vector: List[float]) -> None:
-        """Add to cache, evicting oldest entries if full."""
-        if len(self._cache) >= self._cache_max_size:
-            keys_to_remove = list(self._cache.keys())[:self._cache_max_size // 10]
-            for key in keys_to_remove:
-                del self._cache[key]
-        self._cache[text] = vector
+        """Add to cache, evicting oldest entries if full (thread-safe)."""
+        with self._cache_lock:
+            if len(self._cache) >= self._cache_max_size:
+                keys_to_remove = list(self._cache.keys())[:self._cache_max_size // 10]
+                for key in keys_to_remove:
+                    del self._cache[key]
+            self._cache[text] = vector
 
     def health_check(self) -> bool:
         """Check if embedding endpoint is reachable."""

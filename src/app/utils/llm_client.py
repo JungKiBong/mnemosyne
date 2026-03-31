@@ -50,8 +50,17 @@ class LLMClient:
         self._num_ctx = int(os.environ.get('OLLAMA_NUM_CTX', '8192'))
 
     def _is_ollama(self) -> bool:
-        """Check if we're talking to an Ollama server."""
-        return '11434' in (self.base_url or '')
+        """Check if we're talking to an Ollama server.
+        
+        Uses LLM_PROVIDER env var as primary signal (explicit config wins).
+        Falls back to URL heuristic only when provider is unset.
+        """
+        provider = os.environ.get('LLM_PROVIDER', '').lower()
+        if provider:
+            return provider == 'ollama'
+        # Fallback heuristic: Ollama default port or hostname
+        url = (self.base_url or '').lower()
+        return '11434' in url or 'ollama' in url
 
     def chat(
         self,

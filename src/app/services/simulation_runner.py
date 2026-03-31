@@ -388,7 +388,7 @@ class SimulationRunner:
                 from ..utils.llm_client import LLMClient
                 
                 try:
-                    llm = LLMClient.create()
+                    llm = LLMClient()
                     orchestrator = ObserverOrchestrator(storage=storage, graph_id=graph_id, llm_client=llm)
                 except Exception as oe:
                     logger.warning(f"Failed to create ObserverOrchestrator: {oe}")

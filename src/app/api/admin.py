@@ -304,7 +304,6 @@ def _apply_to_runtime(env: dict):
 
 
 @admin_bp.route('/settings', methods=['GET'])
-@admin_bp.route('/settings', methods=['GET'])
 def get_settings():
     """Return current runtime settings (masking sensitive values)."""
     api_key = os.environ.get('LLM_API_KEY', '')
@@ -333,7 +332,6 @@ def get_settings():
     })
 
 
-@admin_bp.route('/settings', methods=['PUT'])
 @admin_bp.route('/settings', methods=['PUT'])
 def update_settings():
     """
