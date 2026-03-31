@@ -134,8 +134,8 @@ class DataIngestionService:
             "source_type": result.source_type.value,
             "text_length": len(result.text) if result.text else 0,
             "chunks": len(episode_ids),
-            "entities_injected": len(result.entities),
-            "relations_injected": len(result.relations),
+            "entities_injected": len(result.entities or []),
+            "relations_injected": len(result.relations or []),
             "metadata": result.metadata,
         }
         logger.info("Ingestion complete: %s", summary)

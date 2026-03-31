@@ -2,7 +2,7 @@
   "mcpServers": {
     "mories-memory": {
       "command": "python3",
-      "args": ["-m", "mcp_server.server"],
+      "args": ["/absolute/path/to/mirofish-supermemory/mcp_server/mories_mcp.py"],
       "cwd": "/Users/jungkibong/Projects/tmp/mirofish-supermemory",
       "env": {
         "MORIES_API_URL": "http://localhost:5001",
