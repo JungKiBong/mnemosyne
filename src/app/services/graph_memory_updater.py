@@ -338,12 +338,26 @@ class GraphMemoryUpdater:
 
         for attempt in range(self.MAX_RETRIES):
             try:
+                # 1. Update Graph Knowledge Base (NER extraction)
                 self.storage.add_text(self.graph_id, combined_text)
+                
+                # 2. Inject into STM Buffer for cognitive evaluation (Task B3-2)
+                try:
+                    from .memory_pipeline import MemoryPipeline
+                    pipeline = MemoryPipeline()
+                    pipeline.process_ingestion_result(
+                        graph_id=self.graph_id,
+                        source_ref=f"agent-sim-{platform}",
+                        text=combined_text,
+                        auto_promote=True
+                    )
+                except Exception as stm_err:
+                    logger.warning(f"Failed to inject simulation events into STM Buffer: {stm_err}")
 
                 self._total_sent += 1
                 self._total_items_sent += len(activities)
                 display_name = self._get_platform_display_name(platform)
-                logger.info(f"Successfully batch sent {len(activities)} {display_name} activities to graph {self.graph_id}")
+                logger.info(f"Successfully batch sent {len(activities)} {display_name} activities to graph {self.graph_id} and STM")
                 logger.debug(f"Batch preview: {combined_text[:200]}...")
                 return
 

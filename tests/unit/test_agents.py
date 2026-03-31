@@ -157,7 +157,7 @@ class TestSearchAgent:
         mock_sm = MagicMock()
 
         # Mock SM profile
-        mock_sm.profile.return_value = {
+        mock_sm.get_profile.return_value = {
             "static": ["conservative", "tech worker"],
             "dynamic": ["currently angry at Bob"],
         }
@@ -183,7 +183,7 @@ class TestSearchAgent:
     def test_profile_caching(self):
         mock_storage = MagicMock()
         mock_sm = MagicMock()
-        mock_sm.profile.return_value = {"static": ["calm"], "dynamic": []}
+        mock_sm.get_profile.return_value = {"static": ["calm"], "dynamic": []}
         mock_sm.search_memories.return_value = {"memories": []}
         mock_storage.sm = mock_sm
 
@@ -191,14 +191,14 @@ class TestSearchAgent:
 
         # First call: profile is fetched
         search.retrieve("Alice", "test", current_round=1)
-        assert mock_sm.profile.call_count == 1
+        assert mock_sm.get_profile.call_count == 1
 
         # Second call same round: cached
         search.retrieve("Alice", "test2", current_round=1)
-        assert mock_sm.profile.call_count == 1  # no new call
+        assert mock_sm.get_profile.call_count == 1  # no new call
 
         # Third call, 3 rounds later: cache expired
         search.retrieve("Alice", "test3", current_round=5)
-        assert mock_sm.profile.call_count == 2
+        assert mock_sm.get_profile.call_count == 2
 
         search.shutdown()

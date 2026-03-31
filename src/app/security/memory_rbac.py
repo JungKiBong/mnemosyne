@@ -45,14 +45,16 @@ logger = logging.getLogger('mirofish.rbac')
 # ──────────────────────────────────────────
 
 ROLE_PERMISSIONS = {
-    "reader": {"search", "recall", "status", "history", "export"},
+    "reader": {"search", "recall", "status", "history", "export", "term_read"},
     "writer": {"search", "recall", "status", "history", "export",
-               "store", "boost", "pipeline"},
+               "store", "boost", "pipeline", "term_read", "term_write", "term_delete"},
     "sharer": {"search", "recall", "status", "history", "export",
-               "store", "boost", "pipeline", "share", "empathy"},
+               "store", "boost", "pipeline", "share", "empathy",
+               "term_read", "term_write", "term_delete"},
     "admin":  {"search", "recall", "status", "history", "export",
                "store", "boost", "pipeline", "share", "empathy",
-               "decay", "config", "rollback", "encrypt", "keys", "gateway"},
+               "decay", "config", "rollback", "encrypt", "keys", "gateway",
+               "term_read", "term_write", "term_delete", "term_migrate"},
 }
 
 SCOPE_VISIBILITY = {
@@ -420,8 +422,9 @@ class MemoryRBAC:
 _rbac_instance: Optional[MemoryRBAC] = None
 
 
-def get_rbac() -> MemoryRBAC:
+def get_rbac(driver=None) -> MemoryRBAC:
+    """Get or create the RBAC singleton, optionally injecting a shared Neo4j driver."""
     global _rbac_instance
     if _rbac_instance is None:
-        _rbac_instance = MemoryRBAC()
+        _rbac_instance = MemoryRBAC(driver=driver)
     return _rbac_instance

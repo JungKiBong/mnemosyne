@@ -6,16 +6,10 @@
   <title>Mories — Memory History & Audit Trail</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <link rel="stylesheet" href="/dashboard/assets/css/tokens.css">
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-    :root {
-      --bg: #0a0a0f; --bg2: #12121a; --card: #16161f; --card-hover: #1c1c28;
-      --border: #2a2a3a; --text: #e8e8f0; --text2: #8888a0; --text3: #555568;
-      --blue: #4a7dff; --purple: #8b5cf6; --cyan: #06b6d4; --orange: #f97316;
-      --green: #22c55e; --red: #ef4444; --pink: #ec4899; --yellow: #eab308;
-      --grad: linear-gradient(135deg, #4a7dff 0%, #8b5cf6 100%);
-      --radius: 12px; --radius-sm: 8px;
-    }
+    
     body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 
     /* Background */
@@ -128,25 +122,22 @@
       .main-grid { grid-template-columns: 1fr; }
     }
   </style>
+<link rel="stylesheet" href="/dashboard/nav-component.css">
 </head>
 <body>
 <div class="bg-grid"></div>
 
-<!-- TOPBAR -->
-<header class="topbar">
+<!-- UNIFIED NAV -->
+<div id="mories-nav" data-active="history"></div>
+
+<!-- Page toolbar -->
+<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 32px;border-bottom:1px solid var(--border);background:var(--bg-secondary);">
   <div style="display:flex;align-items:center;gap:12px">
-    <h1>📜 <span>Memory Audit Trail</span></h1>
+    <h2 style="font-size:16px;font-weight:600;">📜 Memory Audit Trail</h2>
     <span class="badge">Phase 10</span>
   </div>
-  <nav class="topbar-nav">
-    <a href="/">🏠 Dashboard</a>
-    <a href="/graph">🕸️ Graph Explorer</a>
-    <a href="/memory">🧠 Cognitive Memory</a>
-    <a href="/memory/synaptic">🌐 Synaptic</a>
-    <a href="/maturity">🌱 Maturity</a>
-    <button class="btn btn-primary" onclick="refreshAll()">🔄 새로고침</button>
-  </nav>
-</header>
+  <button class="btn btn-primary" onclick="refreshAll()">🔄 새로고침</button>
+</div>
 
 <div class="content">
   <!-- Stats -->
@@ -457,5 +448,6 @@ function formatTime(ts) {
   } catch { return ts; }
 }
 </script>
+<script src="/dashboard/nav-component.js"></script>
 </body>
 </html>

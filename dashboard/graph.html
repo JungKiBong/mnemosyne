@@ -5,22 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mories — Knowledge Graph Explorer</title>
 <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
-<style>
-:root {
-  --bg-0: #0a0a0f;
-  --bg-1: #12121a;
-  --bg-2: #16161f;
-  --border: #2a2a3a;
-  --text-0: #e8e8f0;
-  --text-1: #8888a0;
-  --text-2: #555568;
-  --accent-blue: #4a7dff;
-  --accent-purple: #8b5cf6;
-  --accent-green: #22c55e;
-  --accent-cyan: #06b6d4;
-  --accent-orange: #f97316;
-  --radius: 12px;
-}
+  <link rel="stylesheet" href="/dashboard/assets/css/tokens.css">
+  <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family:'Inter',system-ui,sans-serif; background:var(--bg-0); color:var(--text-0); height:100vh; display:flex; flex-direction:column; overflow:hidden; }
 a { color:var(--accent-cyan); text-decoration:none; }
@@ -78,20 +64,11 @@ select.select-modern option { background:var(--bg-1); }
 .spinner { width:32px; height:32px; border:3px solid var(--border); border-top-color:var(--accent-cyan); border-radius:50%; animation:spin 1s linear infinite; }
 @keyframes spin { to { transform:rotate(360deg); } }
 </style>
+<link rel="stylesheet" href="/dashboard/nav-component.css">
 </head>
 <body>
 
-<div class="header">
-  <h1>🕸️ Knowledge Graph & Synaptic Visualizer</h1>
-  <span class="badge">MiroFish × Neo4j</span>
-  <div class="nav-links">
-    <a href="/">🏠 Dashboard</a>
-    <a href="/memory">🧠 Memory</a>
-    <a href="/synaptic">🌐 Synaptic</a>
-    <a href="/memory/history">📜 Audit</a>
-    <a href="/maturity">🌱 Maturity</a>
-  </div>
-</div>
+<div id="mories-nav" data-active="graph"></div>
 
 <div class="layout">
   <!-- Sidebar -->
@@ -429,5 +406,6 @@ document.addEventListener('DOMContentLoaded', () => {
   runQuery(); // Load default graph
 });
 </script>
+<script src="/dashboard/nav-component.js"></script>
 </body>
 </html>

@@ -19,7 +19,10 @@ _VECTOR_SEARCH_EDGES = """
 CALL db.index.vector.queryRelationships('fact_embedding', $limit, $query_vector)
 YIELD relationship, score
 WHERE relationship.graph_id = $graph_id
-RETURN relationship AS r, score
+OPTIONAL MATCH (ep:Episode)
+  WHERE ep.uuid IN relationship.episode_ids
+WITH relationship AS r, score, collect(ep.data) AS episode_contexts
+RETURN r, score, episode_contexts
 ORDER BY score DESC
 LIMIT $limit
 """
@@ -39,7 +42,10 @@ _FULLTEXT_SEARCH_EDGES = """
 CALL db.index.fulltext.queryRelationships('fact_fulltext', $query_text)
 YIELD relationship, score
 WHERE relationship.graph_id = $graph_id
-RETURN relationship AS r, score
+OPTIONAL MATCH (ep:Episode)
+  WHERE ep.uuid IN relationship.episode_ids
+WITH relationship AS r, score, collect(ep.data) AS episode_contexts
+RETURN r, score, episode_contexts
 ORDER BY score DESC
 LIMIT $limit
 """
@@ -133,7 +139,12 @@ class SearchService:
                 limit=limit,
             )
             return [
-                {**dict(record["r"]), "uuid": record["r"]["uuid"], "_score": record["score"]}
+                {
+                    **dict(record["r"]),
+                    "uuid": record["r"]["uuid"],
+                    "_score": record["score"],
+                    "episode_contexts": record.get("episode_contexts", []),
+                }
                 for record in result
             ]
         except Exception as e:
@@ -154,7 +165,12 @@ class SearchService:
                 limit=limit,
             )
             return [
-                {**dict(record["r"]), "uuid": record["r"]["uuid"], "_score": record["score"]}
+                {
+                    **dict(record["r"]),
+                    "uuid": record["r"]["uuid"],
+                    "_score": record["score"],
+                    "episode_contexts": record.get("episode_contexts", []),
+                }
                 for record in result
             ]
         except Exception as e:
@@ -270,11 +286,10 @@ class SearchService:
 
             def _boost():
                 try:
-                    mgr = MemoryManager()
+                    mgr = MemoryManager.get_instance()
                     boosted = mgr.boost_on_retrieval(uuids)
                     if boosted > 0:
                         logger.debug(f"Retrieval boost: {boosted} items reinforced")
-                    mgr.close()
                 except Exception as e:
                     logger.debug(f"Retrieval boost skipped: {e}")
 

@@ -105,12 +105,12 @@ class MoriesToolkit:
 
     def __init__(self):
         from ..storage.memory_manager import MemoryManager
-        self._manager = MemoryManager()
+        self._manager = MemoryManager.get_instance()
         self._tools: Dict[str, ToolDefinition] = {}
         self._register_tools()
 
     def close(self):
-        self._manager.close()
+        pass  # Singleton — do not close shared manager
 
     # ──────────────────────────────────────────
     # Tool Definitions
@@ -338,11 +338,7 @@ class MoriesToolkit:
                             limit: int = 10, min_salience: float = 0.1) -> dict:
         scope_filter = f"AND e.scope = '{scope}'" if scope != "all" else ""
 
-        from neo4j import GraphDatabase
-        from ..config import Config
-        driver = GraphDatabase.driver(Config.NEO4J_URI, auth=(Config.NEO4J_USER, Config.NEO4J_PASSWORD))
-
-        with driver.session() as session:
+        with self._manager._driver.session() as session:
             records = session.run(f"""
                 MATCH (e:Entity)
                 WHERE e.salience IS NOT NULL
@@ -359,9 +355,6 @@ class MoriesToolkit:
                 ORDER BY e.salience DESC
                 LIMIT $limit
             """, search_term=query, min_sal=min_salience, limit=limit).data()
-
-
-        driver.close()
 
         # Retrieval boost for found items
         if records:
@@ -383,20 +376,16 @@ class MoriesToolkit:
     def _exec_memory_share(self, uuid: str, from_agent: str,
                            target_scope: str = "tribal", message: str = "") -> dict:
         from ..storage.synaptic_bridge import SynapticBridge
-        bridge = SynapticBridge()
-        try:
-            return bridge.share_memory(from_agent, uuid, target_scope, message)
-        finally:
-            bridge.close()
+        driver = self._manager._driver if self._manager else None
+        bridge = SynapticBridge(driver=driver)
+        return bridge.share_memory(from_agent, uuid, target_scope, message)
 
     def _exec_memory_empathy(self, uuid: str, from_agent: str,
                              boost_amount: float = 0.1, reason: str = "") -> dict:
         from ..storage.synaptic_bridge import SynapticBridge
-        bridge = SynapticBridge()
-        try:
-            return bridge.empathy_boost(from_agent, uuid, boost_amount, reason)
-        finally:
-            bridge.close()
+        driver = self._manager._driver if self._manager else None
+        bridge = SynapticBridge(driver=driver)
+        return bridge.empathy_boost(from_agent, uuid, boost_amount, reason)
 
     def _exec_memory_status(self) -> dict:
         return self._manager.get_memory_overview()
@@ -408,31 +397,27 @@ class MoriesToolkit:
                             min_salience: float = 0.3,
                             manifest_name: str = None) -> dict:
         from ..storage.data_product import MemoryDataProduct
-        dp = MemoryDataProduct()
-        try:
-            if format == "rag_corpus":
-                return dp.export_rag_corpus(scope, min_salience, True, "json")
-            elif format == "knowledge_snapshot":
-                return dp.export_knowledge_snapshot(scope, min_salience)
-            elif format == "training_dataset":
-                return dp.export_training_dataset("json", min_salience)
-            elif format == "manifest":
-                name = manifest_name or f"Snapshot-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M')}"
-                return dp.create_manifest(name, scope=scope)
-            elif format == "analytics_csv":
-                return {"csv": dp.export_analytics_csv()}
-            else:
-                return {"error": f"Unknown format: {format}"}
-        finally:
-            dp.close()
+        driver = self._manager._driver if self._manager else None
+        dp = MemoryDataProduct(driver=driver)
+        if format == "rag_corpus":
+            return dp.export_rag_corpus(scope, min_salience, True, "json")
+        elif format == "knowledge_snapshot":
+            return dp.export_knowledge_snapshot(scope, min_salience)
+        elif format == "training_dataset":
+            return dp.export_training_dataset("json", min_salience)
+        elif format == "manifest":
+            name = manifest_name or f"Snapshot-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M')}"
+            return dp.create_manifest(name, scope=scope)
+        elif format == "analytics_csv":
+            return {"csv": dp.export_analytics_csv()}
+        else:
+            return {"error": f"Unknown format: {format}"}
 
     def _exec_memory_history(self, uuid: str) -> dict:
         from ..storage.memory_audit import MemoryAudit
-        audit = MemoryAudit()
-        try:
-            return audit.get_history(uuid)
-        finally:
-            audit.close()
+        driver = self._manager._driver if self._manager else None
+        audit = MemoryAudit(driver=driver)
+        return audit.get_history(uuid)
 
     # ── Security Handlers ──
 
@@ -458,10 +443,6 @@ class MoriesToolkit:
                                categories: list = None,
                                graph_id: str = None) -> dict:
         """Retrieve categorized prior knowledge for a research topic."""
-        from neo4j import GraphDatabase
-        from ..config import Config
-        driver = GraphDatabase.driver(Config.NEO4J_URI, auth=(Config.NEO4J_USER, Config.NEO4J_PASSWORD))
-
         # Build category filter
         cat_filter = ""
         if categories:
@@ -470,7 +451,7 @@ class MoriesToolkit:
 
         graph_filter = f"AND e.graph_id = '{graph_id}'" if graph_id else ""
 
-        with driver.session() as session:
+        with self._manager._driver.session() as session:
             records = session.run(f"""
                 MATCH (e:Entity)
                 WHERE e.salience IS NOT NULL
@@ -489,8 +470,6 @@ class MoriesToolkit:
                 ORDER BY e.salience DESC
                 LIMIT $limit
             """, topic=topic, limit=limit).data()
-
-        driver.close()
 
         # Categorize results
         categorized = {"papers": [], "citations": [], "experiments": [],
@@ -600,13 +579,9 @@ class MoriesToolkit:
 
     def _set_scope(self, uuid: str, scope: str):
         """Set scope on an entity node."""
-        from neo4j import GraphDatabase
-        from ..config import Config
-        driver = GraphDatabase.driver(Config.NEO4J_URI, auth=(Config.NEO4J_USER, Config.NEO4J_PASSWORD))
-        with driver.session() as session:
+        with self._manager._driver.session() as session:
             session.run("MATCH (e:Entity {uuid: $uuid}) SET e.scope = $scope",
                        uuid=uuid, scope=scope)
-        driver.close()
 
     # ──────────────────────────────────────────
     # Schema Export

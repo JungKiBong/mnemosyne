@@ -38,10 +38,9 @@ TOOL_DEFINITIONS = [
     {
         "name": "mories_search",
         "description": (
-            "Search the Mories memory system. Returns a COMPACT INDEX "
-            "(~50-100 tokens/result) with type icons and relevance scores. "
-            "Filter by status for task tracking. "
-            "Use mories_detail for full content, mories_timeline for context."
+            "Search the Mories hybrid memory system. "
+            "Queries Neo4j knowledge graph via fulltext and vector indexes. "
+            "Returns entities, facts, and episodes matching the query."
         ),
         "inputSchema": {
             "type": "object",
@@ -60,92 +59,8 @@ TOOL_DEFINITIONS = [
                     "description": "Max results to return",
                     "default": 10,
                 },
-                "status": {
-                    "type": "string",
-                    "description": "Filter by status: pending, in_progress, completed, blocked",
-                    "enum": ["pending", "in_progress", "completed", "blocked"],
-                    "default": "",
-                },
             },
             "required": ["query"],
-        },
-    },
-    {
-        "name": "mories_detail",
-        "description": (
-            "Retrieve FULL content of a specific memory by UUID. "
-            "Use after mories_search to get complete details for selected items. "
-            "Returns all properties, relationships, and full text."
-        ),
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "uuid": {
-                    "type": "string",
-                    "description": "Memory/entity UUID from mories_search results",
-                },
-                "include_relations": {
-                    "type": "boolean",
-                    "description": "Include connected nodes/relationships",
-                    "default": True,
-                },
-            },
-            "required": ["uuid"],
-        },
-    },
-    {
-        "name": "mories_timeline",
-        "description": (
-            "Get temporal neighborhood of a memory. "
-            "Shows what happened before/after a specific memory "
-            "for narrative context. Use after mories_search."
-        ),
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "uuid": {
-                    "type": "string",
-                    "description": "Center memory UUID",
-                },
-                "window": {
-                    "type": "integer",
-                    "description": "Number of items before/after center",
-                    "default": 5,
-                },
-            },
-            "required": ["uuid"],
-        },
-    },
-    {
-        "name": "mories_update_status",
-        "description": (
-            "Update status/priority/assignment on a memory node. "
-            "Lightweight Whiteboard — replaces deleted Orchestration Blackboard. "
-            "Use with mories_search(status=...) for task tracking."
-        ),
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "uuid": {
-                    "type": "string",
-                    "description": "Target node UUID",
-                },
-                "status": {
-                    "type": "string",
-                    "description": "New status",
-                    "enum": ["pending", "in_progress", "completed", "blocked"],
-                },
-                "priority": {
-                    "type": "integer",
-                    "description": "Priority (1=highest)",
-                },
-                "assigned_to": {
-                    "type": "string",
-                    "description": "Agent UUID to assign",
-                    "default": "",
-                },
-            },
-            "required": ["uuid"],
         },
     },
     {
@@ -280,9 +195,6 @@ def dispatch_tool(name: str, arguments: dict, allowed_scopes: list[str] = None) 
     """Dispatch a tool call to the appropriate function."""
     from .tools import (
         mories_search,
-        mories_detail,
-        mories_timeline,
-        mories_update_status,
         mories_ingest,
         mories_profile,
         mories_graph_query,
@@ -291,9 +203,6 @@ def dispatch_tool(name: str, arguments: dict, allowed_scopes: list[str] = None) 
 
     tool_map = {
         "mories_search": mories_search,
-        "mories_detail": mories_detail,
-        "mories_timeline": mories_timeline,
-        "mories_update_status": mories_update_status,
         "mories_ingest": mories_ingest,
         "mories_profile": mories_profile,
         "mories_graph_query": mories_graph_query,
@@ -337,7 +246,7 @@ def handle_jsonrpc(message: dict, allowed_scopes: list[str] = None) -> dict | No
                 },
                 "serverInfo": {
                     "name": "mories-memory",
-                    "version": "0.7.0",
+                    "version": "0.5.0",
                 },
             },
         }
@@ -505,7 +414,7 @@ def run_sse(host: str = "0.0.0.0", port: int = 3100):
         return jsonify({
             "status": "ok",
             "service": "mories-mcp-server",
-            "version": "0.7.0",
+            "version": "0.5.0",
             "tools": len(TOOL_DEFINITIONS),
             "read_only": MCPConfig.READ_ONLY_CYPHER,
         })

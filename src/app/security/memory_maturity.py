@@ -384,8 +384,9 @@ class MemoryMaturityManager:
 # Singleton
 _maturity_instance: Optional[MemoryMaturityManager] = None
 
-def get_maturity_manager() -> MemoryMaturityManager:
+def get_maturity_manager(driver=None) -> MemoryMaturityManager:
+    """Get or create the Maturity singleton, optionally injecting a shared Neo4j driver."""
     global _maturity_instance
     if _maturity_instance is None:
-        _maturity_instance = MemoryMaturityManager()
+        _maturity_instance = MemoryMaturityManager(driver=driver)
     return _maturity_instance

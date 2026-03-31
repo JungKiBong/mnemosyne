@@ -192,7 +192,7 @@ class MemoryScheduler:
         """Run Ebbinghaus decay on all LTM memories."""
         logger.info("🕐 Running daily decay cycle...")
         from ..storage.memory_manager import MemoryManager
-        manager = MemoryManager()
+        manager = MemoryManager.get_instance()
         try:
             result = manager.run_decay(dry_run=False)
             logger.info(
@@ -201,13 +201,11 @@ class MemoryScheduler:
             )
         except Exception as e:
             logger.error(f"❌ Decay failed: {e}", exc_info=True)
-        finally:
-            manager.close()
 
     def _job_stm_cleanup(self):
         """Remove expired STM items."""
         from ..storage.memory_manager import MemoryManager
-        manager = MemoryManager()
+        manager = MemoryManager.get_instance()
         try:
             before = len(manager._stm_buffer)
             items = manager.stm_list()  # triggers cleanup
@@ -217,14 +215,14 @@ class MemoryScheduler:
                 logger.info(f"🧹 STM cleanup: removed {cleaned} expired items")
         except Exception as e:
             logger.debug(f"STM cleanup: {e}")
-        finally:
-            manager.close()
 
     def _job_scope_promotion(self):
         """Check and auto-promote qualifying memories."""
         logger.info("⬆️ Checking scope promotion candidates...")
         from ..storage.memory_scopes import MemoryScopeManager
-        scopes = MemoryScopeManager()
+        from flask import current_app
+        driver = current_app.extensions.get('neo4j_driver') if current_app else None
+        scopes = MemoryScopeManager(driver=driver)
         try:
             for source_scope in ['personal', 'tribal', 'social']:
                 candidates = scopes.find_promotion_candidates(source_scope)
@@ -242,8 +240,6 @@ class MemoryScheduler:
                             logger.debug(f"Promotion failed for {c.get('uuid','?')}: {e}")
         except Exception as e:
             logger.error(f"Scope promotion check failed: {e}", exc_info=True)
-        finally:
-            scopes.close()
 
     def _job_maturity_promotion(self):
         """Auto-promote memory maturity: learning→unstable→mature."""
@@ -260,7 +256,7 @@ class MemoryScheduler:
     def _job_health_update(self):
         """Log current memory health metrics."""
         from ..storage.memory_manager import MemoryManager
-        manager = MemoryManager()
+        manager = MemoryManager.get_instance()
         try:
             overview = manager.get_memory_overview()
             ltm = overview.get('ltm', {})
@@ -273,8 +269,6 @@ class MemoryScheduler:
             )
         except Exception as e:
             logger.debug(f"Health update: {e}")
-        finally:
-            manager.close()
 
     def _safe_run(self, func):
         """Safely run a job function."""

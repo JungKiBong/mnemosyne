@@ -33,11 +33,13 @@ class GraphStorage(ABC):
     # --- Add data ---
 
     @abstractmethod
-    def add_text(self, graph_id: str, text: str) -> str:
-        """
-        Process text: NER/RE → create nodes/edges → return episode_id.
-        This is synchronous (unlike Zep Cloud's async episodes).
-        """
+    def add_text(
+        self, 
+        graph_id: str, 
+        text: str, 
+        principal_id: Optional[str] = None
+    ) -> str:
+        """Parse text via NER/RE and add to graph."""
 
     @abstractmethod
     def add_text_batch(
@@ -46,6 +48,7 @@ class GraphStorage(ABC):
         chunks: List[str],
         batch_size: int = 3,
         progress_callback: Optional[Callable] = None,
+        principal_id: Optional[str] = None
     ) -> List[str]:
         """Batch-add text chunks. Returns list of episode_ids."""
 

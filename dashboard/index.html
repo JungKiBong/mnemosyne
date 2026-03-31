@@ -6,33 +6,11 @@
   <title>Mories — Memory Intelligence Dashboard</title>
   <meta name="description" content="MiroFish × Supermemory Hybrid Memory System Dashboard">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/dashboard/assets/css/tokens.css">
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
-    :root {
-      --bg-primary: #0a0a0f;
-      --bg-secondary: #12121a;
-      --bg-card: #16161f;
-      --bg-card-hover: #1c1c28;
-      --border: #2a2a3a;
-      --border-active: #4a4aff;
-      --text-primary: #e8e8f0;
-      --text-secondary: #8888a0;
-      --text-muted: #555568;
-      --accent-blue: #4a7dff;
-      --accent-purple: #8b5cf6;
-      --accent-cyan: #06b6d4;
-      --accent-orange: #f97316;
-      --accent-green: #22c55e;
-      --accent-red: #ef4444;
-      --accent-pink: #ec4899;
-      --gradient-primary: linear-gradient(135deg, #4a7dff 0%, #8b5cf6 100%);
-      --gradient-warm: linear-gradient(135deg, #f97316 0%, #ec4899 100%);
-      --glass: rgba(22, 22, 31, 0.7);
-      --radius: 12px;
-      --radius-sm: 8px;
-      --shadow: 0 4px 24px rgba(0,0,0,0.3);
-    }
+    
 
     body {
       font-family: 'Inter', system-ui, sans-serif;
@@ -310,41 +288,15 @@
     .tab-content.active { display: block; animation: fadeIn 0.3s ease; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
   </style>
+<link rel="stylesheet" href="/dashboard/nav-component.css">
 </head>
 <body>
   <div class="bg-grid"></div>
   <div class="bg-glow"></div>
 
   <div class="app">
-    <!-- TOPBAR -->
-    <header class="topbar">
-      <div class="topbar-brand">
-        <div class="logo">M</div>
-        <div>
-          <h1>Mories</h1>
-        </div>
-        <span>v0.4.0</span>
-      </div>
-      <div class="topbar-status">
-        <a href="/graph" style="padding:6px 14px;border-radius:8px;background:linear-gradient(135deg,#06b6d4,#8b5cf6);color:white;text-decoration:none;font-size:12px;font-weight:600;transition:transform 0.2s;margin-right:6px;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">🕸️ Graph</a>
-        <a href="/memory" style="padding:6px 14px;border-radius:8px;background:linear-gradient(135deg,#4f8cff,#8b5cf6);color:white;text-decoration:none;font-size:12px;font-weight:600;transition:transform 0.2s;margin-right:6px;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">🧠 Memory</a>
-        <a href="/memory/synaptic" style="padding:6px 14px;border-radius:8px;background:linear-gradient(135deg,#22c55e,#06b6d4);color:white;text-decoration:none;font-size:12px;font-weight:600;transition:transform 0.2s;margin-right:6px;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">🌐 Synaptic</a>
-        <a href="/memory/history" style="padding:6px 14px;border-radius:8px;background:linear-gradient(135deg,#f97316,#ef4444);color:white;text-decoration:none;font-size:12px;font-weight:600;transition:transform 0.2s;margin-right:6px;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">📜 Audit</a>
-        <a href="/maturity" style="padding:6px 14px;border-radius:8px;background:linear-gradient(135deg,#ec4899,#8b5cf6);color:white;text-decoration:none;font-size:12px;font-weight:600;transition:transform 0.2s;margin-right:6px;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">🌱 Maturity</a>
-        <div class="status-pill">
-          <div class="status-dot green" id="neo4j-status"></div>
-          Neo4j
-        </div>
-        <div class="status-pill">
-          <div class="status-dot" id="sm-status"></div>
-          Supermemory
-        </div>
-        <div class="status-pill">
-          <div class="status-dot" id="observer-status"></div>
-          Observers
-        </div>
-      </div>
-    </header>
+    <!-- UNIFIED NAV -->
+    <div id="mories-nav" data-active="dashboard" data-status="true"></div>
 
     <main class="main-content">
       <!-- TABS -->
@@ -1238,5 +1190,6 @@
     // Load settings on page load
     loadSettings();
   </script>
+<script src="/dashboard/nav-component.js"></script>
 </body>
 </html>

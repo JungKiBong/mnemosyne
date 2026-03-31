@@ -130,6 +130,14 @@ except ImportError as e:
     print("Please install first: pip install oasis-ai camel-ai")
     sys.exit(1)
 
+try:
+    from app.storage.neo4j_storage import Neo4jStorage
+    from app.storage.hybrid_storage import HybridStorage
+    from app.services.search_agent import SearchAgent
+except ImportError as e:
+    print(f"Warning: Could not import SearchAgent components: {e}")
+    SearchAgent = None
+
 
 # IPC-related constants
 IPC_COMMANDS_DIR = "ipc_commands"
@@ -599,6 +607,18 @@ class TwitterSimulationRunner:
         await self.env.reset()
         print("Environment initialization complete\n")
         
+        # Initialize Cognitive SearchAgent if graph learning is enabled
+        search_agent = None
+        graph_id = self.config.get("graph_id")
+        if SearchAgent and graph_id:
+            try:
+                neo4j_storage = Neo4jStorage()
+                hybrid_storage = HybridStorage(neo4j_storage)
+                search_agent = SearchAgent(graph_id=graph_id, storage=hybrid_storage)
+                print(f"Cognitive SearchAgent initialized for graph: {graph_id}")
+            except Exception as e:
+                print(f"Warning: Failed to initialize SearchAgent: {e}")
+        
         # Initialize IPC handler
         self.ipc_handler = IPCHandler(self.simulation_dir, self.env, self.agent_graph)
         self.ipc_handler.update_status("running")
@@ -644,14 +664,34 @@ class TwitterSimulationRunner:
             if not active_agents:
                 continue
             
-            # Build action
-            actions = {
-                agent: LLMAction()
-                for _, agent in active_agents
-            }
+            # Build action and inject cognitive memory context
+            actions = {}
+            original_sys_msgs = {}
+            
+            for agent_id, agent in active_agents:
+                if search_agent:
+                    try:
+                        query = "Current simulated state and recent interactions"
+                        search_res = search_agent.retrieve(
+                            agent_name=str(agent_id),
+                            query=query,
+                            current_round=round_num
+                        )
+                        prompt_injection = search_res.to_prompt_injection()
+                        if prompt_injection:
+                            original_sys_msgs[agent] = agent.system_message.content
+                            agent.system_message.content = f"{original_sys_msgs[agent]}\n\n{prompt_injection}"
+                    except Exception as e:
+                        print(f"  Warning: Context retrieval failed for {agent_id}: {e}")
+                
+                actions[agent] = LLMAction()
             
             # Execute action
             await self.env.step(actions)
+            
+            # Restore system messages to prevent prompt size accumulation
+            for agent, orig_msg in original_sys_msgs.items():
+                agent.system_message.content = orig_msg
             
             # Print progress
             if (round_num + 1) % 10 == 0 or round_num == 0:

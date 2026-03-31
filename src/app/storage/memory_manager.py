@@ -99,13 +99,45 @@ class MemoryConfig:
 
 class MemoryManager:
     """
-    Core cognitive memory engine.
+    Core cognitive memory engine (Singleton).
 
     Manages STM buffer, decay scheduling, and retrieval reinforcement.
     Uses Neo4j as the long-term memory backend.
+    
+    Usage:
+        # In create_app() — initialize once with shared driver:
+        mm = MemoryManager.get_instance(driver=neo4j_driver)
+        
+        # Everywhere else — retrieve the singleton:
+        mm = MemoryManager.get_instance()
     """
 
-    def __init__(self, config: Optional[MemoryConfig] = None):
+    _instance: Optional['MemoryManager'] = None
+    _initialized: bool = False
+
+    @classmethod
+    def get_instance(cls, config: Optional['MemoryConfig'] = None,
+                     driver=None) -> 'MemoryManager':
+        """Get or create the singleton MemoryManager instance."""
+        if cls._instance is None:
+            cls._instance = cls(config=config, driver=driver)
+        return cls._instance
+
+    @classmethod
+    def reset_instance(cls):
+        """Reset singleton (for testing only)."""
+        if cls._instance is not None:
+            try:
+                if cls._instance._owns_driver:
+                    cls._instance._driver.close()
+            except Exception:
+                pass
+        cls._instance = None
+        cls._initialized = False
+
+    def __init__(self, config: Optional[MemoryConfig] = None, driver=None):
+        if MemoryManager._initialized and MemoryManager._instance is self:
+            return
         self.config = config or MemoryConfig()
         self._stm_buffer: Dict[str, STMItem] = {}
         self._lock = threading.Lock()
@@ -117,11 +149,16 @@ class MemoryManager:
             'total_decays_run': 0,
         }
 
-        # Neo4j connection
-        self._driver = GraphDatabase.driver(
-            Config.NEO4J_URI,
-            auth=(Config.NEO4J_USER, Config.NEO4J_PASSWORD)
-        )
+        # Neo4j connection — prefer injected driver, fallback to self-created
+        if driver is not None:
+            self._driver = driver
+            self._owns_driver = False
+        else:
+            self._driver = GraphDatabase.driver(
+                Config.NEO4J_URI,
+                auth=(Config.NEO4J_USER, Config.NEO4J_PASSWORD)
+            )
+            self._owns_driver = True
 
         # Phase 10: Audit Trail
         from .memory_audit import MemoryAudit
@@ -130,12 +167,15 @@ class MemoryManager:
         # Ensure salience-related properties exist
         self._ensure_salience_schema()
 
-        logger.info("MemoryManager initialized with config: "
+        MemoryManager._initialized = True
+        logger.info("MemoryManager singleton initialized with config: "
                      f"decay_rate={self.config.decay_rate}, "
                      f"stm_ttl={self.config.stm_default_ttl}s")
 
     def close(self):
-        self._driver.close()
+        """Close driver only if we own it (self-created)."""
+        if self._owns_driver:
+            self._driver.close()
 
     # ──────────────────────────────────────────
     # Schema Enhancement

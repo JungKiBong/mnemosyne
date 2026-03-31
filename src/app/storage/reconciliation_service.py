@@ -117,9 +117,11 @@ class ReconciliationService:
     3. Audit trail coverage (every entity has at least one revision)
     4. Salience staleness (entities not updated in 30+ days)
     5. Dead letter queue health (outbox failures)
+    6. Episodic binding integrity (RELATION → Episode linkage)
+    7. Neo4j ↔ Supermemory drift detection
     """
 
-    def __init__(self, driver=None):
+    def __init__(self, driver=None, sm_client=None):
         if driver:
             self._driver = driver
             self._owns_driver = False
@@ -129,6 +131,7 @@ class ReconciliationService:
                 auth=(Config.NEO4J_USER, Config.NEO4J_PASSWORD)
             )
             self._owns_driver = True
+        self._sm = sm_client  # Optional SupermemoryClientWrapper
 
     def close(self):
         if self._owns_driver:
@@ -169,6 +172,12 @@ class ReconciliationService:
 
             # 6. Check orphaned revisions
             self._check_orphaned_revisions(result, auto_fix)
+
+            # 7. Episodic binding integrity
+            self._check_episodic_binding(result, auto_fix)
+
+            # 8. Neo4j ↔ Supermemory drift detection
+            self._check_neo4j_sm_drift(result)
 
         except Exception as e:
             logger.error(f"Reconciliation error: {e}")
@@ -406,6 +415,123 @@ class ReconciliationService:
                         record.get("mem_uuid", "unknown"),
                         f"Orphaned revision: {record['rid'][:8]}",
                     )
+
+    # ──────────────────────────────────────────
+    # Episodic Binding & SM Drift
+    # ──────────────────────────────────────────
+
+    def _check_episodic_binding(self, result: ReconciliationResult, auto_fix: bool):
+        """
+        Check that every RELATION's episode_ids point to existing Episode nodes.
+        
+        Broken bindings mean a fact has lost its causal origin — the 'why' 
+        behind the knowledge is missing. This is a critical episodic memory defect.
+        """
+        with self._driver.session() as session:
+            # Find relations with episode_ids that reference non-existent Episodes
+            records = session.run("""
+                MATCH (src:Entity)-[r:RELATION]->(tgt:Entity)
+                WHERE r.episode_ids IS NOT NULL AND size(r.episode_ids) > 0
+                UNWIND r.episode_ids AS ep_id
+                OPTIONAL MATCH (ep:Episode {uuid: ep_id})
+                WITH r, ep_id, ep
+                WHERE ep IS NULL
+                RETURN r.uuid AS rel_uuid, r.fact AS fact, ep_id AS missing_episode
+                LIMIT 100
+            """).data()
+
+            for record in records:
+                rel_uuid = record.get("rel_uuid", "unknown")
+                fact_preview = (record.get("fact", ""))[:60]
+                missing_ep = record.get("missing_episode", "unknown")[:8]
+
+                if auto_fix:
+                    # Remove the broken episode_id from the relation's list
+                    session.run("""
+                        MATCH ()-[r:RELATION {uuid: $uuid}]->()
+                        SET r.episode_ids = [eid IN r.episode_ids WHERE eid <> $bad_id]
+                    """, uuid=rel_uuid, bad_id=record.get("missing_episode"))
+                    result.add_issue(
+                        DriftType.ORPHAN_NEO4J, DriftSeverity.INFO,
+                        rel_uuid,
+                        f"Broken episode binding: '{fact_preview}...' → Episode {missing_ep} — cleaned",
+                        auto_fixed=True,
+                    )
+                else:
+                    result.add_issue(
+                        DriftType.ORPHAN_NEO4J, DriftSeverity.WARNING,
+                        rel_uuid,
+                        f"Broken episode binding: '{fact_preview}...' → Episode {missing_ep} not found",
+                    )
+
+            # Also check Relations with empty or null episode_ids
+            orphan_records = session.run("""
+                MATCH (src:Entity)-[r:RELATION]->(tgt:Entity)
+                WHERE r.episode_ids IS NULL OR size(r.episode_ids) = 0
+                RETURN r.uuid AS rel_uuid, r.fact AS fact
+                LIMIT 50
+            """).data()
+
+            for record in orphan_records:
+                rel_uuid = record.get("rel_uuid", "unknown")
+                fact_preview = (record.get("fact", ""))[:60]
+                result.add_issue(
+                    DriftType.ORPHAN_NEO4J, DriftSeverity.WARNING,
+                    rel_uuid,
+                    f"Relation without any episode binding: '{fact_preview}...'",
+                )
+
+            result.total_checked += len(records) + len(orphan_records)
+
+    def _check_neo4j_sm_drift(self, result: ReconciliationResult):
+        """
+        Cross-check Neo4j episode/fact counts against Supermemory memory counts
+        per graph_id. Large discrepancies indicate SM replication lag or data loss.
+        """
+        if not self._sm or not self._sm.client:
+            logger.debug("SM client not available — skipping drift check")
+            return
+
+        with self._driver.session() as session:
+            # Get episode counts per graph  
+            graph_records = session.run("""
+                MATCH (ep:Episode)
+                RETURN ep.graph_id AS graph_id, count(ep) AS neo4j_count
+                ORDER BY neo4j_count DESC
+                LIMIT 20
+            """).data()
+
+        for record in graph_records:
+            graph_id = record.get("graph_id")
+            neo4j_count = record.get("neo4j_count", 0)
+
+            if not graph_id:
+                continue
+
+            try:
+                # Query SM for memories tagged to this graph
+                sm_results = self._sm.search_memories(
+                    query="*",  # wildcard to get count
+                    container_tag=graph_id,
+                    limit=1,
+                )
+                # Approximate SM count from response
+                sm_count = len(sm_results) if isinstance(sm_results, list) else 0
+                
+                drift_ratio = abs(neo4j_count - sm_count) / max(neo4j_count, 1)
+                
+                if drift_ratio > 0.5:
+                    result.add_issue(
+                        DriftType.ORPHAN_SM, DriftSeverity.WARNING,
+                        graph_id,
+                        f"Significant drift: Neo4j has {neo4j_count} episodes, "
+                        f"SM returned {sm_count} memories (drift={drift_ratio:.0%})",
+                    )
+                    
+            except Exception as e:
+                logger.debug(f"SM drift check failed for {graph_id}: {e}")
+
+            result.total_checked += 1
 
     # ──────────────────────────────────────────
     # Persistence & History

@@ -374,10 +374,32 @@ class SimulationRunner:
             if not graph_id:
                 raise ValueError("Must provide graph_id when enabling graph memory update")
             
+            # Write graph_id back to config so worker script can read it
+            config['graph_id'] = graph_id
+            with open(config_path, 'w', encoding='utf-8') as f:
+                json.dump(config, f, ensure_ascii=False, indent=2)
+                
             try:
                 if not storage:
                     raise ValueError("Must provide storage (GraphStorage) when enabling graph memory update")
-                GraphMemoryManager.create_updater(simulation_id, graph_id, storage)
+                
+                # Task B3-1: Initialize ObserverOrchestrator
+                from .observer_orchestrator import ObserverOrchestrator
+                from ..utils.llm_client import LLMClient
+                
+                try:
+                    llm = LLMClient.create()
+                    orchestrator = ObserverOrchestrator(storage=storage, graph_id=graph_id, llm_client=llm)
+                except Exception as oe:
+                    logger.warning(f"Failed to create ObserverOrchestrator: {oe}")
+                    orchestrator = None
+                
+                GraphMemoryManager.create_updater(
+                    simulation_id=simulation_id, 
+                    graph_id=graph_id, 
+                    storage=storage, 
+                    observer_orchestrator=orchestrator
+                )
                 cls._graph_memory_enabled[simulation_id] = True
                 logger.info(f"Graph memory update enabled: simulation_id={simulation_id}, graph_id={graph_id}")
             except Exception as e:

@@ -397,8 +397,9 @@ class MemoryEncryption:
 _enc_instance: Optional[MemoryEncryption] = None
 
 
-def get_encryption() -> MemoryEncryption:
+def get_encryption(driver=None) -> MemoryEncryption:
+    """Get or create the Encryption singleton, optionally injecting a shared Neo4j driver."""
     global _enc_instance
     if _enc_instance is None:
-        _enc_instance = MemoryEncryption()
+        _enc_instance = MemoryEncryption(driver=driver)
     return _enc_instance

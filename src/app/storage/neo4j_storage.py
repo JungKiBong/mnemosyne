@@ -173,7 +173,12 @@ class Neo4jStorage(GraphStorage):
     # Add data (NER → nodes/edges)
     # ----------------------------------------------------------------
 
-    def add_text(self, graph_id: str, text: str) -> str:
+    def add_text(
+        self, 
+        graph_id: str, 
+        text: str, 
+        principal_id: Optional[str] = None
+    ) -> str:
         """Process text: NER/RE → batch embed → create nodes/edges → return episode_id."""
         episode_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat()
@@ -181,9 +186,15 @@ class Neo4jStorage(GraphStorage):
         # Get ontology for NER guidance
         ontology = self.get_ontology(graph_id)
 
+        term_mappings = None
+        if principal_id:
+            from .terminology_service import TerminologyService
+            term_svc = TerminologyService(driver=self._driver)
+            term_mappings = term_svc.get_active_mappings_for_principal(principal_id)
+
         # Extract entities and relations
         logger.info(f"[add_text] Starting NER extraction for chunk ({len(text)} chars)...")
-        extraction = self._ner.extract(text, ontology)
+        extraction = self._ner.extract(text, ontology, term_mappings=term_mappings)
         entities = extraction.get("entities", [])
         relations = extraction.get("relations", [])
 
@@ -319,6 +330,7 @@ class Neo4jStorage(GraphStorage):
                         """
                         MATCH (src:Entity {uuid: $src_uuid})
                         MATCH (tgt:Entity {uuid: $tgt_uuid})
+                        MATCH (ep:Episode {uuid: $episode_id})
                         CREATE (src)-[r:RELATION {
                             uuid: $uuid,
                             graph_id: $gid,
@@ -332,6 +344,8 @@ class Neo4jStorage(GraphStorage):
                             invalid_at: null,
                             expired_at: null
                         }]->(tgt)
+                        MERGE (ep)-[:MENTIONS]->(src)
+                        MERGE (ep)-[:MENTIONS]->(tgt)
                         """,
                         src_uuid=_source_uuid,
                         tgt_uuid=_target_uuid,
@@ -355,6 +369,7 @@ class Neo4jStorage(GraphStorage):
         chunks: List[str],
         batch_size: int = 3,
         progress_callback: Optional[Callable] = None,
+        principal_id: Optional[str] = None
     ) -> List[str]:
         """Batch-add text chunks with progress reporting."""
         episode_ids = []
@@ -363,7 +378,7 @@ class Neo4jStorage(GraphStorage):
         for i, chunk in enumerate(chunks):
             if not chunk or not chunk.strip():
                 continue
-            episode_id = self.add_text(graph_id, chunk)
+            episode_id = self.add_text(graph_id, chunk, principal_id=principal_id)
             episode_ids.append(episode_id)
 
             if progress_callback:

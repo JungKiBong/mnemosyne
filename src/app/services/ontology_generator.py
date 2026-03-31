@@ -346,10 +346,12 @@ Based on the above content, design entity types and relationship types suitable 
     
     def generate_python_code(self, ontology: Dict[str, Any]) -> str:
         """
-        [DEPRECATED] Convert ontology definition to Zep-format Pydantic code.
-        Not used in MiroFish-Offline (ontology stored as JSON in Neo4j).
-        Kept for reference only.
+        [DEPRECATED — Zep Legacy] Convert ontology to Zep-format Pydantic code.
+        Not used in Mories (ontology stored as JSON in Neo4j).
+        Scheduled for removal in Phase B cleanup.
         """
+        import warnings
+        warnings.warn("generate_python_code is deprecated Zep legacy code", DeprecationWarning, stacklevel=2)
         code_lines = [
             '"""',
             'Custom entity type definitions',

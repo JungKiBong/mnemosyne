@@ -293,7 +293,8 @@ def build_graph():
         # Parse request
         data = request.get_json() or {}
         project_id = data.get('project_id')
-        logger.debug(f"Request parameters: project_id={project_id}")
+        principal_id = data.get('principal_id') or request.headers.get("X-User-ID", "anonymous")
+        logger.debug(f"Request parameters: project_id={project_id}, principal_id={principal_id}")
         
         if not project_id:
             return jsonify({
@@ -400,7 +401,7 @@ def build_graph():
                 # Create graph
                 task_manager.update_task(
                     task_id,
-                    message="Creating Zep graph...",
+                    message="Creating knowledge graph...",
                     progress=10
                 )
                 graph_id = builder.create_graph(name=graph_name)
@@ -436,7 +437,8 @@ def build_graph():
                     graph_id,
                     chunks,
                     batch_size=3,
-                    progress_callback=add_progress_callback
+                    progress_callback=add_progress_callback,
+                    principal_id=principal_id
                 )
 
                 # Neo4j processing is synchronous, no need to wait
@@ -595,3 +597,63 @@ def delete_graph(graph_id: str):
             "error": str(e),
             "traceback": traceback.format_exc()
         }), 500
+
+
+# --- Merged from graphs.py ---
+
+def _get_driver():
+    """Get shared Neo4j driver from app.extensions."""
+    driver = current_app.extensions.get('neo4j_driver')
+    if driver is None:
+        raise RuntimeError("Shared Neo4j driver not initialized")
+    return driver
+
+
+@graph_bp.route('/graphs', methods=['GET'])
+def list_graphs():
+    """List all unique graph_ids (Projects) and their public/private status."""
+    try:
+        driver = _get_driver()
+        with driver.session() as session:
+            res = session.run("MATCH (n) WHERE n.graph_id IS NOT NULL RETURN DISTINCT n.graph_id AS graph_id")
+            graph_ids = [r['graph_id'] for r in res]
+
+            counts_res = session.run("MATCH (n) WHERE n.graph_id IS NOT NULL RETURN n.graph_id AS graph_id, count(n) AS count")
+            counts = {r['graph_id']: r['count'] for r in counts_res}
+
+            meta_res = session.run("MATCH (g:GraphMeta) RETURN g.graph_id AS graph_id, g.is_public AS is_public")
+            meta = {r['graph_id']: r['is_public'] for r in meta_res}
+
+            result = []
+            for gid in graph_ids:
+                if not gid:
+                    continue
+                result.append({
+                    "graph_id": gid,
+                    "count": counts.get(gid, 0),
+                    "is_public": meta.get(gid, False)
+                })
+        return jsonify({"graphs": result})
+    except Exception as e:
+        logger.error(f"Error listing graphs: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@graph_bp.route('/graphs/<graph_id>/visibility', methods=['POST'])
+def set_visibility(graph_id):
+    """Set public/private visibility securely for a specific graph_id."""
+    data = request.json or {}
+    is_public = data.get('is_public', False)
+
+    try:
+        driver = _get_driver()
+        with driver.session() as session:
+            session.run('''
+                MERGE (g:GraphMeta {graph_id: $graph_id})
+                ON CREATE SET g.created_at = timestamp()
+                SET g.is_public = $is_public
+            ''', graph_id=graph_id, is_public=is_public)
+        return jsonify({"graph_id": graph_id, "is_public": is_public})
+    except Exception as e:
+        logger.error(f"Error setting visibility: {e}")
+        return jsonify({"error": str(e)}), 500

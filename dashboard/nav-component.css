@@ -1,0 +1,182 @@
+/* ========================================
+   Mories — Unified Navigation Component
+   Shared across all dashboard pages
+   ======================================== */
+
+/* Topbar */
+.mories-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 28px;
+  height: 56px;
+  border-bottom: 1px solid var(--mories-border, #2a2a3a);
+  background: var(--mories-topbar-bg, rgba(18,18,26,0.85));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+/* Brand */
+.mories-topbar__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: inherit;
+  flex-shrink: 0;
+}
+.mories-topbar__brand:hover { text-decoration: none; }
+
+.mories-topbar__logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, #6366f1 0%, #06b6d4 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 13px;
+  color: #fff;
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  letter-spacing: -0.5px;
+}
+
+.mories-topbar__title {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  background: linear-gradient(135deg, #a5b4fc, #67e8f9);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.mories-topbar__version {
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--mories-text-muted, #555568);
+  background: var(--mories-bg-card, #16161f);
+  padding: 2px 7px;
+  border-radius: 4px;
+  margin-left: 2px;
+}
+
+/* Navigation links */
+.mories-topbar__nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.mories-topbar__link {
+  color: var(--mories-text-dim, #8888a0);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 7px;
+  text-decoration: none;
+  transition: color 0.2s, background 0.2s;
+  white-space: nowrap;
+}
+.mories-topbar__link:hover {
+  color: var(--mories-text, #e8e8f0);
+  background: var(--mories-bg-hover, rgba(255,255,255,0.05));
+  text-decoration: none;
+}
+.mories-topbar__link--active {
+  color: #fff !important;
+  background: rgba(99,102,241,0.18) !important;
+}
+
+/* Status Pills (optional, shown on dashboard) */
+.mories-topbar__status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: 16px;
+  flex-shrink: 0;
+}
+
+.mories-status-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 14px;
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+  background: var(--mories-bg-card, #16161f);
+  border: 1px solid var(--mories-border, #2a2a3a);
+  color: var(--mories-text-dim, #8888a0);
+}
+
+.mories-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #555;
+  animation: mories-pulse 2s ease-in-out infinite;
+}
+.mories-status-dot--green  { background: #22c55e; }
+.mories-status-dot--yellow { background: #f97316; }
+.mories-status-dot--red    { background: #ef4444; }
+
+@keyframes mories-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* Mobile burger (hidden on desktop) */
+.mories-topbar__burger {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--mories-text-dim, #8888a0);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px;
+}
+
+/* ── Responsive ── */
+@media (max-width: 1100px) {
+  .mories-topbar__nav {
+    position: fixed;
+    top: 56px;
+    left: 0;
+    right: 0;
+    background: var(--mories-topbar-bg, rgba(18,18,26,0.97));
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--mories-border, #2a2a3a);
+    padding: 8px 16px;
+    gap: 4px;
+    flex-wrap: wrap;
+    display: none;
+    z-index: 999;
+  }
+  .mories-topbar__nav.open {
+    display: flex;
+  }
+  .mories-topbar__burger {
+    display: block;
+  }
+  .mories-topbar__link {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+}
+
+@media (max-width: 600px) {
+  .mories-topbar {
+    padding: 0 16px;
+    height: 48px;
+  }
+  .mories-topbar__title { font-size: 14px; }
+  .mories-topbar__version { display: none; }
+  .mories-topbar__status { display: none; }
+}

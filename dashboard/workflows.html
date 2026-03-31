@@ -4,14 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mories — n8n Workflow Catalog</title>
-<style>
+  <link rel="stylesheet" href="/dashboard/assets/css/tokens.css">
+  <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{
-  --bg:#0a0a12;--surface:#12121e;--card:#1a1a2e;--border:#2a2a3e;
-  --text:#e0e0f0;--muted:#8888aa;--accent:#6c63ff;--accent2:#ff6b9d;
-  --green:#00e676;--orange:#ff9800;--blue:#448aff;--cyan:#00bcd4;
-  --purple:#ab47bc;--red:#ff5252;
-}
+
 body{font-family:'Inter','Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
 a{color:var(--accent);text-decoration:none}
 a:hover{text-decoration:underline}
@@ -96,22 +92,12 @@ a:hover{text-decoration:underline}
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/dashboard/nav-component.css">
 </head>
 <body>
 
-<!-- Top Bar -->
-<div class="topbar">
-  <h1>🧠 Mories</h1>
-  <div class="nav">
-    <a href="/">Dashboard</a>
-    <a href="/graph">Graph Explorer</a>
-    <a href="/memory">Memory</a>
-    <a href="/memory/synaptic">Synaptic</a>
-    <a href="/maturity">Maturity</a>
-    <a href="/api-docs">API Explorer</a>
-    <a href="/workflows" class="active">Workflows</a>
-  </div>
-</div>
+<!-- UNIFIED NAV -->
+<div id="mories-nav" data-active="workflows"></div>
 
 <!-- Main -->
 <div class="main">
@@ -365,5 +351,6 @@ document.getElementById('modal').addEventListener('click', e => { if (e.target =
 // Init
 loadWorkflows();
 </script>
+<script src="/dashboard/nav-component.js"></script>
 </body>
 </html>

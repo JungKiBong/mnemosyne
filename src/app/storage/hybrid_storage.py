@@ -33,7 +33,7 @@ class HybridStorage(GraphStorage):
 
     def health_check(self) -> dict:
         """Combine health checking for Neo4j and SM."""
-        neo4j_health = self.neo4j.health_check()
+        neo4j_health = self.neo4j.health_check() if hasattr(self.neo4j, 'health_check') else {"status": "unknown"}
         return {
             "neo4j": neo4j_health,
             "supermemory": {
@@ -57,11 +57,14 @@ class HybridStorage(GraphStorage):
         self.neo4j.delete_graph(graph_id)
         # In the future: bulk delete by container_tag on SM
 
-    def add_text(self, graph_id: str, text: str) -> str:
-        """
-        Neo4j is Source of Truth (Sync). Supermemory is eventually consistent (Async Outbox).
-        """
-        episode_id = self.neo4j.add_text(graph_id, text)
+    def add_text(
+        self, 
+        graph_id: str, 
+        text: str, 
+        principal_id: Optional[str] = None
+    ) -> str:
+        # We only rely on neo4j for add_text.
+        episode_id = self.neo4j.add_text(graph_id, text, principal_id=principal_id)
         
         # Determine if text is from an agent by applying heuristics
         agent_id = self._extract_agent_tag(text)
@@ -79,8 +82,13 @@ class HybridStorage(GraphStorage):
         
         return episode_id
 
-    def add_text_batch(self, graph_id: str, texts: List[str]) -> List[str]:
-        episode_ids = self.neo4j.add_text_batch(graph_id, texts)
+    def add_text_batch(
+        self, 
+        graph_id: str, 
+        texts: List[str],
+        principal_id: Optional[str] = None
+    ) -> List[str]:
+        episode_ids = self.neo4j.add_text_batch(graph_id, texts, principal_id=principal_id)
         
         for text, ep_id in zip(texts, episode_ids):
             agent_id = self._extract_agent_tag(text)
@@ -104,18 +112,19 @@ class HybridStorage(GraphStorage):
     # Search & Retrieval
     # ==========================================
 
-    def search(self, graph_id: str, query: str, limit: int = 10, search_scope: str = "edges") -> List[Dict]:
+    def search(self, graph_id: str, query: str, limit: int = 10, search_scope: str = "edges", agent_id: str = None) -> List[Dict]:
         """
         Hybrid search combining Supermemory results and Neo4j BM25+Vector graph results.
         """
         sm_results = []
+        sm_tag = f"{graph_id}_{agent_id}" if agent_id else graph_id
         try:
             # Fallback wrapper internally handled, but we use Circuit Breaker
             if self.sm.client:
                 sm_results = self.cb.call(
                     self.sm.search_memories,
                     query=query,
-                    container_tag=graph_id,
+                    container_tag=sm_tag,
                     limit=limit
                 )
         except (CircuitOpenError, Exception) as e:
@@ -168,7 +177,7 @@ class HybridStorage(GraphStorage):
                 return parts[1]
         return None
 
-    def _merge_search_results(self, sm_data: List[Any], neo4j_data: List[Dict], limit: int) -> List[Dict]:
+    def _merge_search_results(self, sm_data: List[Any], neo4j_data: Dict[str, Any], limit: int) -> List[Dict]:
         """Merge SM and Neo4j documents, deduplicating appropriately."""
         merged = []
         seen = set()
@@ -182,12 +191,24 @@ class HybridStorage(GraphStorage):
                 if len(merged) == limit:
                     break
                     
-        for item in neo4j_data:
+        # Extract items from Neo4j results (handles both nodes and edges)
+        neo4j_items = neo4j_data.get("edges", []) + neo4j_data.get("nodes", [])
+                    
+        for item in neo4j_items:
             if len(merged) == limit:
                 break
-            content = item.get("content", str(item))
+                
+            content = item.get("fact", item.get("summary", str(item)))
+            
+            # Formulate source_context from episode_contexts
+            episodes = [e for e in item.get("episode_contexts", []) if e]
+            if episodes:
+                context_str = " | ".join(episodes)
+                content = f"{content} (근거 상황: {context_str})"
+            
             if content not in seen:
-                merged.append(item)
+                # Add formatted content
+                merged.append({"content": content, "source": "neo4j", **item})
                 seen.add(content)
                 
         return merged
@@ -207,3 +228,30 @@ class HybridStorage(GraphStorage):
 
     def get_graph_summary(self, graph_id: str) -> Dict:
         return self.neo4j.get_graph_summary(graph_id)
+
+    def create_graph(self, graph_id: str, description: str = "") -> bool:
+        return self.neo4j.create_graph(graph_id, description)
+
+    def get_graph_data(self, graph_id: str, limit: int = 100) -> Dict[str, Any]:
+        return self.neo4j.get_graph_data(graph_id, limit)
+
+    def get_graph_info(self, graph_id: str) -> Dict[str, Any]:
+        return self.neo4j.get_graph_info(graph_id)
+
+    def get_node(self, graph_id: str, node_id: str) -> Dict[str, Any]:
+        return self.neo4j.get_node(graph_id, node_id)
+
+    def get_node_edges(self, graph_id: str, node_id: str) -> List[Dict[str, Any]]:
+        return self.neo4j.get_node_edges(graph_id, node_id)
+
+    def get_nodes_by_label(self, graph_id: str, label: str, limit: int = 100) -> List[Dict[str, Any]]:
+        return self.neo4j.get_nodes_by_label(graph_id, label, limit)
+
+    def get_ontology(self, graph_id: str) -> Dict[str, Any]:
+        return self.neo4j.get_ontology(graph_id)
+
+    def set_ontology(self, graph_id: str, ontology: Dict[str, Any]) -> bool:
+        return self.neo4j.set_ontology(graph_id, ontology)
+
+    def wait_for_processing(self) -> None:
+        self.neo4j.wait_for_processing()

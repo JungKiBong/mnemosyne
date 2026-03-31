@@ -51,7 +51,8 @@ class GraphBuilderService:
         graph_name: str = "MiroFish Graph",
         chunk_size: int = 500,
         chunk_overlap: int = 50,
-        batch_size: int = 3
+        batch_size: int = 3,
+        principal_id: Optional[str] = None
     ) -> str:
         """
         Build graph asynchronously
@@ -63,6 +64,7 @@ class GraphBuilderService:
             chunk_size: Text chunk size
             chunk_overlap: Chunk overlap size
             batch_size: Number of chunks to send per batch
+            principal_id: User principal for terminology mappings
 
         Returns:
             Task ID
@@ -74,13 +76,14 @@ class GraphBuilderService:
                 "graph_name": graph_name,
                 "chunk_size": chunk_size,
                 "text_length": len(text),
+                "principal_id": principal_id
             }
         )
 
         # Execute build in background thread
         thread = threading.Thread(
             target=self._build_graph_worker,
-            args=(task_id, text, ontology, graph_name, chunk_size, chunk_overlap, batch_size)
+            args=(task_id, text, ontology, graph_name, chunk_size, chunk_overlap, batch_size, principal_id)
         )
         thread.daemon = True
         thread.start()
@@ -95,7 +98,8 @@ class GraphBuilderService:
         graph_name: str,
         chunk_size: int,
         chunk_overlap: int,
-        batch_size: int
+        batch_size: int,
+        principal_id: Optional[str]
     ):
         """Graph build worker thread"""
         try:
@@ -134,11 +138,12 @@ class GraphBuilderService:
             # 4. Send data in batches (NER + embedding + Neo4j insert — synchronous)
             episode_uuids = self.add_text_batches(
                 graph_id, chunks, batch_size,
-                lambda msg, prog: self.task_manager.update_task(
+                progress_callback=lambda msg, prog: self.task_manager.update_task(
                     task_id,
                     progress=20 + int(prog * 0.6),  # 20-80%
                     message=msg
-                )
+                ),
+                principal_id=principal_id
             )
 
             # 5. Wait for processing (no-op for Neo4j — already synchronous)
@@ -187,7 +192,8 @@ class GraphBuilderService:
         graph_id: str,
         chunks: List[str],
         batch_size: int = 3,
-        progress_callback: Optional[Callable] = None
+        progress_callback: Optional[Callable] = None,
+        principal_id: Optional[str] = None
     ) -> List[str]:
         """Add text in batches to graph, return uuid list of all episodes"""
         episode_uuids = []
@@ -216,7 +222,7 @@ class GraphBuilderService:
                 )
                 t0 = time.time()
                 try:
-                    episode_id = self.storage.add_text(graph_id, chunk)
+                    episode_id = self.storage.add_text(graph_id, chunk, principal_id=principal_id)
                     episode_uuids.append(episode_id)
                     elapsed = time.time() - t0
                     logger.info(

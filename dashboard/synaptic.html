@@ -5,23 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mories — Synaptic Network & Data Products</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-<style>
-:root {
-  --bg-0: #0a0e1a;
-  --bg-1: #111827;
-  --bg-2: #1e293b;
-  --bg-3: #334155;
-  --accent-blue: #3b82f6;
-  --accent-purple: #8b5cf6;
-  --accent-green: #10b981;
-  --accent-amber: #f59e0b;
-  --accent-rose: #f43f5e;
-  --accent-cyan: #06b6d4;
-  --text-0: #f8fafc;
-  --text-1: #cbd5e1;
-  --text-2: #94a3b8;
-  --radius: 12px;
-}
+  <link rel="stylesheet" href="/dashboard/assets/css/tokens.css">
+  <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family:'Inter',system-ui,sans-serif; background:var(--bg-0); color:var(--text-0); min-height:100vh; }
 a { color:var(--accent-cyan); text-decoration:none; }
@@ -112,21 +97,11 @@ a:hover { text-decoration:underline; }
 .loading .spinner { display:inline-block; width:24px; height:24px; border:3px solid var(--bg-3); border-top-color:var(--accent-purple); border-radius:50%; animation:spin 1s linear infinite; }
 @keyframes spin { to { transform:rotate(360deg); } }
 </style>
+<link rel="stylesheet" href="/dashboard/nav-component.css">
 </head>
 <body>
 
-<div class="header">
-  <h1>🧠 Mories Synaptic Network</h1>
-  <span class="badge badge-9">Phase 9</span>
-  <span class="badge badge-11">Phase 11</span>
-  <div class="nav-links">
-    <a href="/graph">🕸️ Graph Explorer</a>
-    <a href="/memory">← Cognitive Memory</a>
-    <a href="/memory/history">📋 Audit Trail</a>
-    <a href="/maturity">🌱 Maturity</a>
-    <a href="/">🏠 Dashboard</a>
-  </div>
-</div>
+<div id="mories-nav" data-active="synaptic"></div>
 
 <div class="tabs">
   <div class="tab active" data-tab="network">🌐 Synaptic Network</div>
@@ -403,5 +378,6 @@ async function init() {
 }
 init();
 </script>
+<script src="/dashboard/nav-component.js"></script>
 </body>
 </html>

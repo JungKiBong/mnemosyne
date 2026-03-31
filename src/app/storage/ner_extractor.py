@@ -20,13 +20,17 @@ Given a text and an ontology (entity types + relation types), extract all entiti
 ONTOLOGY:
 {ontology_description}
 
+TERMINOLOGY MAPPINGS:
+{mapping_rules}
+
 RULES:
 1. Only extract entity types and relation types defined in the ontology.
 2. Normalize entity names: strip whitespace, use canonical form (e.g., "Jack Ma" not "ma jack").
-3. Each entity must have: name, type (from ontology), and optional attributes.
-4. Each relation must have: source entity name, target entity name, type (from ontology), and a fact sentence describing the relationship.
-5. If no entities or relations are found, return empty lists.
-6. Be precise — only extract what is explicitly stated or strongly implied in the text.
+3. IMPORTANT: Apply TERMINOLOGY MAPPINGS. If an entity matches a source term exactly, you MUST replace it with its mapped standard term.
+4. Each entity must have: name, type (from ontology), and optional attributes.
+5. Each relation must have: source entity name, target entity name, type (from ontology), and a fact sentence describing the relationship.
+6. If no entities or relations are found, return empty lists.
+7. Be precise — only extract what is explicitly stated or strongly implied in the text.
 
 Return ONLY valid JSON in this exact format:
 {{
@@ -50,13 +54,19 @@ class NERExtractor:
         self.llm = llm_client or LLMClient()
         self.max_retries = max_retries
 
-    def extract(self, text: str, ontology: Dict[str, Any]) -> Dict[str, Any]:
+    def extract(
+        self, 
+        text: str, 
+        ontology: Dict[str, Any], 
+        term_mappings: Optional[List[Dict[str, str]]] = None
+    ) -> Dict[str, Any]:
         """
         Extract entities and relations from text, guided by ontology.
 
         Args:
             text: Input text chunk
             ontology: Dict with 'entity_types' and 'relation_types' from graph
+            term_mappings: Optional list of mapping dicts (source_term -> standard_term)
 
         Returns:
             Dict with 'entities' and 'relations' lists:
@@ -69,7 +79,11 @@ class NERExtractor:
             return {"entities": [], "relations": []}
 
         ontology_desc = self._format_ontology(ontology)
-        system_msg = _SYSTEM_PROMPT.format(ontology_description=ontology_desc)
+        mapping_rules = self._format_mappings(term_mappings)
+        system_msg = _SYSTEM_PROMPT.format(
+            ontology_description=ontology_desc,
+            mapping_rules=mapping_rules
+        )
         user_msg = _USER_PROMPT.format(text=text.strip())
 
         messages = [
@@ -146,6 +160,16 @@ class NERExtractor:
         if not parts:
             parts.append("No specific ontology defined. Extract all entities and relations you find.")
 
+        return "\n".join(parts)
+
+    def _format_mappings(self, mappings: Optional[List[Dict[str, str]]]) -> str:
+        """Format mappings list into readable text for the LLM prompt."""
+        if not mappings:
+            return "No specific terminology mapping rules defined."
+            
+        parts = []
+        for m in mappings:
+            parts.append(f"  - Replace '{m.get('source_term')}' with '{m.get('standard_term')}'")
         return "\n".join(parts)
 
     def _validate_and_clean(

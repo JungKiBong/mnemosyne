@@ -1,3 +1,179 @@
+import logging
+from flask import Blueprint, request, jsonify, current_app
+
+logger = logging.getLogger('mirofish.api.analytics')
+analytics_bp = Blueprint('analytics', __name__)
+
+
+# --- Merged from maturity.py ---
+"""
+Maturity API — Knowledge Lifecycle Management
+
+Endpoints:
+  GET  /api/maturity/overview           — 종합 현황 (대시보드용)
+  GET  /api/maturity/list/<level>       — 특정 성숙도 기억 목록
+  POST /api/maturity/set                — 성숙도 수동 설정
+  GET  /api/maturity/<uuid>             — 특정 기억 성숙도 조회
+  POST /api/maturity/check-promotions   — 자동 승격 실행
+  GET  /api/maturity/rules              — 접근 규칙 매트릭스
+"""
+
+
+
+
+
+def _get_manager():
+    from ..security.memory_maturity import get_maturity_manager
+    return get_maturity_manager()
+
+
+@analytics_bp.route('/maturity/overview', methods=['GET'])
+def overview():
+    """종합 현황 — 대시보드용."""
+    mgr = _get_manager()
+    return jsonify(mgr.get_overview())
+
+
+@analytics_bp.route('/maturity/list/<level>', methods=['GET'])
+def list_by_maturity(level):
+    """특정 성숙도 레벨의 기억 목록."""
+    mgr = _get_manager()
+    scope = request.args.get('scope')
+    limit = int(request.args.get('limit', 50))
+    memories = mgr.get_memories_by_maturity(level, scope, limit)
+    return jsonify({"maturity": level, "count": len(memories), "memories": memories})
+
+
+@analytics_bp.route('/maturity/set', methods=['POST'])
+def set_maturity():
+    """기억 성숙도 수동 설정."""
+    data = request.get_json(force=True)
+    mgr = _get_manager()
+    result = mgr.set_maturity(
+        uuid=data.get('uuid', ''),
+        level=data.get('level', 'learning'),
+        changed_by=data.get('changed_by', 'admin'),
+        reason=data.get('reason', ''),
+    )
+    return jsonify(result)
+
+
+@analytics_bp.route('/maturity/<uuid>', methods=['GET'])
+def get_maturity(uuid):
+    """특정 기억의 성숙도 조회."""
+    mgr = _get_manager()
+    return jsonify(mgr.get_maturity(uuid))
+
+
+@analytics_bp.route('/maturity/check-promotions', methods=['POST'])
+def check_promotions():
+    """자동 승격 실행."""
+    mgr = _get_manager()
+    result = mgr.check_promotions()
+    return jsonify(result)
+
+
+@analytics_bp.route('/maturity/rules', methods=['GET'])
+def access_rules():
+    """성숙도별 접근 규칙 매트릭스."""
+    from ..security.memory_maturity import MATURITY_ACCESS, MaturityLevel
+    rules = {}
+    for level, access in MATURITY_ACCESS.items():
+        rules[level.value] = {
+            **access,
+            "emoji": {"learning": "🌱", "unstable": "⚡", "mature": "✅", "secret": "🔒"}[level.value],
+        }
+    return jsonify({"rules": rules})
+
+
+# --- Merged from reconciliation.py ---
+"""
+Reconciliation API — Data Consistency Endpoints
+
+Provides REST endpoints for:
+  - Running reconciliation checks
+  - Quick health checks
+  - Viewing reconciliation history
+"""
+
+from ..utils.logger import get_logger
+
+
+logger = get_logger('mirofish.api.reconciliation')
+
+
+def _get_service():
+    """Lazy-load ReconciliationService."""
+    from ..storage.reconciliation_service import ReconciliationService
+    return ReconciliationService()
+
+
+@analytics_bp.route('/reconcile/run', methods=['POST'])
+def run_reconciliation():
+    """
+    POST /api/reconciliation/run
+    Run full reconciliation check.
+
+    Body (JSON):
+        auto_fix (bool): Auto-fix INFO-level issues (default: false)
+
+    Returns:
+        ReconciliationResult with all issues and health score
+    """
+    data = request.get_json(silent=True) or {}
+    auto_fix = data.get('auto_fix', False)
+
+    svc = _get_service()
+    try:
+        result = svc.run(auto_fix=auto_fix)
+        return jsonify(result.to_dict())
+    except Exception as e:
+        logger.error(f"Reconciliation run failed: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        svc.close()
+
+
+@analytics_bp.route('/reconcile/check', methods=['GET'])
+def quick_check():
+    """
+    GET /api/reconciliation/check
+    Lightweight health check (no auto-fix).
+    """
+    svc = _get_service()
+    try:
+        result = svc.quick_check()
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Quick check failed: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        svc.close()
+
+
+@analytics_bp.route('/reconcile/history', methods=['GET'])
+def reconciliation_history():
+    """
+    GET /api/reconciliation/history
+    Get history of reconciliation runs.
+
+    Query params:
+        limit (int): Max results (default: 10)
+    """
+    limit = request.args.get('limit', 10, type=int)
+
+    svc = _get_service()
+    try:
+        history = svc.get_run_history(limit=limit)
+        return jsonify({"history": history, "count": len(history)})
+    except Exception as e:
+        logger.error(f"History query failed: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        svc.close()
+
+
+# --- Merged from report.py ---
 """
 Report API Routes
 Provides interfaces for simulation report generation, retrieval, and conversation
@@ -8,7 +184,7 @@ import traceback
 import threading
 from flask import request, jsonify, send_file, current_app
 
-from . import report_bp
+
 from ..config import Config
 from ..services.report_agent import ReportAgent, ReportManager, ReportStatus
 from ..services.simulation_manager import SimulationManager
@@ -22,7 +198,7 @@ logger = get_logger('mirofish.api.report')
 
 # ============== Report Generation Interface ==============
 
-@report_bp.route('/generate', methods=['POST'])
+@analytics_bp.route('/report/generate', methods=['POST'])
 def generate_report():
     try:
         data = request.get_json() or {}
@@ -113,7 +289,7 @@ def generate_report():
         return jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}), 500
 
 
-@report_bp.route('/generate/status', methods=['POST'])
+@analytics_bp.route('/report/generate/status', methods=['POST'])
 def get_generate_status():
     try:
         data = request.get_json() or {}
@@ -149,7 +325,7 @@ def get_generate_status():
 
 # ============== Report Retrieval Interface ==============
 
-@report_bp.route('/<report_id>', methods=['GET'])
+@analytics_bp.route('/report/<report_id>', methods=['GET'])
 def get_report(report_id: str):
     try:
         report = ReportManager.get_report(report_id)
@@ -161,7 +337,7 @@ def get_report(report_id: str):
         return jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}), 500
 
 
-@report_bp.route('/by-simulation/<simulation_id>', methods=['GET'])
+@analytics_bp.route('/report/by-simulation/<simulation_id>', methods=['GET'])
 def get_report_by_simulation(simulation_id: str):
     try:
         report = ReportManager.get_report_by_simulation(simulation_id)
@@ -173,7 +349,7 @@ def get_report_by_simulation(simulation_id: str):
         return jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}), 500
 
 
-@report_bp.route('/list', methods=['GET'])
+@analytics_bp.route('/report/list', methods=['GET'])
 def list_reports():
     try:
         simulation_id = request.args.get('simulation_id')
@@ -185,7 +361,7 @@ def list_reports():
         return jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}), 500
 
 
-@report_bp.route('/<report_id>/download', methods=['GET'])
+@analytics_bp.route('/report/<report_id>/download', methods=['GET'])
 def download_report(report_id: str):
     try:
         report = ReportManager.get_report(report_id)
@@ -207,7 +383,7 @@ def download_report(report_id: str):
         return jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}), 500
 
 
-@report_bp.route('/<report_id>', methods=['DELETE'])
+@analytics_bp.route('/report/<report_id>', methods=['DELETE'])
 def delete_report(report_id: str):
     try:
         success = ReportManager.delete_report(report_id)
@@ -221,7 +397,7 @@ def delete_report(report_id: str):
 
 # ============== Report Agent Chat Interface ==============
 
-@report_bp.route('/chat', methods=['POST'])
+@analytics_bp.route('/report/chat', methods=['POST'])
 def chat_with_report_agent():
     try:
         data = request.get_json() or {}
@@ -271,7 +447,7 @@ def chat_with_report_agent():
 
 # ============== Report Progress and Section Retrieval Interface ==============
 
-@report_bp.route('/<report_id>/progress', methods=['GET'])
+@analytics_bp.route('/report/<report_id>/progress', methods=['GET'])
 def get_report_progress(report_id: str):
     try:
         progress = ReportManager.get_progress(report_id)
@@ -283,7 +459,7 @@ def get_report_progress(report_id: str):
         return jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}), 500
 
 
-@report_bp.route('/<report_id>/sections', methods=['GET'])
+@analytics_bp.route('/report/<report_id>/sections', methods=['GET'])
 def get_report_sections(report_id: str):
     try:
         sections = ReportManager.get_generated_sections(report_id)
@@ -300,7 +476,7 @@ def get_report_sections(report_id: str):
         return jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}), 500
 
 
-@report_bp.route('/<report_id>/section/<int:section_index>', methods=['GET'])
+@analytics_bp.route('/report/<report_id>/section/<int:section_index>', methods=['GET'])
 def get_single_section(report_id: str, section_index: int):
     try:
         section_path = ReportManager._get_section_path(report_id, section_index)
@@ -316,7 +492,7 @@ def get_single_section(report_id: str, section_index: int):
 
 # ============== Report Status Check Interface ==============
 
-@report_bp.route('/check/<simulation_id>', methods=['GET'])
+@analytics_bp.route('/report/check/<simulation_id>', methods=['GET'])
 def check_report_status(simulation_id: str):
     try:
         report = ReportManager.get_report_by_simulation(simulation_id)
@@ -338,7 +514,7 @@ def check_report_status(simulation_id: str):
 
 # ============== Agent Log Interface ==============
 
-@report_bp.route('/<report_id>/agent-log', methods=['GET'])
+@analytics_bp.route('/report/<report_id>/agent-log', methods=['GET'])
 def get_agent_log(report_id: str):
     try:
         from_line = request.args.get('from_line', 0, type=int)
@@ -349,7 +525,7 @@ def get_agent_log(report_id: str):
         return jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}), 500
 
 
-@report_bp.route('/<report_id>/agent-log/stream', methods=['GET'])
+@analytics_bp.route('/report/<report_id>/agent-log/stream', methods=['GET'])
 def stream_agent_log(report_id: str):
     try:
         logs = ReportManager.get_agent_log_stream(report_id)
@@ -361,7 +537,7 @@ def stream_agent_log(report_id: str):
 
 # ============== Console Log Interface ==============
 
-@report_bp.route('/<report_id>/console-log', methods=['GET'])
+@analytics_bp.route('/report/<report_id>/console-log', methods=['GET'])
 def get_console_log(report_id: str):
     try:
         from_line = request.args.get('from_line', 0, type=int)
@@ -372,7 +548,7 @@ def get_console_log(report_id: str):
         return jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}), 500
 
 
-@report_bp.route('/<report_id>/console-log/stream', methods=['GET'])
+@analytics_bp.route('/report/<report_id>/console-log/stream', methods=['GET'])
 def stream_console_log(report_id: str):
     try:
         logs = ReportManager.get_console_log_stream(report_id)
@@ -384,7 +560,7 @@ def stream_console_log(report_id: str):
 
 # ============== Tool Call Interface (For Debugging) ==============
 
-@report_bp.route('/tools/search', methods=['POST'])
+@analytics_bp.route('/report/tools/search', methods=['POST'])
 def search_graph_tool():
     try:
         data = request.get_json() or {}
@@ -404,7 +580,7 @@ def search_graph_tool():
         return jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}), 500
 
 
-@report_bp.route('/tools/statistics', methods=['POST'])
+@analytics_bp.route('/report/tools/statistics', methods=['POST'])
 def get_graph_statistics_tool():
     try:
         data = request.get_json() or {}
@@ -420,3 +596,294 @@ def get_graph_statistics_tool():
     except Exception as e:
         logger.error(f"Failed to get graph statistics: {str(e)}")
         return jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}), 500
+
+# --- Merged from data_product.py ---
+"""
+Data Product API — Phase 11: AI-Ready Memory Export
+
+REST endpoints for exporting memories as AI-consumable data products.
+"""
+
+
+
+
+
+def _get_dp():
+    from ..storage.data_product import MemoryDataProduct
+    driver = current_app.extensions.get('neo4j_driver')
+    return MemoryDataProduct(driver=driver)
+
+
+# ── RAG Corpus ──
+
+@analytics_bp.route('/data-product/rag', methods=['GET'])
+def export_rag():
+    """
+    Export RAG-ready corpus.
+    Query: scope, min_salience, format(json|jsonl), include_relations(true|false)
+    """
+    scope = request.args.get('scope', None)
+    min_sal = request.args.get('min_salience', 0.3, type=float)
+    fmt = request.args.get('format', 'jsonl')
+    include_rels = request.args.get('include_relations', 'true') == 'true'
+
+    dp = _get_dp()
+    result = dp.export_rag_corpus(scope, min_sal, include_rels, fmt)
+    return jsonify(result)
+
+
+@analytics_bp.route('/data-product/rag/download', methods=['GET'])
+def download_rag():
+    """Download RAG corpus as a file."""
+    scope = request.args.get('scope', None)
+    min_sal = request.args.get('min_salience', 0.3, type=float)
+
+    dp = _get_dp()
+    result = dp.export_rag_corpus(scope, min_sal, True, 'jsonl')
+    return Response(
+        result["content"],
+        mimetype='application/x-jsonlines',
+        headers={"Content-Disposition": "attachment; filename=mories_rag_corpus.jsonl"},
+    )
+
+
+# ── Knowledge Snapshot ──
+
+@analytics_bp.route('/data-product/snapshot', methods=['GET'])
+def export_snapshot():
+    """Export full knowledge graph snapshot."""
+    scope = request.args.get('scope', None)
+    min_sal = request.args.get('min_salience', 0.0, type=float)
+
+    dp = _get_dp()
+    result = dp.export_knowledge_snapshot(scope, min_sal)
+    return jsonify(result)
+
+
+# ── Training Dataset ──
+
+@analytics_bp.route('/data-product/training', methods=['GET'])
+def export_training():
+    """
+    Export Q&A training pairs.
+    Query: format(json|jsonl), min_salience
+    """
+    fmt = request.args.get('format', 'jsonl')
+    min_sal = request.args.get('min_salience', 0.5, type=float)
+
+    dp = _get_dp()
+    result = dp.export_training_dataset(fmt, min_sal)
+    return jsonify(result)
+
+
+@analytics_bp.route('/data-product/training/download', methods=['GET'])
+def download_training():
+    """Download training dataset as file."""
+    min_sal = request.args.get('min_salience', 0.5, type=float)
+
+    dp = _get_dp()
+    result = dp.export_training_dataset('jsonl', min_sal)
+    return Response(
+        result["content"],
+        mimetype='application/x-jsonlines',
+        headers={"Content-Disposition": "attachment; filename=mories_training.jsonl"},
+    )
+
+
+# ── Memory Manifest ──
+
+@analytics_bp.route('/data-product/manifest', methods=['POST'])
+def create_manifest():
+    """
+    Create a versioned Memory Manifest package.
+    Body: {"name": "...", "description": "...", "scope": "tribal", "include_audit": true}
+    """
+    data = request.get_json(force=True)
+    name = data.get('name')
+    if not name:
+        return jsonify({"error": "name is required"}), 400
+
+    dp = _get_dp()
+    manifest = dp.create_manifest(
+        name=name,
+        description=data.get('description', ''),
+        scope=data.get('scope', None),
+        include_audit=data.get('include_audit', True),
+    )
+    return jsonify(manifest)
+
+
+@analytics_bp.route('/data-product/manifest/list', methods=['GET'])
+def list_manifests():
+    """List all created manifests."""
+    dp = _get_dp()
+    return jsonify(dp.list_manifests())
+
+
+# ── Import — Manifest ──
+
+@analytics_bp.route('/data-product/manifest/import', methods=['POST'])
+def import_manifest():
+    """
+    Import a Memory Manifest JSON into Neo4j.
+    Body: Full manifest JSON (from create_manifest or downloaded file).
+    Query: graph_id (optional), strategy (merge|create), imported_by (optional)
+    """
+    data = request.get_json(force=True)
+    if not data:
+        return jsonify({"error": "Request body must be a valid manifest JSON"}), 400
+
+    graph_id = request.args.get('graph_id', '')
+    strategy = request.args.get('strategy', 'merge')
+    imported_by = request.args.get('imported_by', 'api')
+
+    if strategy not in ('merge', 'create'):
+        return jsonify({"error": "strategy must be 'merge' or 'create'"}), 400
+
+    dp = _get_dp()
+    try:
+        result = dp.import_manifest(
+            manifest=data,
+            target_graph_id=graph_id,
+            merge_strategy=strategy,
+            imported_by=imported_by,
+        )
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Manifest import failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# ── Import — RAG Corpus ──
+
+@analytics_bp.route('/data-product/rag/import', methods=['POST'])
+def import_rag():
+    """
+    Import a JSONL RAG corpus into Neo4j.
+    Content-Type: application/json → body: {"content": "...jsonl..."}
+    Content-Type: text/plain → body is raw JSONL content.
+    Query: graph_id, scope, imported_by
+    """
+    content_type = request.content_type or ''
+
+    if 'json' in content_type:
+        data = request.get_json(force=True)
+        content = data.get('content', '')
+    else:
+        # Accept raw JSONL text
+        content = request.get_data(as_text=True)
+
+    if not content or not content.strip():
+        return jsonify({"error": "JSONL content is required"}), 400
+
+    graph_id = request.args.get('graph_id', '')
+    scope = request.args.get('scope', 'personal')
+    imported_by = request.args.get('imported_by', 'api')
+
+    dp = _get_dp()
+    try:
+        result = dp.import_rag_corpus(
+            content=content,
+            target_graph_id=graph_id,
+            default_scope=scope,
+            imported_by=imported_by,
+        )
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"RAG import failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# ── Import History ──
+
+@analytics_bp.route('/data-product/imports', methods=['GET'])
+def list_imports():
+    """List all import records."""
+    dp = _get_dp()
+    return jsonify(dp.list_imports())
+
+
+# ── Analytics CSV ──
+
+@analytics_bp.route('/data-product/analytics/csv', methods=['GET'])
+def export_csv():
+    """Export analytics as CSV file."""
+    dp = _get_dp()
+    csv_content = dp.export_analytics_csv()
+    return Response(
+        csv_content,
+        mimetype='text/csv',
+        headers={"Content-Disposition": "attachment; filename=mories_analytics.csv"},
+    )
+
+
+# ── Summary ──
+
+@analytics_bp.route('/data-product/catalog', methods=['GET'])
+def catalog():
+    """List all available data products and their descriptions."""
+    return jsonify({
+        "products": [
+            {
+                "id": "rag_corpus",
+                "name": "RAG Corpus",
+                "description": "Embedding-ready documents for Retrieval-Augmented Generation",
+                "endpoint": "/api/memory/data/rag",
+                "formats": ["json", "jsonl"],
+                "download": "/api/memory/data/rag/download",
+            },
+            {
+                "id": "knowledge_snapshot",
+                "name": "Knowledge Graph Snapshot",
+                "description": "Full graph export (nodes, edges, agents) for visualization or import",
+                "endpoint": "/api/memory/data/snapshot",
+                "formats": ["json"],
+            },
+            {
+                "id": "training_dataset",
+                "name": "Training Dataset",
+                "description": "Q&A pairs for LLM fine-tuning from knowledge relationships",
+                "endpoint": "/api/memory/data/training",
+                "formats": ["json", "jsonl"],
+                "download": "/api/memory/data/training/download",
+            },
+            {
+                "id": "memory_manifest",
+                "name": "Memory Manifest",
+                "description": "Versioned, shareable knowledge package with lineage metadata",
+                "endpoint": "/api/memory/data/manifest",
+                "method": "POST",
+            },
+            {
+                "id": "analytics_csv",
+                "name": "Analytics Export",
+                "description": "Memory analytics as CSV for dashboards and spreadsheets",
+                "endpoint": "/api/memory/data/analytics/csv",
+                "formats": ["csv"],
+            },
+            {
+                "id": "manifest_import",
+                "name": "Manifest Import",
+                "description": "Import a Memory Manifest JSON into Neo4j (merge or create strategy)",
+                "endpoint": "/api/memory/data/manifest/import",
+                "method": "POST",
+                "params": ["graph_id", "strategy(merge|create)", "imported_by"],
+            },
+            {
+                "id": "rag_import",
+                "name": "RAG Corpus Import",
+                "description": "Import JSONL RAG corpus documents as Entity nodes",
+                "endpoint": "/api/memory/data/rag/import",
+                "method": "POST",
+                "params": ["graph_id", "scope", "imported_by"],
+            },
+            {
+                "id": "import_history",
+                "name": "Import History",
+                "description": "List all past import operations with statistics",
+                "endpoint": "/api/memory/data/imports",
+                "method": "GET",
+            },
+        ],
+        "version": "1.1.0",
+    })

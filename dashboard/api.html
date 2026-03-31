@@ -7,40 +7,15 @@
 <meta name="description" content="Interactive API documentation and testing console for Mories Memory System">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>
-:root {
-  --bg: #0a0e1a;
-  --bg-card: #111827;
-  --bg-surface: #1a2236;
-  --bg-hover: #1f2b42;
-  --border: #2a3550;
-  --border-bright: #3b4f73;
-  --text: #e2e8f0;
-  --text-dim: #94a3b8;
-  --text-muted: #64748b;
-  --accent: #6366f1;
-  --accent-glow: rgba(99,102,241,.15);
-  --green: #22c55e;
-  --green-dim: rgba(34,197,94,.12);
-  --yellow: #f59e0b;
-  --yellow-dim: rgba(245,158,11,.12);
-  --red: #ef4444;
-  --red-dim: rgba(239,68,68,.12);
-  --blue: #3b82f6;
-  --blue-dim: rgba(59,130,246,.12);
-  --orange: #f97316;
-  --cyan: #06b6d4;
-  --radius: 10px;
-  --font: 'Inter', -apple-system, sans-serif;
-  --mono: 'JetBrains Mono', monospace;
-}
+  <link rel="stylesheet" href="/dashboard/assets/css/tokens.css">
+  <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; }
 a { color: var(--accent); text-decoration: none; }
 
 /* Layout */
 .layout { display: flex; min-height: 100vh; }
-.sidebar { width: 320px; border-right: 1px solid var(--border); display: flex; flex-direction: column; background: var(--bg-card); flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow: hidden; }
+.sidebar { width: 320px; border-right: 1px solid var(--border); display: flex; flex-direction: column; background: var(--bg-card); flex-shrink: 0; position: sticky; top: 56px; height: calc(100vh - 56px); overflow: hidden; }
 .main { flex: 1; padding: 32px; max-width: calc(100% - 320px); overflow-y: auto; }
 
 /* Sidebar header */
@@ -184,8 +159,11 @@ a { color: var(--accent); text-decoration: none; }
   .main { max-width: 100%; }
 }
 </style>
+<link rel="stylesheet" href="/dashboard/nav-component.css">
 </head>
 <body>
+
+<div id="mories-nav" data-active="api"></div>
 
 <div class="layout">
   <!-- Sidebar -->
@@ -210,7 +188,7 @@ a { color: var(--accent); text-decoration: none; }
 
     <div class="stats-bar">
       <div class="stat-item"><div class="stat-dot" style="background:var(--green)"></div> <span id="statEndpoints">0</span> endpoints</div>
-      <div class="stat-item"><div class="stat-dot" style="background:var(--cyan)"></div> <span id="statMcp">8</span> MCP tools</div>
+      <div class="stat-item"><div class="stat-dot" style="background:var(--cyan)"></div> <span id="statMcp">4</span> MCP tools</div>
     </div>
   </aside>
 
@@ -333,53 +311,26 @@ a { color: var(--accent); text-decoration: none; }
           <span class="method-badge method-POST">MCP</span>
           <h2>MCP Tools for Agents</h2>
         </div>
-      <div class="ep-desc">
+        <div class="ep-desc">
           MCP (Model Context Protocol) 도구는 AI 에이전트가 Mories의 기억을 직접 조작할 수 있게 해주는 JSON-RPC 인터페이스입니다.<br>
-          <strong>엔드포인트:</strong> <code>POST /api/mcp</code> | 프로토콜: JSON-RPC 2.0 | <strong>버전:</strong> <code>v0.7.0</code> (8개 도구)
-          <div style="margin-top:10px;padding:10px 14px;background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.2);border-radius:8px;font-size:12px;color:var(--text-dim)">
-            🏗️ <strong>Phase 4 아키텍처</strong>: Mories=기억 저장·검색, n8n=오케스트레이션 — <a href="/guide#7-n8n" style="color:var(--cyan)">n8n 워크플로우 연동 가이드 →</a>
-          </div>
+          <strong>엔드포인트:</strong> <code>POST /api/mcp</code> | 프로토콜: JSON-RPC 2.0
         </div>
       </div>
 
       <div class="mcp-section">
-        <h3>🔧 Available MCP Tools <span style="font-family:var(--mono);font-size:11px;font-weight:400;color:var(--text-muted);background:var(--bg-surface);padding:2px 8px;border-radius:4px;margin-left:6px;">v0.7.0 · 8 tools</span></h3>
+        <h3>🔧 Available MCP Tools</h3>
 
         <div class="mcp-tool">
           <h4>mories_search</h4>
-          <p>지식 그래프에서 Compact Index 형식으로 기억을 검색합니다 (Layer 1 — 토큰 효율 최적화). <code>status</code> 필터로 작업 상태 기반 검색도 지원합니다.</p>
+          <p>지식 그래프에서 벡터 유사도 + 키워드 기반으로 기억을 검색합니다. 검색된 기억은 자동으로 Retrieval Boost됩니다.</p>
           <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">
-            <strong>Params:</strong> query (string, required), graph_id (string), limit (int, default:10), status (string: pending|in_progress|completed|blocked)
-          </div>
-        </div>
-
-        <div class="mcp-tool">
-          <h4>mories_detail</h4>
-          <p>특정 UUID 노드의 전체 상세 정보를 조회합니다 (Layer 3 — Full Content). 관계(Relations), 이웃 노드 포함.</p>
-          <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">
-            <strong>Params:</strong> uuid (string, required), include_relations (bool, default:true)
-          </div>
-        </div>
-
-        <div class="mcp-tool">
-          <h4>mories_timeline</h4>
-          <p>특정 기억의 시간순 이웃 노드를 탐색합니다 (Layer 2 — Temporal Context). 맥락 재구성에 사용합니다.</p>
-          <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">
-            <strong>Params:</strong> uuid (string, required), direction (before|after|both, default:both), limit (int, default:5)
-          </div>
-        </div>
-
-        <div class="mcp-tool">
-          <h4>mories_update_status ✨ New</h4>
-          <p>기억/태스크 노드의 상태를 업데이트합니다 (경량 Whiteboard). 삭제된 Orchestration Blackboard를 대체하는 Phase 4-1 도구입니다.</p>
-          <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">
-            <strong>Params:</strong> uuid (string, required), status (pending|in_progress|completed|blocked), priority (int, 1=최우선), assigned_to (string)
+            <strong>Params:</strong> query (string), graph_id (string), limit (int, default: 10)
           </div>
         </div>
 
         <div class="mcp-tool">
           <h4>mories_ingest</h4>
-          <p>텍스트/문서를 지식 그래프에 인제스트합니다. 엔티티 추출 → 관계 구축 → STM 승격 → <strong>Task-Memory Alignment</strong>(RELATES_TO_TASK 자동 생성) 파이프라인을 자동 실행합니다.</p>
+          <p>텍스트/문서를 지식 그래프에 인제스트합니다. 엔티티 추출 → 관계 구축 → STM 승격 파이프라인을 자동 실행합니다.</p>
           <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">
             <strong>Params:</strong> content (string), source (string), graph_id (string), auto_relate (bool)
           </div>
@@ -425,15 +376,14 @@ a { color: var(--accent); text-decoration: none; }
             </div>
             <div class="try-row">
               <label>JSON-RPC Body</label>
-              <textarea id="mcpBody" style="min-height:200px">{
+              <textarea id="mcpBody" style="min-height:160px">{
   "jsonrpc": "2.0",
   "id": 1,
   "method": "tools/call",
   "params": {
     "name": "mories_search",
     "arguments": {
-      "query": "Phase 4 orchestration",
-      "status": "in_progress",
+      "query": "TurboQuant quantization",
       "limit": 5
     }
   }
@@ -888,5 +838,6 @@ renderSidebar();
 checkConnection();
 setInterval(checkConnection, 15000);
 </script>
+<script src="/dashboard/nav-component.js"></script>
 </body>
 </html>

@@ -124,13 +124,33 @@ class ObserverAgent:
                     container_tag = f"{self.graph_id}_{agent_name}"
                     
                     # Store via supermemory client in HybridStorage
-                    if hasattr(self.storage, 'sm'):
-                        self.storage.sm.add(
-                            content=f"[{self.observer_type.value.upper()}] {text_insight}",
-                            containerTag=container_tag,
-                            metadata={"role": self.observer_type.value, "source": "observer"}
-                        )
-                        logger.debug(f"Observer ({self.observer_type.value}) extracted for {agent_name}: {text_insight}")
+                    if hasattr(self.storage, 'sm') and self.storage.sm:
+                        try:
+                            rounds = [act.round_num for act in batch if hasattr(act, 'round_num')]
+                            min_round = min(rounds) if rounds else None
+                            max_round = max(rounds) if rounds else None
+                            
+                            metadata = {
+                                "role": self.observer_type.value,
+                                "source": "observer",
+                                "simulation_min_round": min_round,
+                                "simulation_max_round": max_round
+                            }
+                            
+                            prefix = self.observer_type.value.upper()
+                            if self.observer_type == ObserverType.PERSONAL:
+                                trait_type = insight.get("trait_type", "dynamic")
+                                metadata["trait_type"] = trait_type
+                                prefix = f"{prefix}_{trait_type.upper()}"
+                            
+                            self.storage.sm.add(
+                                content=f"[{prefix}] {text_insight}",
+                                container_tag=container_tag,
+                                metadata=metadata
+                            )
+                            logger.debug(f"Observer ({self.observer_type.value}) extracted for {agent_name}: {text_insight}")
+                        except Exception as inner_e:
+                            logger.error(f"Failed to add insight to Supermemory: {inner_e}")
 
         except Exception as e:
             logger.error(f"Failed to process batch in Observer ({self.observer_type.value}): {e}")
@@ -145,7 +165,8 @@ class ObserverAgent:
             return base + (
                 "Role: Personal Observer\n"
                 "Focus on extracting personal characteristics, preferences, habits, and static personality traits. "
-                "Only extract if there is meaningful evidence. Example insight: 'Shows a strong preference for reading scientific articles.'"
+                "For PERSONAL role, you MUST also add a 'trait_type' field to each object, value being 'static' or 'dynamic'. "
+                "Only extract if there is meaningful evidence. Example insight: 'Shows a strong preference for reading scientific articles.' with trait_type 'static'."
             )
         elif self.observer_type == ObserverType.EVENT:
             return base + (

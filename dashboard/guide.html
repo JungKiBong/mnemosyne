@@ -5,25 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mories Guide</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>
-:root {
-  --bg: #0a0e1a;
-  --bg-card: #111827;
-  --bg-surface: #1a2236;
-  --bg-hover: #1f2b42;
-  --border: #2a3550;
-  --border-bright: #3b4f73;
-  --text: #e2e8f0;
-  --text-dim: #94a3b8;
-  --text-muted: #64748b;
-  --accent: #6366f1;
-  --accent-glow: rgba(99,102,241,.15);
-  --green: #22c55e;
-  --cyan: #06b6d4;
-  --radius: 10px;
-  --font: 'Inter', -apple-system, sans-serif;
-  --mono: 'JetBrains Mono', monospace;
-}
+  <link rel="stylesheet" href="/dashboard/assets/css/tokens.css">
+  <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; }
 a { color: var(--accent); text-decoration: none; }
@@ -69,22 +52,11 @@ a { color: var(--accent); text-decoration: none; }
 .markdown-body td { padding: 12px; border-bottom: 1px solid var(--border); color: var(--text-dim); }
 .markdown-body tr:hover td { background: rgba(255,255,255,0.02); color: var(--text); }
 </style>
+<link rel="stylesheet" href="/dashboard/nav-component.css">
 </head>
 <body>
 
-<div class="topbar">
-  <h1>🧠 <span>Mories</span></h1>
-  <div class="nav">
-    <a href="/">Dashboard</a>
-    <a href="/graph">Graph Explorer</a>
-    <a href="/memory">Memory</a>
-    <a href="/memory/synaptic">Synaptic</a>
-    <a href="/maturity">Maturity</a>
-    <a href="/api-docs">API Explorer</a>
-    <a href="/workflows">Workflows</a>
-    <a href="/guide" class="active">Guide</a>
-  </div>
-</div>
+<div id="mories-nav" data-active="guide"></div>
 
 <div class="layout">
   <aside class="sidebar">
@@ -174,7 +146,7 @@ a { color: var(--accent); text-decoration: none; }
           </div>
           <div class="cat-items">
         
-            <div class="endpoint-item" onclick="document.getElementById('5').scrollIntoView({behavior:'smooth'})">지원 도구 (8개) ✨</div>
+            <div class="endpoint-item" onclick="document.getElementById('5').scrollIntoView({behavior:'smooth'})">지원 도구 (5개)</div>
         
             <div class="endpoint-item" onclick="document.getElementById('rest-mcp-proxy').scrollIntoView({behavior:'smooth'})">REST MCP Proxy</div>
         </div></div>
@@ -481,84 +453,42 @@ curl -X POST http://localhost:5050/api/memory/audit/rollback \
 <hr />
 <h2 id="6-mcp">6. MCP 서버 연동</h2>
 <p>Mories는 MCP(Model Context Protocol) 서버를 내장하고 있어 AI 에이전트가 직접 도구로 호출 가능합니다.</p>
-<h3 id="5">지원 도구 (8개) — v0.7.0</h3>
+<h3 id="5">지원 도구 (5개)</h3>
 <table>
 <thead>
 <tr>
 <th>Tool</th>
-<th>Layer</th>
 <th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>mories_search</code></td>
-<td>Layer 1</td>
-<td>Compact Index 검색 — 토큰 효율 최적화, <code>status</code> 필터 지원</td>
+<td><code>memory_store</code></td>
+<td>기억 저장 (STM/LTM)</td>
 </tr>
 <tr>
-<td><code>mories_timeline</code></td>
-<td>Layer 2</td>
-<td>시간순 이웃 탐색 — 맥락 재구성용 Temporal Context</td>
+<td><code>memory_search</code></td>
+<td>의미 기반 기억 검색</td>
 </tr>
 <tr>
-<td><code>mories_detail</code></td>
-<td>Layer 3</td>
-<td>완전한 노드 상세 정보 — 관계(RELATES_TO_TASK 포함) 포함</td>
+<td><code>memory_boost</code></td>
+<td>기억 중요도 강화</td>
 </tr>
 <tr>
-<td><code>mories_update_status</code> ✨</td>
-<td>Whiteboard</td>
-<td>태스크 상태 업데이트 — pending/in_progress/completed/blocked, priority, assigned_to</td>
+<td><code>memory_scope</code></td>
+<td>범위 조회/승격</td>
 </tr>
 <tr>
-<td><code>mories_ingest</code></td>
-<td>Pipeline</td>
-<td>텍스트 인제스트 — Task-Memory Alignment(RELATES_TO_TASK 자동 생성) 포함</td>
-</tr>
-<tr>
-<td><code>mories_profile</code></td>
-<td>Profile</td>
-<td>주제 종합 프로필 구축 (관련 엔티티·관계·사실 집계)</td>
-</tr>
-<tr>
-<td><code>mories_graph_query</code></td>
-<td>Query</td>
-<td>읽기 전용 Cypher 쿼리 직접 실행</td>
-</tr>
-<tr>
-<td><code>mories_stream</code></td>
-<td>Stream</td>
-<td>실시간 스트리밍 인제스트 소스 관리</td>
+<td><code>memory_audit</code></td>
+<td>감사 이력 조회</td>
 </tr>
 </tbody>
 </table>
-<h3 id="rest-mcp-proxy">REST MCP Proxy (JSON-RPC 2.0)</h3>
-<pre><code class="language-bash"># Layer 1: Compact 검색 (status 필터 포함)
-curl -X POST http://localhost:5002/mcp/call \
+<h3 id="rest-mcp-proxy">REST MCP Proxy</h3>
+<pre><code class="language-bash"># JSON-RPC 형식으로 MCP 도구 호출
+curl -X POST http://localhost:5050/api/mcp \
   -H &quot;Content-Type: application/json&quot; \
-  -d '{
-    &quot;jsonrpc&quot;: &quot;2.0&quot;,
-    &quot;method&quot;: &quot;tools/call&quot;,
-    &quot;params&quot;: {
-      &quot;name&quot;: &quot;mories_search&quot;,
-      &quot;arguments&quot;: {&quot;query&quot;: &quot;architecture&quot;, &quot;status&quot;: &quot;in_progress&quot;}
-    },
-    &quot;id&quot;: 1
-  }'
-
-# Phase 4: 태스크 상태 업데이트 (경량 Whiteboard)
-curl -X POST http://localhost:5002/mcp/call \
-  -H &quot;Content-Type: application/json&quot; \
-  -d '{
-    &quot;jsonrpc&quot;: &quot;2.0&quot;,
-    &quot;method&quot;: &quot;tools/call&quot;,
-    &quot;params&quot;: {
-      &quot;name&quot;: &quot;mories_update_status&quot;,
-      &quot;arguments&quot;: {&quot;uuid&quot;: &quot;&lt;task-uuid&gt;&quot;, &quot;status&quot;: &quot;completed&quot;}
-    },
-    &quot;id&quot;: 2
-  }'
+  -d '{&quot;method&quot;: &quot;memory_search&quot;, &quot;params&quot;: {&quot;query&quot;: &quot;architecture&quot;}}'
 </code></pre>
 <hr />
 <h2 id="7-n8n">7. n8n / 외부 시스템 연동</h2>
@@ -575,22 +505,8 @@ POST /api/gateway/spark
 # 범용 웹훅
 POST /api/gateway/webhook
 </code></pre>
-<h3 id="n8n">n8n 오케스트레이션 워크플로우 (Phase 4-3)</h3>
-<blockquote>
-<p><code>n8n/mories_observer_workflow.json</code>을 n8n에 Import하면 즉시 사용 가능합니다.</p>
-</blockquote>
-<pre><code class="language-bash"># 환경변수 설정 후 Import
-export MORIES_MCP_URL=http://localhost:5002
-export AGENT_WEBHOOK_URL=http://your-agent/webhook
-n8n import:workflow --input=n8n/mories_observer_workflow.json
-</code></pre>
-<p>워크플로우 흐름:</p>
-<pre><code>[Schedule: 5분마다]
-  → mories_search(status=in_progress)  ← Mories 활성 태스크 검색
-  → Has results? YES → Split → mories_detail(uuid)  ← 상세 조회
-  → Priority ≤ 3? YES → Agent Webhook 디스패치
-  → mories_update_status(completed)  ← 완료 처리
-</code></pre>
+<h3 id="n8n">n8n 워크플로우 예시</h3>
+<p><code>n8n_workflows/</code> 폴더에 사전 구성된 템플릿이 있습니다.</p>
 <hr />
 <h2 id="8">8. 보안 설정</h2>
 <h3 id="81-rbac">8.1 RBAC (역할 기반 접근 제어)</h3>
@@ -759,10 +675,11 @@ lsof -i :7474
 </tbody>
 </table>
 <hr />
-<p><em>Last updated: 2026-03-30 — MCP v0.7.0 (8 tools), Phase 4 완료</em></p>
+<p><em>Last updated: 2026-03-28</em></p>
     </div>
   </div>
 </div>
 
+<script src="/dashboard/nav-component.js"></script>
 </body>
 </html>

@@ -6,28 +6,9 @@
     <title>Mories — Knowledge Maturity & Security</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <style>
-        :root {
-            --bg-primary: #0a0e1a;
-            --bg-secondary: #111827;
-            --bg-card: #1a1f35;
-            --bg-card-hover: #222845;
-            --text-primary: #e8eaed;
-            --text-secondary: #9aa0b8;
-            --text-muted: #6b7394;
-            --accent-blue: #4f8cff;
-            --accent-purple: #8b5cf6;
-            --accent-green: #22c55e;
-            --accent-amber: #f59e0b;
-            --accent-red: #ef4444;
-            --accent-cyan: #06b6d4;
-            --accent-pink: #ec4899;
-            --border-color: #2d3452;
-            --gradient-1: linear-gradient(135deg, #4f8cff 0%, #8b5cf6 100%);
-            --gradient-2: linear-gradient(135deg, #22c55e 0%, #06b6d4 100%);
-            --gradient-3: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
-            --shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
-        }
+      <link rel="stylesheet" href="/dashboard/assets/css/tokens.css">
+  <style>
+        
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; }
@@ -132,24 +113,12 @@
         @media (max-width: 1200px) { .stats-grid { grid-template-columns: repeat(3, 1fr); } .rules-grid { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 768px) { .stats-grid { grid-template-columns: 1fr 1fr; } .charts-row { grid-template-columns: 1fr; } .rules-grid { grid-template-columns: 1fr; } }
     </style>
+<link rel="stylesheet" href="/dashboard/nav-component.css">
 </head>
 <body>
 
-<!-- Header -->
-<div class="header">
-    <div class="header-left">
-        <h1>🧠 <span>Mories</span></h1>
-        <span class="header-badge badge-maturity">Knowledge Maturity</span>
-    </div>
-    <div class="header-nav">
-        <a href="/">🏠 Dashboard</a>
-        <a href="/graph">🕸️ Graph Explorer</a>
-        <a href="/memory">🧬 Memory</a>
-        <a href="/memory/synaptic">🌐 Synaptic</a>
-        <a href="/memory/history">📜 Audit Trail</a>
-        <a href="/maturity" style="background:var(--accent-pink);color:white;border-color:transparent;">🌱 Maturity</a>
-    </div>
-</div>
+<!-- UNIFIED NAV -->
+<div id="mories-nav" data-active="maturity"></div>
 
 <div class="container">
 
@@ -567,5 +536,6 @@ async function submitSetMaturity() {
 })();
 </script>
 
+<script src="/dashboard/nav-component.js"></script>
 </body>
 </html>

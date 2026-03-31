@@ -100,7 +100,6 @@ class SearchAgent:
             Merged SearchResult with facts, context, timeline.
         """
         start_time = time.time()
-        container_tag = f"{self.graph_id}_{agent_name}"
 
         result = SearchResult()
 
@@ -111,7 +110,7 @@ class SearchAgent:
         futures = {}
         for mode in SearchMode:
             future = self._executor.submit(
-                self._search_by_mode, mode, container_tag, query, search_limit
+                self._search_by_mode, mode, agent_name, query, search_limit
             )
             futures[future] = mode
 
@@ -147,7 +146,7 @@ class SearchAgent:
         container_tag = f"{self.graph_id}_{agent_name}"
         try:
             if hasattr(self.storage, 'sm') and self.storage.sm:
-                profile_data = self.storage.sm.profile(containerTag=container_tag)
+                profile_data = self.storage.sm.get_profile(container_tag=container_tag)
                 # Profile typically returns static/dynamic traits
                 if isinstance(profile_data, dict):
                     static = profile_data.get('static', [])
@@ -170,12 +169,12 @@ class SearchAgent:
     def _search_by_mode(
         self,
         mode: SearchMode,
-        container_tag: str,
+        agent_name: str,
         query: str,
         limit: int,
     ) -> List[str]:
         """Execute a single search agent query."""
-        if not hasattr(self.storage, 'sm') or not self.storage.sm:
+        if not self.storage:
             return []
 
         # Prefix query based on search mode to bias results
@@ -187,28 +186,18 @@ class SearchAgent:
         enriched_query = mode_prefixes.get(mode, "") + query
 
         try:
-            results = self.storage.sm.search_memories(
-                q=enriched_query,
-                containerTag=container_tag,
+            results = self.storage.search(
+                graph_id=self.graph_id,
+                query=enriched_query,
                 limit=limit,
+                search_scope="edges",
+                agent_id=agent_name
             )
 
-            # Extract text from search results
+            # Extract text from search results mapping
             items = []
-            if isinstance(results, list):
-                for r in results:
-                    if isinstance(r, dict):
-                        text = r.get('content', r.get('text', str(r)))
-                    else:
-                        text = str(r)
-                    items.append(text)
-            elif isinstance(results, dict):
-                memories = results.get('memories', results.get('results', []))
-                for m in memories:
-                    if isinstance(m, dict):
-                        items.append(m.get('content', m.get('text', str(m))))
-                    else:
-                        items.append(str(m))
+            for r in results:
+                items.append(r.get('content', str(r)))
 
             return items[:limit]
 
