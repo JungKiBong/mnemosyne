@@ -1,0 +1,81 @@
+# Mories — Production Docker Compose Profile
+#
+# 사용법:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Dev 환경과의 차이점:
+#   - gunicorn 4 worker (dev: Flask dev server)
+#   - FLASK_ENV=production
+#   - 환경변수를 .env 파일로부터 주입 (env_file 참조)
+#   - Neo4j memory 상한 4g
+#   - 로그 rotation (json driver)
+#   - 포트는 prod에서 reverse proxy 뒤에 두므로 외부 노출 최소화
+#   - healthcheck 더 엄격(interval 30s)
+
+services:
+  neo4j:
+    environment:
+      - NEO4J_server_memory_heap_max__size=4g
+      - NEO4J_server_memory_heap_initial__size=1g
+      - NEO4J_server_memory_pagecache_size=2g
+    healthcheck:
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  mirofish-api:
+    command: >
+      gunicorn
+      --workers 4
+      --worker-class sync
+      --timeout 120
+      --bind 0.0.0.0:5000
+      --access-logfile -
+      --error-logfile -
+      --log-level info
+      "app:create_app()"
+    environment:
+      - FLASK_ENV=production
+      - FLASK_DEBUG=0
+      # LLM (air-gap Ollama/vLLM — override via .env.prod)
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - LLM_BASE_URL=${LLM_BASE_URL:-http://host.docker.internal:11434/v1}
+      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-qwen3.5:35b-a3b-q4_K_M}
+      - LLM_API_KEY=${LLM_API_KEY:-ollama}
+      - OLLAMA_NUM_CTX=${OLLAMA_NUM_CTX:-8192}
+      # Embedding (same Inference Server)
+      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-ollama}
+      - EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL:-http://host.docker.internal:11434}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-nomic-embed-text}
+      # Harness Webhooks
+      - WEBHOOK_ENABLED=${WEBHOOK_ENABLED:-false}
+      - WEBHOOK_URL=${WEBHOOK_URL:-}
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET:-}
+      - WEBHOOK_TIMEOUT=${WEBHOOK_TIMEOUT:-5}
+      # Security
+      - MCP_API_KEY=${MCP_API_KEY:-}
+      - SUPERMEMORY_API_KEY=${SUPERMEMORY_API_KEY:-}
+    healthcheck:
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "10"
+    restart: always
+
+  dashboard:
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+    restart: always

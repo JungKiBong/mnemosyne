@@ -161,6 +161,11 @@ def list_workflow_executions():
 @core_bp.route('/health')
 @core_bp.route('/api/health')
 def health():
+    """
+    표준화된 헬스체크 엔드포인트.
+    - 모든 구성 요소가 정상이면 200 OK
+    - 핵심 구성 요소(neo4j)가 비정상이면 503 Service Unavailable
+    """
     storage = current_app.extensions.get('neo4j_storage')
     neo4j_status = 'disconnected'
     node_count = 0
@@ -179,32 +184,55 @@ def health():
             neo4j_status = 'error'
 
     backend = current_app.config.get('STORAGE_BACKEND', 'neo4j')
-    
-    # Needs to match Config if possible, but reading from env is also safe
     llm_url = os.environ.get('LLM_BASE_URL', 'not configured')
     llm_model = os.environ.get('LLM_MODEL_NAME', 'not configured')
 
-    return jsonify({
-        'status': 'healthy',
+    # Embedding health (quick check based on config)
+    embed_provider = os.environ.get('EMBEDDING_PROVIDER', 'auto')
+    embed_base_url = os.environ.get('EMBEDDING_BASE_URL', '')
+    embedding_status = 'configured' if embed_base_url else 'not configured'
+
+    # Webhook status
+    webhook_enabled = os.environ.get('WEBHOOK_ENABLED', 'false').lower() == 'true'
+    webhook_urls = [u for u in os.environ.get('WEBHOOK_URL', '').split(',') if u.strip()]
+
+    overall = 'healthy' if neo4j_status == 'connected' else 'degraded'
+
+    body = {
+        'status': overall,
         'service': 'Mories (MiroFish × Supermemory)',
         'backend': backend,
-        'neo4j': neo4j_status,
-        'neo4j_nodes': node_count,
-        'supermemory': 'configured' if os.environ.get('SUPERMEMORY_API_KEY') else 'not configured',
+        'neo4j': {
+            'status': neo4j_status,
+            'node_count': node_count,
+        },
         'llm': {
             'provider': os.environ.get('LLM_PROVIDER', 'ollama'),
             'base_url': llm_url,
             'model': llm_model,
         },
-        'adapters': 11,
-        'observers': 3,
-        'search_agents': 3,
+        'embedding': {
+            'provider': embed_provider,
+            'base_url': embed_base_url or 'not configured',
+            'status': embedding_status,
+        },
+        'harness': {
+            'webhook_enabled': webhook_enabled,
+            'webhook_targets': len(webhook_urls),
+            'supermemory': 'configured' if os.environ.get('SUPERMEMORY_API_KEY') else 'not configured',
+        },
         'components': {
             'neo4j': neo4j_status,
             'scheduler': 'running' if current_app.extensions.get('memory_scheduler') else 'stopped',
             'supermemory': 'configured' if os.environ.get('SUPERMEMORY_API_KEY') else 'not configured',
         },
-    })
+        'adapters': 11,
+        'observers': 3,
+        'search_agents': 3,
+    }
+
+    http_status = 200 if overall == 'healthy' else 503
+    return jsonify(body), http_status
 
 
 # --- MCP Tools via REST (for n8n / external agents) ---

@@ -321,6 +321,19 @@ class MemoryManager:
             logger.debug(f"Audit record failed: {e}")
 
         logger.info(f"STM → LTM promoted: {item_id} → {node_uuid} (salience={item.salience})")
+
+        # Harness: notify external orchestration layer
+        try:
+            from ..utils.webhook import get_webhook
+            get_webhook().memory_promoted(
+                stm_id=item_id,
+                ltm_uuid=node_uuid,
+                salience=item.salience,
+                scope=item.metadata.get('scope', 'personal'),
+            )
+        except Exception as wh_err:
+            logger.debug(f"Webhook publish skipped: {wh_err}")
+
         return {
             "status": "promoted",
             "stm_id": item_id,
@@ -511,7 +524,22 @@ class MemoryManager:
         results['dry_run'] = dry_run
         logger.info(f"Decay cycle complete: {results['decayed']} decayed, "
                      f"{results['archived']} archived, {results['warned']} warned")
+
+        # Harness: notify external orchestration layer (only on real run)
+        if not dry_run and (results['decayed'] > 0 or results['archived'] > 0):
+            try:
+                from ..utils.webhook import get_webhook
+                import uuid as _uuid
+                get_webhook().memory_decayed(
+                    removed_count=results['archived'],
+                    weakened_count=results['decayed'],
+                    cycle_id=str(_uuid.uuid4())[:8],
+                )
+            except Exception as wh_err:
+                logger.debug(f"Webhook publish skipped: {wh_err}")
+
         return results
+
 
     # ──────────────────────────────────────────
     # 3. Retrieval Boost (Reinforcement)
