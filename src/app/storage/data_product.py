@@ -87,7 +87,7 @@ class MemoryDataProduct:
                        e.salience AS salience,
                        COALESCE(e.scope, 'personal') AS scope,
                        COALESCE(e.source_type, 'document') AS source_type,
-                       e.created_at AS created_at,
+                       toString(e.created_at) AS created_at,
                        e.access_count AS access_count
                 ORDER BY e.salience DESC
             """, min_sal=min_salience, scope=scope or "").data()
@@ -182,7 +182,7 @@ class MemoryDataProduct:
                        COALESCE(e.source_type, 'document') AS source_type,
                        e.summary AS summary,
                        e.access_count AS access_count,
-                       e.created_at AS created_at,
+                       toString(e.created_at) AS created_at,
                        e.owner_id AS owner_id
                 ORDER BY e.salience DESC
             """, min_sal=min_salience, scope=scope or "").data()
@@ -388,8 +388,8 @@ class MemoryDataProduct:
                        COALESCE(e.scope, 'personal') AS scope,
                        COALESCE(e.source_type, 'document') AS source_type,
                        e.access_count AS access_count,
-                       e.last_accessed AS last_accessed,
-                       e.created_at AS created_at,
+                       toString(e.last_accessed) AS last_accessed,
+                       toString(e.created_at) AS created_at,
                        e.owner_id AS owner_id
                 ORDER BY e.salience DESC
             """).data()
@@ -410,7 +410,7 @@ class MemoryDataProduct:
                 RETURN m.manifest_id AS manifest_id,
                        m.name AS name,
                        m.version AS version,
-                       m.created_at AS created_at,
+                       toString(m.created_at) AS created_at,
                        m.scope_filter AS scope_filter,
                        m.node_count AS node_count,
                        m.edge_count AS edge_count,
@@ -770,7 +770,7 @@ class MemoryDataProduct:
                 RETURN m.import_id AS import_id,
                        m.source_manifest_id AS source_manifest_id,
                        m.source_name AS source_name,
-                       m.imported_at AS imported_at,
+                       toString(m.imported_at) AS imported_at,
                        m.imported_by AS imported_by,
                        m.merge_strategy AS merge_strategy,
                        m.target_graph_id AS target_graph_id,

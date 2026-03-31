@@ -161,20 +161,20 @@ class TestDataProductsAPI:
     """Data Products (Phase 11) endpoints — url_prefix=/api/memory/data."""
 
     def test_rag_corpus_export(self, client):
-        """GET /api/memory/data/rag returns corpus data."""
-        resp = client.get('/api/memory/data/rag')
+        """GET /api/analytics/data-product/rag returns corpus data."""
+        resp = client.get('/api/analytics/data-product/rag')
         assert resp.status_code == 200
         data = resp.get_json()
         assert isinstance(data, (list, dict))
 
     def test_knowledge_graph_snapshot(self, client):
-        """GET /api/memory/data/snapshot returns snapshot."""
-        resp = client.get('/api/memory/data/snapshot')
+        """GET /api/analytics/data-product/snapshot returns snapshot."""
+        resp = client.get('/api/analytics/data-product/snapshot')
         assert resp.status_code == 200
 
     def test_data_catalog(self, client):
-        """GET /api/memory/data/catalog returns catalog listing."""
-        resp = client.get('/api/memory/data/catalog')
+        """GET /api/analytics/data-product/manifest/list returns catalog listing."""
+        resp = client.get('/api/analytics/data-product/manifest/list')
         assert resp.status_code == 200
 
 
@@ -182,13 +182,13 @@ class TestSecurityAPI:
     """Security & RBAC endpoints — url_prefix=/api/security."""
 
     def test_security_roles(self, client):
-        """GET /api/security/roles returns role definitions."""
-        resp = client.get('/api/security/roles')
+        """GET /api/admin/security/roles returns role definitions."""
+        resp = client.get('/api/admin/security/roles')
         assert resp.status_code == 200
 
     def test_security_keys_list(self, client):
-        """GET /api/security/keys returns encryption key info."""
-        resp = client.get('/api/security/keys')
+        """GET /api/admin/security/keys returns encryption key info."""
+        resp = client.get('/api/admin/security/keys')
         assert resp.status_code == 200
 
 
@@ -196,13 +196,13 @@ class TestMaturityAPI:
     """Maturity model endpoints — url_prefix=/api/maturity."""
 
     def test_maturity_overview(self, client):
-        """GET /api/maturity/overview returns maturity model info."""
-        resp = client.get('/api/maturity/overview')
+        """GET /api/analytics/maturity/overview returns maturity model info."""
+        resp = client.get('/api/analytics/maturity/overview')
         assert resp.status_code == 200
 
     def test_maturity_rules(self, client):
-        """GET /api/maturity/rules returns promotion rules."""
-        resp = client.get('/api/maturity/rules')
+        """GET /api/analytics/maturity/rules returns promotion rules."""
+        resp = client.get('/api/analytics/maturity/rules')
         assert resp.status_code == 200
 
 
@@ -210,15 +210,15 @@ class TestReconciliationAPI:
     """Reconciliation endpoints — url_prefix=/api/reconciliation."""
 
     def test_quick_check(self, client):
-        """GET /api/reconciliation/check returns health data."""
-        resp = client.get('/api/reconciliation/check')
+        """GET /api/analytics/reconcile/check returns health data."""
+        resp = client.get('/api/analytics/reconcile/check')
         assert resp.status_code == 200
         data = resp.get_json()
         assert 'health_score' in data
 
     def test_run_reconciliation(self, client):
-        """POST /api/reconciliation/run executes full check."""
-        resp = client.post('/api/reconciliation/run', json={
+        """POST /api/analytics/reconcile/run executes full check."""
+        resp = client.post('/api/analytics/reconcile/run', json={
             'auto_fix': False,
         })
         assert resp.status_code == 200
@@ -227,8 +227,8 @@ class TestReconciliationAPI:
         assert 'health_score' in data
 
     def test_reconciliation_history(self, client):
-        """GET /api/reconciliation/history returns run history."""
-        resp = client.get('/api/reconciliation/history')
+        """GET /api/analytics/reconcile/history returns run history."""
+        resp = client.get('/api/analytics/reconcile/history')
         assert resp.status_code == 200
         data = resp.get_json()
         assert 'history' in data

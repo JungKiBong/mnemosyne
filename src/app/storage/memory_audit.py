@@ -384,5 +384,5 @@ class MemoryAudit:
 
         return {
             "total_revisions": total["total"] if total else 0,
-            "by_type": {s["ct"]: s["cnt"] for s in stats},
+            "by_type": {s["ct"] if s["ct"] is not None else "unknown": s["cnt"] for s in stats},
         }

@@ -96,15 +96,9 @@ def create_app(config_class=Config):
         app.extensions['neo4j_driver'] = None
         app.extensions['memory_manager'] = None
 
-    @app.teardown_appcontext
-    def close_neo4j_driver(exception):
-        driver = app.extensions.get('neo4j_driver')
-        if driver:
-            try:
-                driver.close()
-            except Exception:
-                pass
-
+    # The neo4j driver manages its own connection pool and should live as long as the application.
+    # Closing it inside teardown_appcontext destroys it after the first request.
+    # Teardown logic handled at the application level.
     # Register simulation process cleanup function (ensure all simulation processes terminate on server shutdown)
     from .services.simulation_runner import SimulationRunner
     SimulationRunner.register_cleanup()

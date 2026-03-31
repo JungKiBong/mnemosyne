@@ -16,7 +16,7 @@ Endpoints:
   POST /api/memory/config         — Update config
 """
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from ..storage.memory_manager import MemoryManager, MemoryConfig
 
 memory_bp = Blueprint('memory', __name__)

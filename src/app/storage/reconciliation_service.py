@@ -230,7 +230,9 @@ class ReconciliationService:
                 MATCH (n:Entity)
                 WHERE n.salience IS NOT NULL
                   AND n.last_accessed IS NOT NULL
-                  AND datetime(n.last_accessed) < datetime() - duration('P30D')
+                  AND toString(n.last_accessed) =~ '\\d{4}-\\d{2}-\\d{2}.*'
+                WITH n
+                WHERE datetime(n.last_accessed) < datetime() - duration('P30D')
                 RETURN count(n) AS cnt
             """).single()["cnt"]
 
@@ -353,7 +355,9 @@ class ReconciliationService:
                 WHERE n.salience IS NOT NULL
                   AND n.salience > 0.1
                   AND n.last_accessed IS NOT NULL
-                  AND datetime(n.last_accessed) < datetime() - duration('P30D')
+                  AND toString(n.last_accessed) =~ '\\d{4}-\\d{2}-\\d{2}.*'
+                WITH n
+                WHERE datetime(n.last_accessed) < datetime() - duration('P30D')
                 RETURN n.uuid AS uuid, n.name AS name,
                        n.salience AS salience, n.last_accessed AS last_accessed
                 ORDER BY n.last_accessed ASC
