@@ -289,6 +289,155 @@ class MoriesToolkit:
             ],
         )
 
+        # ── Cognitive Memory Tools ──
+
+        # 16. memory_preference — 선호 기억 저장
+        self._tools["memory_preference"] = ToolDefinition(
+            name="memory_preference",
+            description="사용자/에이전트의 선호를 기억합니다. 같은 키의 선호가 이미 있으면 업서트합니다.",
+            category="cognitive",
+            parameters=[
+                ToolParameter("key", "string", "선호 키 (예: language, coding_style)"),
+                ToolParameter("value", "string", "선호 값 (예: korean, functional)"),
+                ToolParameter("description", "string", "선호 설명", required=False, default=""),
+                ToolParameter("subcategory", "string", "선호 카테고리", required=False, default="general",
+                            enum=["communication", "coding_style", "workflow", "ui", "general"]),
+                ToolParameter("confidence", "number", "확신도 0.0~1.0", required=False, default=0.8),
+            ],
+        )
+
+        # 17. memory_recall_preferences
+        self._tools["memory_recall_preferences"] = ToolDefinition(
+            name="memory_recall_preferences",
+            description="저장된 선호를 회상합니다. 세션 시작 시 호출하여 사용자 맥락을 복원합니다.",
+            category="cognitive",
+            parameters=[
+                ToolParameter("key", "string", "특정 키 필터", required=False),
+            ],
+        )
+
+        # 18. memory_instruction — 행동 규칙 기억
+        self._tools["memory_instruction"] = ToolDefinition(
+            name="memory_instruction",
+            description="행동 규칙을 기억합니다. must 수준은 자동으로 영구 기억(PM)으로 승격됩니다.",
+            category="cognitive",
+            parameters=[
+                ToolParameter("rule", "string", "규칙 내용"),
+                ToolParameter("trigger", "string", "적용 시점", required=False, default="always",
+                            enum=["always", "pre_commit", "pre_code", "pre_deploy", "on_error"]),
+                ToolParameter("priority", "string", "우선순위", required=False, default="should",
+                            enum=["must", "should", "may"]),
+                ToolParameter("subcategory", "string", "규칙 분류", required=False, default="workflow",
+                            enum=["coding", "workflow", "communication", "security"]),
+            ],
+        )
+
+        # 19. memory_recall_instructions
+        self._tools["memory_recall_instructions"] = ToolDefinition(
+            name="memory_recall_instructions",
+            description="활성 행동 규칙을 회상합니다. 작업 전 준수 규칙 확인용.",
+            category="cognitive",
+            parameters=[
+                ToolParameter("trigger", "string", "시점 필터", required=False,
+                            enum=["always", "pre_commit", "pre_code", "pre_deploy", "on_error"]),
+                ToolParameter("priority", "string", "우선순위 필터", required=False,
+                            enum=["must", "should", "may"]),
+            ],
+        )
+
+        # 20. memory_reflection — 자기 성찰 기억
+        self._tools["memory_reflection"] = ToolDefinition(
+            name="memory_reflection",
+            description="성찰/교훈을 기억합니다. 동일 교훈 반복 시 자동 강화됩니다.",
+            category="cognitive",
+            parameters=[
+                ToolParameter("event", "string", "발생 이벤트"),
+                ToolParameter("lesson", "string", "교훈"),
+                ToolParameter("severity", "string", "심각도", required=False, default="medium",
+                            enum=["high", "medium", "low"]),
+                ToolParameter("domain", "string", "교훈 영역", required=False, default="general"),
+            ],
+        )
+
+        # 21. memory_recall_reflections
+        self._tools["memory_recall_reflections"] = ToolDefinition(
+            name="memory_recall_reflections",
+            description="과거 교훈을 회상합니다. 같은 실수 방지용.",
+            category="cognitive",
+            parameters=[
+                ToolParameter("domain", "string", "영역 필터", required=False),
+                ToolParameter("severity", "string", "심각도 필터", required=False,
+                            enum=["high", "medium", "low"]),
+            ],
+        )
+
+        # 22. memory_conditional — 조건부 지식
+        self._tools["memory_conditional"] = ToolDefinition(
+            name="memory_conditional",
+            description="IF condition THEN action 형태의 조건부 지식을 기억합니다.",
+            category="cognitive",
+            parameters=[
+                ToolParameter("condition", "object", "조건 (예: {\"python_version\": \"<3.10\"})"),
+                ToolParameter("then_action", "string", "조건 충족 시 행동"),
+                ToolParameter("else_action", "string", "미충족 시 행동", required=False),
+                ToolParameter("subcategory", "string", "조건 유형", required=False, default="contextual",
+                            enum=["version_specific", "env_specific", "temporal", "contextual"]),
+                ToolParameter("confidence", "number", "확신도", required=False, default=0.9),
+            ],
+        )
+
+        # 23. memory_recall_conditionals
+        self._tools["memory_recall_conditionals"] = ToolDefinition(
+            name="memory_recall_conditionals",
+            description="조건부 지식을 회상합니다. context 전달 시 매칭되는 것만 반환.",
+            category="cognitive",
+            parameters=[
+                ToolParameter("context", "object", "현재 환경 컨텍스트", required=False),
+                ToolParameter("subcategory", "string", "유형 필터", required=False,
+                            enum=["version_specific", "env_specific", "temporal", "contextual"]),
+            ],
+        )
+
+        # 24. memory_task_handoff — 멀티에이전트 태스크 핸드오프
+        self._tools["memory_task_handoff"] = ToolDefinition(
+            name="memory_task_handoff",
+            description="멀티에이전트 태스크를 위임합니다. 컨텍스트와 함께 기억에 저장.",
+            category="orchestration",
+            parameters=[
+                ToolParameter("task_id", "string", "고유 태스크 ID"),
+                ToolParameter("task_description", "string", "태스크 설명"),
+                ToolParameter("from_agent", "string", "위임 에이전트 ID"),
+                ToolParameter("to_agent", "string", "수신 에이전트 ID"),
+                ToolParameter("context", "object", "공유 컨텍스트", required=False),
+                ToolParameter("task_type", "string", "유형", required=False, default="handoff",
+                            enum=["handoff", "delegation", "coordination", "escalation"]),
+            ],
+        )
+
+        # 25. memory_task_update
+        self._tools["memory_task_update"] = ToolDefinition(
+            name="memory_task_update",
+            description="태스크 상태 업데이트. 실패 시 자동 성찰 기억 생성.",
+            category="orchestration",
+            parameters=[
+                ToolParameter("task_id", "string", "태스크 ID"),
+                ToolParameter("status", "string", "새 상태",
+                            enum=["in_progress", "completed", "failed", "escalated"]),
+                ToolParameter("result_summary", "string", "결과 요약", required=False),
+                ToolParameter("escalate_to", "string", "에스컬레이션 대상", required=False),
+            ],
+        )
+
+        # 26. memory_active_tasks
+        self._tools["memory_active_tasks"] = ToolDefinition(
+            name="memory_active_tasks",
+            description="활성 멀티에이전트 태스크 조회.",
+            category="orchestration",
+            parameters=[
+                ToolParameter("agent_id", "string", "에이전트 ID 필터", required=False),
+            ],
+        )
+
     # ──────────────────────────────────────────
     # Tool Execution
     # ──────────────────────────────────────────
@@ -443,7 +592,6 @@ class MoriesToolkit:
                                categories: list = None,
                                graph_id: str = None) -> dict:
         """Retrieve categorized prior knowledge for a research topic."""
-        # Build category filter
         cat_filter = ""
         if categories:
             type_list = ", ".join(f"'{c}'" for c in categories)
@@ -471,7 +619,6 @@ class MoriesToolkit:
                 LIMIT $limit
             """, topic=topic, limit=limit).data()
 
-        # Categorize results
         categorized = {"papers": [], "citations": [], "experiments": [],
                        "lessons": [], "synthesis": [], "other": []}
         category_map = {
@@ -490,7 +637,6 @@ class MoriesToolkit:
                 "topic": r.get("topic"),
             })
 
-        # Boost retrieved items
         if records:
             uuids = [r["uuid"] for r in records]
             self._manager.boost_on_retrieval(uuids)
@@ -509,7 +655,6 @@ class MoriesToolkit:
         stored = []
         errors = []
 
-        # Define artifact types with salience levels
         artifact_types = [
             ("paper_draft", "paper_draft", 0.9, "tribal"),
             ("synthesis", "synthesis", 0.85, "tribal"),
@@ -523,7 +668,6 @@ class MoriesToolkit:
             if not data:
                 continue
 
-            # Handle list-type artifacts (references, lessons)
             items_to_store = data if isinstance(data, list) else [data]
 
             for item in items_to_store:
@@ -548,7 +692,6 @@ class MoriesToolkit:
                 except Exception as e:
                     errors.append({"type": mem_type, "error": str(e)})
 
-        # Handle references separately (always a list)
         refs = artifacts.get("references", [])
         if isinstance(refs, list):
             for ref in refs[:50]:
@@ -574,6 +717,83 @@ class MoriesToolkit:
             "summary": stored,
         }
 
+    # ── Cognitive Memory Handlers ──
+
+    def _get_category_manager(self):
+        """Lazy-load MemoryCategoryManager."""
+        from ..storage.memory_categories import MemoryCategoryManager
+        driver = self._manager._driver if self._manager else None
+        return MemoryCategoryManager(driver=driver)
+
+    def _exec_memory_preference(self, key: str, value: str,
+                                description: str = "", subcategory: str = "general",
+                                confidence: float = 0.8) -> dict:
+        mgr = self._get_category_manager()
+        return mgr.record_preference(key=key, value=value, description=description,
+                                      subcategory=subcategory, confidence=confidence)
+
+    def _exec_memory_recall_preferences(self, key: str = None) -> dict:
+        mgr = self._get_category_manager()
+        return {"preferences": mgr.recall_preferences(key=key)}
+
+    def _exec_memory_instruction(self, rule: str, trigger: str = "always",
+                                  priority: str = "should",
+                                  subcategory: str = "workflow") -> dict:
+        mgr = self._get_category_manager()
+        return mgr.record_instruction(rule=rule, trigger=trigger,
+                                       priority=priority, subcategory=subcategory)
+
+    def _exec_memory_recall_instructions(self, trigger: str = None,
+                                          priority: str = None) -> dict:
+        mgr = self._get_category_manager()
+        return {"instructions": mgr.recall_instructions(trigger=trigger, priority=priority)}
+
+    def _exec_memory_reflection(self, event: str, lesson: str,
+                                 severity: str = "medium",
+                                 domain: str = "general") -> dict:
+        mgr = self._get_category_manager()
+        return mgr.record_reflection(event=event, lesson=lesson,
+                                      severity=severity, domain=domain)
+
+    def _exec_memory_recall_reflections(self, domain: str = None,
+                                         severity: str = None) -> dict:
+        mgr = self._get_category_manager()
+        return {"reflections": mgr.recall_reflections(domain=domain, severity=severity)}
+
+    def _exec_memory_conditional(self, condition: dict, then_action: str,
+                                  else_action: str = None,
+                                  subcategory: str = "contextual",
+                                  confidence: float = 0.9) -> dict:
+        mgr = self._get_category_manager()
+        return mgr.record_conditional(condition=condition, then_action=then_action,
+                                       else_action=else_action, subcategory=subcategory,
+                                       confidence=confidence)
+
+    def _exec_memory_recall_conditionals(self, context: dict = None,
+                                          subcategory: str = None) -> dict:
+        mgr = self._get_category_manager()
+        return {"conditionals": mgr.recall_conditionals(context=context, subcategory=subcategory)}
+
+    def _exec_memory_task_handoff(self, task_id: str, task_description: str,
+                                   from_agent: str, to_agent: str,
+                                   context: dict = None,
+                                   task_type: str = "handoff") -> dict:
+        mgr = self._get_category_manager()
+        return mgr.record_task_handoff(task_id=task_id, task_description=task_description,
+                                        from_agent=from_agent, to_agent=to_agent,
+                                        context=context, task_type=task_type)
+
+    def _exec_memory_task_update(self, task_id: str, status: str,
+                                  result_summary: str = None,
+                                  escalate_to: str = None) -> dict:
+        mgr = self._get_category_manager()
+        return mgr.update_task_status(task_id=task_id, status=status,
+                                       result_summary=result_summary,
+                                       escalate_to=escalate_to)
+
+    def _exec_memory_active_tasks(self, agent_id: str = None) -> dict:
+        mgr = self._get_category_manager()
+        return {"tasks": mgr.get_active_tasks(agent_id=agent_id)}
 
     # ── Helpers ──
 
@@ -602,3 +822,4 @@ class MoriesToolkit:
     def get_tool_description(self, name: str) -> Optional[dict]:
         tool = self._tools.get(name)
         return asdict(tool) if tool else None
+

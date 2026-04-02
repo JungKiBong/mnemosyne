@@ -1,19 +1,28 @@
 """
-Memory Category Extension — Phase 16-C: Procedural & Observational Memory
+Memory Category Extension — Phase 16-C+: Cognitive Memory Categories
 
 Extends the memory system with content categories without changing the core architecture.
 Uses the "Category Extension Pattern" — same STM/LTM/PM lifecycle, different metadata schemas.
 
-Categories:
+Categories (8 total):
   - declarative: Factual knowledge (existing, default)
   - procedural: Tool-use patterns (API calls, MCP tools, code, shell commands)
   - observational: Learned from observing users or other agents
+  - preference: User/agent preferences that persist across sessions
+  - instructional: Behavioral rules and constraints ("always do X")
+  - reflective: Self-improvement lessons from past errors/successes
+  - conditional: Context-dependent knowledge (if-then rules)
+  - orchestration: Multi-agent task coordination memory
 
 Key features:
   - Success-rate based decay modifier for procedural memories
   - Staleness detection for tool memories (API version changes)
   - Observation confidence tracking
   - Category-aware search filtering
+  - Auto-PM promotion for must-priority instructional rules
+  - Occurrence-based reinforcement for reflective memories
+  - Context-matching for conditional knowledge retrieval
+  - Multi-agent task handoff, escalation, and checkpoint tracking
 """
 
 import logging
@@ -93,6 +102,158 @@ def create_observational_metadata(
             "applied_count": 0,
             "success_when_applied": 0,
             "effectiveness": 0.0,
+        },
+    }
+
+
+# ──────────────────────────────────────────────
+# Preference Memory Schema
+# ──────────────────────────────────────────────
+
+def create_preference_metadata(
+    key: str,
+    value: str,
+    subcategory: str = "general",  # communication | coding_style | workflow | ui | general
+    confidence: float = 0.8,
+    context: str = "conversation",
+) -> Dict[str, Any]:
+    """Create structured metadata for a preference memory."""
+    now = datetime.now(timezone.utc).isoformat()
+    return {
+        "category": "preference",
+        "subcategory": subcategory,
+        "preference": {
+            "key": key,
+            "value": value,
+            "confidence": confidence,
+            "last_expressed": now,
+            "expression_count": 1,
+            "context": context,
+        },
+    }
+
+
+# ──────────────────────────────────────────────
+# Instructional Memory Schema
+# ──────────────────────────────────────────────
+
+def create_instructional_metadata(
+    rule: str,
+    trigger: str = "always",  # always | pre_commit | pre_code | pre_deploy | on_error
+    priority: str = "should",  # must | should | may
+    subcategory: str = "workflow",  # coding | workflow | communication | security
+    source_agent: str = "user",
+) -> Dict[str, Any]:
+    """Create structured metadata for an instructional memory."""
+    return {
+        "category": "instructional",
+        "subcategory": subcategory,
+        "instruction": {
+            "rule": rule,
+            "trigger": trigger,
+            "priority": priority,
+            "source_agent": source_agent,
+            "active": True,
+            "supersedes": None,
+        },
+        "stats": {
+            "applied_count": 0,
+            "compliance_rate": 1.0,
+        },
+    }
+
+
+# ──────────────────────────────────────────────
+# Reflective Memory Schema
+# ──────────────────────────────────────────────
+
+def create_reflective_metadata(
+    event: str,
+    lesson: str,
+    severity: str = "medium",  # high | medium | low
+    domain: str = "general",
+    subcategory: str = "lesson_learned",  # error_pattern | success_pattern | lesson_learned
+) -> Dict[str, Any]:
+    """Create structured metadata for a reflective memory."""
+    return {
+        "category": "reflective",
+        "subcategory": subcategory,
+        "reflection": {
+            "event": event,
+            "lesson": lesson,
+            "severity": severity,
+            "domain": domain,
+            "occurrence_count": 1,
+            "last_occurred": datetime.now(timezone.utc).isoformat(),
+        },
+        "stats": {
+            "prevented_count": 0,
+            "referenced_count": 0,
+        },
+    }
+
+
+# ──────────────────────────────────────────────
+# Conditional Memory Schema
+# ──────────────────────────────────────────────
+
+def create_conditional_metadata(
+    condition: Dict[str, Any],
+    then_action: str,
+    else_action: Optional[str] = None,
+    subcategory: str = "contextual",  # version_specific | env_specific | temporal | contextual
+    confidence: float = 0.9,
+    valid_from: Optional[str] = None,
+    valid_until: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Create structured metadata for a conditional memory."""
+    return {
+        "category": "conditional",
+        "subcategory": subcategory,
+        "condition": {
+            "if": condition,
+            "then": then_action,
+            "else": else_action,
+            "confidence": confidence,
+            "valid_from": valid_from,
+            "valid_until": valid_until,
+        },
+    }
+
+
+# ──────────────────────────────────────────────
+# Orchestration Memory Schema (Multi-Agent)
+# ──────────────────────────────────────────────
+
+def create_orchestration_metadata(
+    task_id: str,
+    task_type: str = "handoff",  # handoff | delegation | coordination | escalation | checkpoint
+    from_agent: str = "system",
+    to_agent: Optional[str] = None,
+    context: Optional[Dict[str, Any]] = None,
+    status: str = "pending",  # pending | in_progress | completed | failed | escalated
+    parent_task_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Create structured metadata for multi-agent orchestration memory."""
+    now = datetime.now(timezone.utc).isoformat()
+    return {
+        "category": "orchestration",
+        "subcategory": task_type,
+        "task": {
+            "task_id": task_id,
+            "task_type": task_type,
+            "from_agent": from_agent,
+            "to_agent": to_agent,
+            "status": status,
+            "parent_task_id": parent_task_id,
+            "context": context or {},
+            "created_at": now,
+            "updated_at": now,
+        },
+        "stats": {
+            "handoff_count": 0,
+            "escalation_count": 0,
+            "avg_resolution_ms": 0,
         },
     }
 
@@ -534,6 +695,662 @@ class MemoryCategoryManager:
         }
 
     # ──────────────────────────────────────────
+    # Preference Memory
+    # ──────────────────────────────────────────
+
+    def record_preference(
+        self,
+        key: str,
+        value: str,
+        description: str = "",
+        subcategory: str = "general",
+        confidence: float = 0.8,
+        context: str = "conversation",
+        agent_id: str = "system",
+    ) -> Dict[str, Any]:
+        """Record a user/agent preference. Upserts if key already exists."""
+        now = datetime.now(timezone.utc).isoformat()
+
+        with self._driver.session() as session:
+            existing = session.run("""
+                MATCH (e:Entity)
+                WHERE e.memory_category = 'preference'
+                  AND e.preference_key = $key
+                  AND e.owner_id = $agent_id
+                RETURN e.uuid AS uuid, e.attributes_json AS meta_json,
+                       e.salience AS salience
+                LIMIT 1
+            """, key=key, agent_id=agent_id).single()
+
+            if existing:
+                meta = self._safe_json_load(existing["meta_json"])
+                pref = meta.get("preference", {})
+                pref["value"] = value
+                pref["confidence"] = max(pref.get("confidence", 0), confidence)
+                pref["expression_count"] = pref.get("expression_count", 0) + 1
+                pref["last_expressed"] = now
+                meta["preference"] = pref
+
+                new_sal = min(1.0, existing["salience"] + 0.02)
+                session.run("""
+                    MATCH (e:Entity {uuid: $uuid})
+                    SET e.attributes_json = $meta_json,
+                        e.summary = $desc,
+                        e.salience = $sal,
+                        e.last_accessed = $now
+                """, uuid=existing["uuid"],
+                    meta_json=json.dumps(meta, ensure_ascii=False),
+                    desc=description or f"{key} = {value}",
+                    sal=new_sal, now=now)
+
+                return {"status": "updated", "uuid": existing["uuid"],
+                        "key": key, "value": value,
+                        "expression_count": pref["expression_count"]}
+            else:
+                meta = create_preference_metadata(
+                    key=key, value=value, subcategory=subcategory,
+                    confidence=confidence, context=context)
+                node_uuid = str(uuid.uuid4())
+                initial_salience = 0.7 + (confidence * 0.2)
+
+                session.run("""
+                    CREATE (e:Entity:Memory {
+                        uuid: $uuid,
+                        name: $name, name_lower: $name_lower,
+                        summary: $desc,
+                        memory_category: 'preference',
+                        preference_key: $key,
+                        attributes_json: $meta_json,
+                        salience: $sal,
+                        access_count: 1, last_accessed: $now,
+                        created_at: $now, owner_id: $agent_id,
+                        scope: 'personal'
+                    })
+                """, uuid=node_uuid, name=f"[PREF] {key}",
+                    name_lower=f"[pref] {key}".lower(),
+                    desc=description or f"{key} = {value}",
+                    key=key,
+                    meta_json=json.dumps(meta, ensure_ascii=False),
+                    sal=initial_salience, now=now, agent_id=agent_id)
+
+                return {"status": "created", "uuid": node_uuid,
+                        "key": key, "value": value,
+                        "initial_salience": initial_salience}
+
+    def recall_preferences(
+        self,
+        key: Optional[str] = None,
+        subcategory: Optional[str] = None,
+        agent_id: str = "system",
+    ) -> List[Dict[str, Any]]:
+        """Recall stored preferences. Used at session start."""
+        clauses = ["e.memory_category = 'preference'"]
+        params: Dict[str, Any] = {}
+        if key:
+            clauses.append("e.preference_key = $key")
+            params["key"] = key
+        if agent_id != "all":
+            clauses.append("e.owner_id = $agent_id")
+            params["agent_id"] = agent_id
+
+        where = " AND ".join(clauses)
+        with self._driver.session() as session:
+            records = session.run(f"""
+                MATCH (e:Entity) WHERE {where}
+                RETURN e.uuid AS uuid, e.preference_key AS key,
+                       e.summary AS value_desc, e.salience AS salience,
+                       e.attributes_json AS meta_json
+                ORDER BY e.salience DESC
+            """, **params).data()
+
+        results = []
+        for r in records:
+            meta = self._safe_json_load(r.get("meta_json", "{}"))
+            pref = meta.get("preference", {})
+            results.append({
+                "uuid": r["uuid"], "key": r["key"],
+                "value": pref.get("value", r.get("value_desc", "")),
+                "confidence": pref.get("confidence", 0),
+                "expression_count": pref.get("expression_count", 0),
+                "salience": r["salience"],
+            })
+        return results
+
+    # ──────────────────────────────────────────
+    # Instructional Memory
+    # ──────────────────────────────────────────
+
+    def record_instruction(
+        self,
+        rule: str,
+        description: str = "",
+        trigger: str = "always",
+        priority: str = "should",
+        subcategory: str = "workflow",
+        source_agent: str = "user",
+        agent_id: str = "system",
+    ) -> Dict[str, Any]:
+        """Record a behavioral instruction/rule. Must-priority auto-promotes to PM."""
+        meta = create_instructional_metadata(
+            rule=rule, trigger=trigger, priority=priority,
+            subcategory=subcategory, source_agent=source_agent)
+        node_uuid = str(uuid.uuid4())
+        now = datetime.now(timezone.utc).isoformat()
+        initial_salience = {"must": 0.95, "should": 0.8, "may": 0.6}.get(priority, 0.7)
+
+        with self._driver.session() as session:
+            session.run("""
+                CREATE (e:Entity:Memory {
+                    uuid: $uuid,
+                    name: $name, name_lower: $name_lower,
+                    summary: $desc,
+                    memory_category: 'instructional',
+                    instruction_trigger: $trigger,
+                    instruction_priority: $priority,
+                    attributes_json: $meta_json,
+                    salience: $sal,
+                    access_count: 0, last_accessed: $now,
+                    created_at: $now, owner_id: $agent_id,
+                    scope: 'personal'
+                })
+            """, uuid=node_uuid, name=f"[RULE] {rule[:60]}",
+                name_lower=f"[rule] {rule[:60]}".lower(),
+                desc=description or rule,
+                trigger=trigger, priority=priority,
+                meta_json=json.dumps(meta, ensure_ascii=False),
+                sal=initial_salience, now=now, agent_id=agent_id)
+
+        result = {"status": "created", "uuid": node_uuid,
+                  "rule": rule, "priority": priority, "trigger": trigger,
+                  "initial_salience": initial_salience}
+
+        # Auto-promote must-priority rules to PermanentMemory
+        if priority == "must":
+            try:
+                from .permanent_memory import PermanentMemoryManager
+                pm_mgr = PermanentMemoryManager(driver=self._driver)
+                pm_result = pm_mgr.create_imprint(
+                    content=f"[MUST RULE] {rule}",
+                    scope="personal",
+                    tags=["instructional", trigger, subcategory],
+                    created_by=source_agent,
+                    reason="Auto-promoted must-priority instruction",
+                    memory_category="instructional",
+                )
+                result["auto_promoted_pm"] = pm_result.get("uuid")
+                logger.info(f"Must-rule auto-promoted to PM: {pm_result.get('uuid')}")
+            except Exception as e:
+                logger.warning(f"PM auto-promote failed: {e}")
+
+        return result
+
+    def recall_instructions(
+        self,
+        trigger: Optional[str] = None,
+        priority: Optional[str] = None,
+        agent_id: str = "system",
+    ) -> List[Dict[str, Any]]:
+        """Recall active instructions. Used before task execution."""
+        clauses = ["e.memory_category = 'instructional'"]
+        params: Dict[str, Any] = {}
+        if trigger:
+            clauses.append("(e.instruction_trigger = $trigger OR e.instruction_trigger = 'always')")
+            params["trigger"] = trigger
+        if priority:
+            clauses.append("e.instruction_priority = $priority")
+            params["priority"] = priority
+        if agent_id != "all":
+            clauses.append("e.owner_id = $agent_id")
+            params["agent_id"] = agent_id
+
+        where = " AND ".join(clauses)
+        with self._driver.session() as session:
+            records = session.run(f"""
+                MATCH (e:Entity) WHERE {where}
+                RETURN e.uuid AS uuid, e.summary AS rule,
+                       e.instruction_trigger AS trigger,
+                       e.instruction_priority AS priority,
+                       e.salience AS salience,
+                       e.attributes_json AS meta_json
+                ORDER BY
+                  CASE e.instruction_priority
+                    WHEN 'must' THEN 0
+                    WHEN 'should' THEN 1
+                    WHEN 'may' THEN 2
+                    ELSE 3
+                  END,
+                  e.salience DESC
+            """, **params).data()
+
+        results = []
+        for r in records:
+            meta = self._safe_json_load(r.get("meta_json", "{}"))
+            inst = meta.get("instruction", {})
+            if not inst.get("active", True):
+                continue
+            results.append({
+                "uuid": r["uuid"], "rule": r["rule"],
+                "trigger": r["trigger"], "priority": r["priority"],
+                "salience": r["salience"],
+                "compliance_rate": meta.get("stats", {}).get("compliance_rate", 1.0),
+            })
+        return results
+
+    # ──────────────────────────────────────────
+    # Reflective Memory
+    # ──────────────────────────────────────────
+
+    def record_reflection(
+        self,
+        event: str,
+        lesson: str,
+        description: str = "",
+        severity: str = "medium",
+        domain: str = "general",
+        subcategory: str = "lesson_learned",
+        agent_id: str = "system",
+    ) -> Dict[str, Any]:
+        """Record a self-reflection/lesson. Upserts if similar lesson exists."""
+        now = datetime.now(timezone.utc).isoformat()
+
+        with self._driver.session() as session:
+            existing = session.run("""
+                MATCH (e:Entity)
+                WHERE e.memory_category = 'reflective'
+                  AND e.reflection_domain = $domain
+                  AND (toLower(e.summary) CONTAINS toLower($lesson_key)
+                       OR toLower(e.name) CONTAINS toLower($lesson_key))
+                RETURN e.uuid AS uuid, e.attributes_json AS meta_json,
+                       e.salience AS salience
+                LIMIT 1
+            """, domain=domain, lesson_key=lesson[:40]).single()
+
+            if existing:
+                meta = self._safe_json_load(existing["meta_json"])
+                refl = meta.get("reflection", {})
+                refl["occurrence_count"] = refl.get("occurrence_count", 0) + 1
+                refl["last_occurred"] = now
+                if severity == "high":
+                    refl["severity"] = "high"
+                meta["reflection"] = refl
+
+                new_sal = min(1.0, existing["salience"] + 0.05)
+                session.run("""
+                    MATCH (e:Entity {uuid: $uuid})
+                    SET e.attributes_json = $meta_json,
+                        e.salience = $sal,
+                        e.last_accessed = $now
+                """, uuid=existing["uuid"],
+                    meta_json=json.dumps(meta, ensure_ascii=False),
+                    sal=new_sal, now=now)
+
+                return {"status": "reinforced", "uuid": existing["uuid"],
+                        "occurrence_count": refl["occurrence_count"],
+                        "new_salience": new_sal}
+            else:
+                meta = create_reflective_metadata(
+                    event=event, lesson=lesson, severity=severity,
+                    domain=domain, subcategory=subcategory)
+                node_uuid = str(uuid.uuid4())
+                initial_salience = {"high": 0.85, "medium": 0.65, "low": 0.45}.get(severity, 0.6)
+
+                session.run("""
+                    CREATE (e:Entity:Memory {
+                        uuid: $uuid,
+                        name: $name, name_lower: $name_lower,
+                        summary: $desc,
+                        memory_category: 'reflective',
+                        reflection_domain: $domain,
+                        reflection_severity: $severity,
+                        attributes_json: $meta_json,
+                        salience: $sal,
+                        access_count: 0, last_accessed: $now,
+                        created_at: $now, owner_id: $agent_id,
+                        scope: 'personal'
+                    })
+                """, uuid=node_uuid,
+                    name=f"[REFL] {lesson[:60]}",
+                    name_lower=f"[refl] {lesson[:60]}".lower(),
+                    desc=description or f"Event: {event}\nLesson: {lesson}",
+                    domain=domain, severity=severity,
+                    meta_json=json.dumps(meta, ensure_ascii=False),
+                    sal=initial_salience, now=now, agent_id=agent_id)
+
+                return {"status": "created", "uuid": node_uuid,
+                        "lesson": lesson, "severity": severity,
+                        "initial_salience": initial_salience}
+
+    def recall_reflections(
+        self,
+        domain: Optional[str] = None,
+        severity: Optional[str] = None,
+        agent_id: str = "system",
+    ) -> List[Dict[str, Any]]:
+        """Recall reflections/lessons. Used before task execution."""
+        clauses = ["e.memory_category = 'reflective'"]
+        params: Dict[str, Any] = {}
+        if domain:
+            clauses.append("e.reflection_domain = $domain")
+            params["domain"] = domain
+        if severity:
+            clauses.append("e.reflection_severity = $severity")
+            params["severity"] = severity
+        if agent_id != "all":
+            clauses.append("e.owner_id = $agent_id")
+            params["agent_id"] = agent_id
+
+        where = " AND ".join(clauses)
+        with self._driver.session() as session:
+            records = session.run(f"""
+                MATCH (e:Entity) WHERE {where}
+                RETURN e.uuid AS uuid, e.summary AS description,
+                       e.reflection_domain AS domain,
+                       e.reflection_severity AS severity,
+                       e.salience AS salience,
+                       e.attributes_json AS meta_json
+                ORDER BY e.salience DESC LIMIT 20
+            """, **params).data()
+
+        results = []
+        for r in records:
+            meta = self._safe_json_load(r.get("meta_json", "{}"))
+            refl = meta.get("reflection", {})
+            results.append({
+                "uuid": r["uuid"],
+                "lesson": refl.get("lesson", r.get("description", "")),
+                "event": refl.get("event", ""),
+                "domain": r["domain"], "severity": r["severity"],
+                "occurrence_count": refl.get("occurrence_count", 1),
+                "salience": r["salience"],
+            })
+        return results
+
+    # ──────────────────────────────────────────
+    # Conditional Memory
+    # ──────────────────────────────────────────
+
+    def record_conditional(
+        self,
+        condition: Dict[str, Any],
+        then_action: str,
+        else_action: Optional[str] = None,
+        description: str = "",
+        subcategory: str = "contextual",
+        confidence: float = 0.9,
+        valid_from: Optional[str] = None,
+        valid_until: Optional[str] = None,
+        agent_id: str = "system",
+    ) -> Dict[str, Any]:
+        """Record a conditional knowledge rule."""
+        meta = create_conditional_metadata(
+            condition=condition, then_action=then_action,
+            else_action=else_action, subcategory=subcategory,
+            confidence=confidence, valid_from=valid_from, valid_until=valid_until)
+        node_uuid = str(uuid.uuid4())
+        now = datetime.now(timezone.utc).isoformat()
+        initial_salience = 0.6 + (confidence * 0.3)
+
+        cond_summary = json.dumps(condition, ensure_ascii=False)
+        auto_desc = description or f"IF {cond_summary} THEN {then_action}"
+
+        with self._driver.session() as session:
+            session.run("""
+                CREATE (e:Entity:Memory {
+                    uuid: $uuid,
+                    name: $name, name_lower: $name_lower,
+                    summary: $desc,
+                    memory_category: 'conditional',
+                    condition_subcategory: $sub,
+                    attributes_json: $meta_json,
+                    salience: $sal,
+                    access_count: 0, last_accessed: $now,
+                    created_at: $now, owner_id: $agent_id,
+                    scope: 'personal'
+                })
+            """, uuid=node_uuid,
+                name=f"[COND] {then_action[:50]}",
+                name_lower=f"[cond] {then_action[:50]}".lower(),
+                desc=auto_desc, sub=subcategory,
+                meta_json=json.dumps(meta, ensure_ascii=False),
+                sal=initial_salience, now=now, agent_id=agent_id)
+
+        return {"status": "created", "uuid": node_uuid,
+                "condition": condition, "then": then_action,
+                "initial_salience": initial_salience}
+
+    def recall_conditionals(
+        self,
+        context: Optional[Dict[str, Any]] = None,
+        subcategory: Optional[str] = None,
+        agent_id: str = "system",
+    ) -> List[Dict[str, Any]]:
+        """Recall conditional rules, optionally matching context."""
+        clauses = ["e.memory_category = 'conditional'"]
+        params: Dict[str, Any] = {}
+        if subcategory:
+            clauses.append("e.condition_subcategory = $sub")
+            params["sub"] = subcategory
+        if agent_id != "all":
+            clauses.append("e.owner_id = $agent_id")
+            params["agent_id"] = agent_id
+
+        where = " AND ".join(clauses)
+        with self._driver.session() as session:
+            records = session.run(f"""
+                MATCH (e:Entity) WHERE {where}
+                RETURN e.uuid AS uuid, e.summary AS description,
+                       e.salience AS salience,
+                       e.attributes_json AS meta_json
+                ORDER BY e.salience DESC LIMIT 20
+            """, **params).data()
+
+        results = []
+        for r in records:
+            meta = self._safe_json_load(r.get("meta_json", "{}"))
+            cond = meta.get("condition", {})
+
+            # Skip expired conditionals
+            valid_until = cond.get("valid_until")
+            if valid_until:
+                try:
+                    if datetime.fromisoformat(valid_until.replace("Z", "+00:00")) < datetime.now(timezone.utc):
+                        continue
+                except Exception:
+                    pass
+
+            # Context matching
+            matched = True
+            if context and cond.get("if"):
+                cond_if = cond["if"]
+                for ck, cv in cond_if.items():
+                    ctx_val = context.get(ck)
+                    if ctx_val is not None and str(ctx_val) != str(cv):
+                        if isinstance(cv, str) and cv.startswith("<"):
+                            try:
+                                if float(str(ctx_val)) >= float(cv[1:]):
+                                    matched = False
+                            except ValueError:
+                                matched = False
+                        elif isinstance(cv, str) and cv.startswith(">"):
+                            try:
+                                if float(str(ctx_val)) <= float(cv[1:]):
+                                    matched = False
+                            except ValueError:
+                                matched = False
+                        else:
+                            matched = False
+
+            if not matched:
+                continue
+
+            results.append({
+                "uuid": r["uuid"],
+                "condition": cond.get("if", {}),
+                "then": cond.get("then", ""),
+                "else": cond.get("else"),
+                "confidence": cond.get("confidence", 0),
+                "salience": r["salience"],
+            })
+        return results
+
+    # ──────────────────────────────────────────
+    # Orchestration Memory (Multi-Agent)
+    # ──────────────────────────────────────────
+
+    def record_task_handoff(
+        self,
+        task_id: str,
+        task_description: str,
+        from_agent: str,
+        to_agent: str,
+        context: Optional[Dict[str, Any]] = None,
+        parent_task_id: Optional[str] = None,
+        task_type: str = "handoff",
+    ) -> Dict[str, Any]:
+        """Record a multi-agent task handoff/delegation."""
+        meta = create_orchestration_metadata(
+            task_id=task_id, task_type=task_type,
+            from_agent=from_agent, to_agent=to_agent,
+            context=context, status="pending",
+            parent_task_id=parent_task_id)
+        node_uuid = str(uuid.uuid4())
+        now = datetime.now(timezone.utc).isoformat()
+
+        with self._driver.session() as session:
+            session.run("""
+                CREATE (e:Entity:Memory {
+                    uuid: $uuid,
+                    name: $name, name_lower: $name_lower,
+                    summary: $desc,
+                    memory_category: 'orchestration',
+                    task_id: $task_id,
+                    task_status: 'pending',
+                    task_from_agent: $from_agent,
+                    task_to_agent: $to_agent,
+                    attributes_json: $meta_json,
+                    salience: 0.9,
+                    access_count: 0, last_accessed: $now,
+                    created_at: $now, owner_id: $from_agent,
+                    scope: 'tribal'
+                })
+            """, uuid=node_uuid,
+                name=f"[TASK] {task_description[:60]}",
+                name_lower=f"[task] {task_description[:60]}".lower(),
+                desc=task_description, task_id=task_id,
+                from_agent=from_agent, to_agent=to_agent,
+                meta_json=json.dumps(meta, ensure_ascii=False),
+                now=now)
+
+        logger.info(f"Task handoff: {task_id} {from_agent} -> {to_agent}")
+        return {"status": "created", "uuid": node_uuid,
+                "task_id": task_id, "from": from_agent, "to": to_agent}
+
+    def update_task_status(
+        self,
+        task_id: str,
+        status: str,
+        result_summary: Optional[str] = None,
+        escalate_to: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Update a task's status. Auto-generates reflection on failure."""
+        now = datetime.now(timezone.utc).isoformat()
+
+        with self._driver.session() as session:
+            existing = session.run("""
+                MATCH (e:Entity {task_id: $task_id, memory_category: 'orchestration'})
+                RETURN e.uuid AS uuid, e.attributes_json AS meta_json,
+                       e.task_status AS old_status
+            """, task_id=task_id).single()
+
+            if not existing:
+                return {"error": f"Task {task_id} not found"}
+
+            meta = self._safe_json_load(existing["meta_json"])
+            task = meta.get("task", {})
+            old_status = task.get("status", "pending")
+            task["status"] = status
+            task["updated_at"] = now
+            if result_summary:
+                task["result_summary"] = result_summary
+
+            stats = meta.get("stats", {})
+            if status == "escalated":
+                stats["escalation_count"] = stats.get("escalation_count", 0) + 1
+                if escalate_to:
+                    task["to_agent"] = escalate_to
+
+            meta["task"] = task
+            meta["stats"] = stats
+
+            sal = 0.9 if status in ("pending", "in_progress", "escalated") else 0.4
+
+            session.run("""
+                MATCH (e:Entity {uuid: $uuid})
+                SET e.attributes_json = $meta_json,
+                    e.task_status = $status,
+                    e.salience = $sal,
+                    e.last_accessed = $now
+            """, uuid=existing["uuid"],
+                meta_json=json.dumps(meta, ensure_ascii=False),
+                status=status, sal=sal, now=now)
+
+            # Auto-reflect on failure
+            if status == "failed" and result_summary:
+                try:
+                    self.record_reflection(
+                        event=f"Task {task_id} failed: {result_summary[:100]}",
+                        lesson=f"Task failure in {task.get('task_type', 'unknown')}: review approach",
+                        severity="medium",
+                        domain="orchestration",
+                        subcategory="error_pattern",
+                        agent_id=task.get("from_agent", "system"),
+                    )
+                except Exception as e:
+                    logger.debug(f"Auto-reflection on task failure skipped: {e}")
+
+        return {"status": "updated", "task_id": task_id,
+                "old_status": old_status, "new_status": status}
+
+    def get_active_tasks(
+        self,
+        agent_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Get active orchestration tasks for an agent or all agents."""
+        clauses = ["e.memory_category = 'orchestration'",
+                   "e.task_status IN ['pending', 'in_progress', 'escalated']"]
+        params: Dict[str, Any] = {}
+        if agent_id:
+            clauses.append("(e.task_to_agent = $agent_id OR e.task_from_agent = $agent_id)")
+            params["agent_id"] = agent_id
+
+        where = " AND ".join(clauses)
+        with self._driver.session() as session:
+            records = session.run(f"""
+                MATCH (e:Entity) WHERE {where}
+                RETURN e.uuid AS uuid, e.task_id AS task_id,
+                       e.summary AS description, e.task_status AS status,
+                       e.task_from_agent AS from_agent,
+                       e.task_to_agent AS to_agent,
+                       e.salience AS salience,
+                       e.attributes_json AS meta_json
+                ORDER BY e.salience DESC, e.created_at DESC
+            """, **params).data()
+
+        results = []
+        for r in records:
+            meta = self._safe_json_load(r.get("meta_json", "{}"))
+            task = meta.get("task", {})
+            results.append({
+                "uuid": r["uuid"], "task_id": r["task_id"],
+                "description": r["description"],
+                "status": r["status"],
+                "from_agent": r["from_agent"], "to_agent": r["to_agent"],
+                "context": task.get("context", {}),
+                "parent_task_id": task.get("parent_task_id"),
+            })
+        return results
+
+    # ──────────────────────────────────────────
     # Decay Modifier (for integration with MemoryManager)
     # ──────────────────────────────────────────
 
@@ -542,47 +1359,72 @@ class MemoryCategoryManager:
         """
         Calculate a decay rate modifier based on memory category.
 
-        Returns a multiplier for the base decay rate:
-        - > 1.0: memory decays slower (successful procedures)
-        - < 1.0: memory decays faster (failed procedures, stale)
-        - 1.0: no modification (declarative)
-
-        This is called by MemoryManager.run_decay() for category-aware decay.
+        Category-specific policies:
+        - preference: Very slow decay (1.1)
+        - instructional: No decay (1.0 fixed)
+        - reflective: Proportional to occurrence_count
+        - conditional: Expire after valid_until
+        - orchestration: Fast decay for completed tasks
+        - procedural: Success-rate based
+        - declarative/observational: Default (1.0)
         """
-        if memory_category != "procedural":
+        if memory_category in ('instructional',):
             return 1.0
+
+        if memory_category == 'preference':
+            return 1.1
 
         try:
             meta = json.loads(meta_json) if isinstance(meta_json, str) else meta_json
         except (json.JSONDecodeError, TypeError):
             return 1.0
 
-        stats = meta.get("stats", {})
-        versioning = meta.get("versioning", {})
+        if memory_category == 'reflective':
+            occ = meta.get("reflection", {}).get("occurrence_count", 1)
+            return min(1.1, 1.0 + (occ * 0.02))
 
-        success_rate = stats.get("success_rate", 0.5)
+        if memory_category == 'conditional':
+            valid_until = meta.get("condition", {}).get("valid_until")
+            if valid_until:
+                try:
+                    vu = datetime.fromisoformat(valid_until.replace("Z", "+00:00"))
+                    if datetime.now(timezone.utc) > vu:
+                        return 0.5
+                except Exception:
+                    pass
+            return 1.0
 
-        # Success-rate modifier
-        if success_rate < 0.5:
-            modifier = 0.85  # Fast decay for unreliable procedures
-        elif success_rate > 0.9:
-            modifier = 1.05  # Strengthen reliable procedures
-        else:
-            modifier = 1.0
+        if memory_category == 'orchestration':
+            status = meta.get("task", {}).get("status", "pending")
+            if status in ("completed", "failed"):
+                return 0.7
+            return 1.0
 
-        # Staleness modifier
-        last_verified = versioning.get("last_verified")
-        stale_after = versioning.get("stale_after_days", 90)
-        if last_verified:
-            try:
-                lv_dt = datetime.fromisoformat(last_verified.replace("Z", "+00:00"))
-                days_since = (datetime.now(timezone.utc) - lv_dt).days
-                if days_since > stale_after:
-                    modifier *= 0.9  # Additional staleness penalty
-            except Exception:
-                pass
+        if memory_category == 'procedural':
+            stats = meta.get("stats", {})
+            versioning = meta.get("versioning", {})
+            success_rate = stats.get("success_rate", 0.5)
 
-        return modifier
+            if success_rate < 0.5:
+                modifier = 0.85
+            elif success_rate > 0.9:
+                modifier = 1.05
+            else:
+                modifier = 1.0
+
+            last_verified = versioning.get("last_verified")
+            stale_after = versioning.get("stale_after_days", 90)
+            if last_verified:
+                try:
+                    lv_dt = datetime.fromisoformat(last_verified.replace("Z", "+00:00"))
+                    days_since = (datetime.now(timezone.utc) - lv_dt).days
+                    if days_since > stale_after:
+                        modifier *= 0.9
+                except Exception:
+                    pass
+            return modifier
+
+        return 1.0
 
     @staticmethod
     def _safe_json_load(data) -> Dict:
