@@ -24,6 +24,7 @@ from .graph_storage import GraphStorage
 from .embedding_service import EmbeddingService
 from .ner_extractor import NERExtractor
 from .search_service import SearchService
+from .memory_audit import MemoryAudit
 from . import neo4j_schema
 
 logger = logging.getLogger('mirofish.neo4j_storage')
@@ -53,6 +54,7 @@ class Neo4jStorage(GraphStorage):
         self._embedding = embedding_service or EmbeddingService()
         self._ner = ner_extractor or NERExtractor()
         self._search = SearchService(self._embedding)
+        self._audit = MemoryAudit(driver=self._driver)
 
         # Initialize schema (indexes, constraints)
         self._ensure_schema()
@@ -79,10 +81,24 @@ class Neo4jStorage(GraphStorage):
         Execute a function with retry on Neo4j transient errors.
         Replaces 3 different retry patterns from the Zep codebase.
         """
+        import time
+        import inspect
+        
+        try:
+            from app import neo4j_query_latency
+        except ImportError:
+            neo4j_query_latency = None
+            
+        start_time = time.time()
+        caller_name = inspect.stack()[1].function
+        
         last_error = None
         for attempt in range(self.MAX_RETRIES):
             try:
-                return func(*args, **kwargs)
+                result = func(*args, **kwargs)
+                if neo4j_query_latency:
+                    neo4j_query_latency.labels(operation=caller_name, status="success").observe(time.time() - start_time)
+                return result
             except (TransientError, ServiceUnavailable, SessionExpired) as e:
                 last_error = e
                 wait = self.RETRY_DELAY_BASE * (2 ** attempt)
@@ -91,9 +107,13 @@ class Neo4jStorage(GraphStorage):
                     f"retrying in {wait}s: {e}"
                 )
                 time.sleep(wait)
-            except Exception:
+            except Exception as e:
+                if neo4j_query_latency:
+                    neo4j_query_latency.labels(operation=caller_name, status="error").observe(time.time() - start_time)
                 raise
 
+        if neo4j_query_latency:
+            neo4j_query_latency.labels(operation=caller_name, status="error").observe(time.time() - start_time)
         raise last_error  # type: ignore
 
     # ----------------------------------------------------------------
@@ -242,6 +262,7 @@ class Neo4jStorage(GraphStorage):
             self._call_with_retry(session.execute_write, _create_episode)
 
             # MERGE entities (upsert by graph_id + name + primary label)
+            # With audit trail: captures old values before update and records changes
             entity_uuid_map: Dict[str, str] = {}  # name_lower -> uuid
             for idx, entity in enumerate(entities):
                 ename = entity["name"]
@@ -256,9 +277,14 @@ class Neo4jStorage(GraphStorage):
                 def _merge_entity(tx, _uuid=e_uuid, _name=ename, _type=etype,
                                   _attrs=attrs, _embedding=embedding,
                                   _summary=summary_text, _now=now):
-                    # MERGE by graph_id + lowercase name to deduplicate
+                    # OPTIONAL MATCH captures pre-update state for audit trail
                     result = tx.run(
                         """
+                        OPTIONAL MATCH (existing:Entity {graph_id: $gid, name_lower: $name_lower})
+                        WITH existing,
+                             existing.uuid AS old_uuid,
+                             existing.summary AS old_summary,
+                             existing.attributes_json AS old_attrs
                         MERGE (n:Entity {graph_id: $gid, name_lower: $name_lower})
                         ON CREATE SET
                             n.uuid = $uuid,
@@ -268,11 +294,14 @@ class Neo4jStorage(GraphStorage):
                             n.embedding = $embedding,
                             n.created_at = $now
                         ON MATCH SET
-                            n.summary = CASE WHEN n.summary = '' OR n.summary IS NULL
-                                THEN $summary ELSE n.summary END,
+                            n.summary = $summary,
                             n.attributes_json = $attrs_json,
-                            n.embedding = $embedding
-                        RETURN n.uuid AS uuid
+                            n.embedding = $embedding,
+                            n.updated_at = $now
+                        RETURN n.uuid AS uuid,
+                               old_uuid IS NOT NULL AS existed,
+                               old_summary,
+                               old_attrs
                         """,
                         gid=graph_id,
                         name_lower=_name.lower(),
@@ -284,10 +313,50 @@ class Neo4jStorage(GraphStorage):
                         now=_now,
                     )
                     record = result.single()
-                    return record["uuid"] if record else _uuid
+                    if record:
+                        return {
+                            'uuid': record['uuid'],
+                            'existed': record['existed'],
+                            'old_summary': record['old_summary'],
+                            'old_attrs': record['old_attrs'],
+                        }
+                    return {
+                        'uuid': _uuid, 'existed': False,
+                        'old_summary': None, 'old_attrs': None,
+                    }
 
-                actual_uuid = self._call_with_retry(session.execute_write, _merge_entity)
+                merge_result = self._call_with_retry(session.execute_write, _merge_entity)
+                actual_uuid = merge_result['uuid']
                 entity_uuid_map[ename.lower()] = actual_uuid
+
+                # --- Audit trail for Entity content changes ---
+                if merge_result['existed']:
+                    try:
+                        old_summary = merge_result.get('old_summary') or ''
+                        if old_summary != summary_text:
+                            self._audit.record(
+                                memory_uuid=actual_uuid,
+                                field='summary',
+                                old_value=old_summary,
+                                new_value=summary_text,
+                                change_type='update',
+                                changed_by='ner_ingestion',
+                                reason=f'Updated via NER extraction (episode: {episode_id})',
+                            )
+                        old_attrs = merge_result.get('old_attrs') or '{}'
+                        new_attrs = json.dumps(attrs, ensure_ascii=False)
+                        if old_attrs != new_attrs:
+                            self._audit.record(
+                                memory_uuid=actual_uuid,
+                                field='attributes',
+                                old_value=old_attrs,
+                                new_value=new_attrs,
+                                change_type='update',
+                                changed_by='ner_ingestion',
+                                reason=f'Attributes updated via NER extraction (episode: {episode_id})',
+                            )
+                    except Exception as audit_err:
+                        logger.warning(f"Audit record failed for entity '{ename}': {audit_err}")
 
                 # Add entity type label
                 if etype and etype != "Entity":
@@ -302,7 +371,7 @@ class Neo4jStorage(GraphStorage):
                     except Exception as e:
                         logger.warning(f"Failed to add label '{etype}' to '{ename}': {e}")
 
-            # Create relations
+            # Upsert relations (with temporal tracking and audit trail)
             for idx, relation in enumerate(relations):
                 source_name = relation["source"]
                 target_name = relation["target"]
@@ -322,43 +391,115 @@ class Neo4jStorage(GraphStorage):
                 fact_embedding = relation_embeddings[idx] if idx < len(relation_embeddings) else []
                 r_uuid = str(uuid.uuid4())
 
-                def _create_relation(tx, _r_uuid=r_uuid, _source_uuid=source_uuid,
+                def _upsert_relation(tx, _r_uuid=r_uuid, _source_uuid=source_uuid,
                                      _target_uuid=target_uuid, _rtype=rtype,
                                      _fact=fact, _fact_emb=fact_embedding,
                                      _episode_id=episode_id, _now=now):
-                    tx.run(
+                    # Step 1: Check for existing relation (same src→tgt with same type)
+                    check_result = tx.run(
                         """
                         MATCH (src:Entity {uuid: $src_uuid})
-                        MATCH (tgt:Entity {uuid: $tgt_uuid})
-                        MATCH (ep:Episode {uuid: $episode_id})
-                        CREATE (src)-[r:RELATION {
-                            uuid: $uuid,
-                            graph_id: $gid,
-                            name: $name,
-                            fact: $fact,
-                            fact_embedding: $fact_embedding,
-                            attributes_json: '{}',
-                            episode_ids: [$episode_id],
-                            created_at: $now,
-                            valid_at: null,
-                            invalid_at: null,
-                            expired_at: null
-                        }]->(tgt)
-                        MERGE (ep)-[:MENTIONS]->(src)
-                        MERGE (ep)-[:MENTIONS]->(tgt)
+                              -[r:RELATION {name: $name, graph_id: $gid}]->
+                              (tgt:Entity {uuid: $tgt_uuid})
+                        RETURN r.uuid AS uuid, r.fact AS old_fact
                         """,
                         src_uuid=_source_uuid,
                         tgt_uuid=_target_uuid,
-                        uuid=_r_uuid,
-                        gid=graph_id,
                         name=_rtype,
-                        fact=_fact,
-                        fact_embedding=_fact_emb,
-                        episode_id=_episode_id,
-                        now=_now,
+                        gid=graph_id,
                     )
+                    existing = check_result.single()
 
-                self._call_with_retry(session.execute_write, _create_relation)
+                    if existing:
+                        # Step 2a: Update existing relation (preserve lineage)
+                        tx.run(
+                            """
+                            MATCH (src:Entity {uuid: $src_uuid})
+                                  -[r:RELATION {name: $name, graph_id: $gid}]->
+                                  (tgt:Entity {uuid: $tgt_uuid})
+                            MATCH (ep:Episode {uuid: $episode_id})
+                            SET r.fact = $fact,
+                                r.fact_embedding = $fact_embedding,
+                                r.episode_ids = r.episode_ids + [$episode_id],
+                                r.updated_at = $now,
+                                r.valid_at = $now
+                            MERGE (ep)-[:MENTIONS]->(src)
+                            MERGE (ep)-[:MENTIONS]->(tgt)
+                            """,
+                            src_uuid=_source_uuid,
+                            tgt_uuid=_target_uuid,
+                            name=_rtype,
+                            gid=graph_id,
+                            fact=_fact,
+                            fact_embedding=_fact_emb,
+                            episode_id=_episode_id,
+                            now=_now,
+                        )
+                        return {
+                            'uuid': existing['uuid'],
+                            'action': 'updated',
+                            'old_fact': existing['old_fact'],
+                            'source_uuid': _source_uuid,
+                        }
+                    else:
+                        # Step 2b: Create new relation with temporal fields
+                        tx.run(
+                            """
+                            MATCH (src:Entity {uuid: $src_uuid})
+                            MATCH (tgt:Entity {uuid: $tgt_uuid})
+                            MATCH (ep:Episode {uuid: $episode_id})
+                            CREATE (src)-[r:RELATION {
+                                uuid: $uuid,
+                                graph_id: $gid,
+                                name: $name,
+                                fact: $fact,
+                                fact_embedding: $fact_embedding,
+                                attributes_json: '{}',
+                                episode_ids: [$episode_id],
+                                created_at: $now,
+                                valid_at: $now,
+                                invalid_at: null,
+                                expired_at: null
+                            }]->(tgt)
+                            MERGE (ep)-[:MENTIONS]->(src)
+                            MERGE (ep)-[:MENTIONS]->(tgt)
+                            """,
+                            src_uuid=_source_uuid,
+                            tgt_uuid=_target_uuid,
+                            uuid=_r_uuid,
+                            gid=graph_id,
+                            name=_rtype,
+                            fact=_fact,
+                            fact_embedding=_fact_emb,
+                            episode_id=_episode_id,
+                            now=_now,
+                        )
+                        return {
+                            'uuid': _r_uuid,
+                            'action': 'created',
+                            'old_fact': None,
+                            'source_uuid': _source_uuid,
+                        }
+
+                rel_result = self._call_with_retry(session.execute_write, _upsert_relation)
+
+                # --- Audit trail for RELATION changes ---
+                if rel_result['action'] == 'updated':
+                    try:
+                        old_fact = rel_result.get('old_fact', '')
+                        if old_fact != fact:
+                            self._audit.record_relation(
+                                relation_uuid=rel_result['uuid'],
+                                source_uuid=rel_result['source_uuid'],
+                                field='fact',
+                                old_value=old_fact,
+                                new_value=fact,
+                                change_type='update',
+                                changed_by='ner_ingestion',
+                                reason=f'Relation fact updated via NER (episode: {episode_id})',
+                            )
+                    except Exception as audit_err:
+                        logger.warning(f"Audit record failed for relation '{rtype}': {audit_err}")
 
         logger.info(f"[add_text] Chunk done: episode={episode_id}")
         return episode_id

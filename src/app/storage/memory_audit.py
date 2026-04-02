@@ -158,6 +158,74 @@ class MemoryAudit:
             rev_ids.append(rid)
         return rev_ids
 
+    def record_relation(
+        self,
+        relation_uuid: str,
+        source_uuid: str,
+        field: str,
+        old_value: Any,
+        new_value: Any,
+        change_type: str,
+        changed_by: str = "system",
+        reason: str = "",
+    ) -> str:
+        """
+        Record a RELATION field change as a MemoryRevision node.
+
+        Unlike entity revisions, relation revisions are attached to the
+        source Entity node (since Neo4j relationships cannot hold child nodes).
+        A 'target_type' property distinguishes relation revisions from entity ones.
+
+        Args:
+            relation_uuid: UUID of the RELATION being changed
+            source_uuid: UUID of the source Entity (anchor for the revision)
+            field: Field name that changed (e.g., 'fact', 'valid_at')
+            old_value: Previous value
+            new_value: New value
+            change_type: One of: update, invalidate, create, supersede
+            changed_by: Agent or user identifier
+            reason: Human-readable reason
+
+        Returns:
+            revision_id (UUID string)
+        """
+        rev_id = str(uuid.uuid4())
+        now = datetime.now(timezone.utc).isoformat()
+
+        with self._driver.session() as session:
+            session.run("""
+                MATCH (src:Entity {uuid: $source_uuid})
+                CREATE (src)-[:HAS_REVISION]->(rev:MemoryRevision {
+                    revision_id: $rev_id,
+                    memory_uuid: $relation_uuid,
+                    target_type: 'RELATION',
+                    field: $field,
+                    old_value: $old_value,
+                    new_value: $new_value,
+                    change_type: $change_type,
+                    changed_by: $changed_by,
+                    changed_at: $changed_at,
+                    reason: $reason
+                })
+            """,
+                rev_id=rev_id,
+                source_uuid=source_uuid,
+                relation_uuid=relation_uuid,
+                field=field,
+                old_value=str(old_value),
+                new_value=str(new_value),
+                change_type=change_type,
+                changed_by=changed_by,
+                changed_at=now,
+                reason=reason,
+            )
+
+        logger.debug(
+            f"Relation revision {rev_id[:8]}: rel={relation_uuid[:8]}.{field} "
+            f"{old_value} → {new_value} ({change_type})"
+        )
+        return rev_id
+
     # ──────────────────────────────────────────
     # Query History
     # ──────────────────────────────────────────
