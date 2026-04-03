@@ -637,6 +637,7 @@ lsof -i :7474
 <li><strong>패턴 생성:</strong> 작업 성공률과 실행 시간을 바탕으로 가장 효과적인 단계별 도구 체인(Tool Chain) 추출</li>
 <li><strong>조건부 로직:</strong> 특정 영역(예: <code>engineering</code>)에서 유연한 조건부 라우팅(재시도, 폴백, 핸드오프) 수행</li>
 <li><strong>공유 지식:</strong> Mories 메모리 엔진을 통해 성공적인 패턴을 전체 에이전트 네트워크와 공유</li>
+<li><strong>AI 패턴 추천:</strong> 주어진 과제(자연어)에 가장 적합한 도구 체인 추천 및 과거 실행 버전에 대한 자동 진화·롤백 내역 제공</li>
 </ul>
 <h3 id="112">11.2 대시보드 및 시각화</h3>
 <p><code>/dashboard/harness.html</code> 페이지에서 프로세스 패턴 데이터를 시각적으로 탐색할 수 있습니다.</p>
@@ -644,6 +645,7 @@ lsof -i :7474
 <li><strong>도메인별 분석:</strong> 전체 및 특정 도메인(engineering, coding 등)의 패턴 통계, 성공률 시각화</li>
 <li><strong>워터폴/노드 차트:</strong> 특정 Harness 패턴의 상세 노드 흐름도 및 시퀀스 워터폴 제공</li>
 <li><strong>메트릭 요약:</strong> 등록된 패턴 수, 평균 성공률, 평균 실행 시간 등 핵심 성과 지표(KPI)</li>
+<li><strong>AI 추천 및 롤백:</strong> 자연어 검색으로 연관 패턴 추천(매칭 점수 제공) 및 잘못된 진화를 이전 도구 체인으로 수동 롤백</li>
 </ul>
 <h3 id="113">11.3 오케스트레이션 및 활용</h3>
 <pre><code class="language-bash"># 프로세스 패턴 기록 예시
