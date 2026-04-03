@@ -9,42 +9,42 @@ import pytest
 from datetime import datetime, timezone
 
 
+@pytest.fixture
+def recon_service(neo4j_driver):
+    from app.storage.reconciliation_service import ReconciliationService
+    svc = ReconciliationService(driver=neo4j_driver)
+    yield svc
+    # Don't close — driver is session-scoped
+
+@pytest.fixture
+def test_entity(neo4j_driver, test_prefix):
+    """Create a test entity for reconciliation checks."""
+    entity_uuid = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+
+    with neo4j_driver.session() as session:
+        session.run("""
+            CREATE (n:Entity:Memory {
+                uuid: $uuid, graph_id: $gid, name: 'Recon Test',
+                name_lower: 'recon test', salience: 0.5,
+                access_count: 1, last_accessed: $now, created_at: $now,
+                scope: 'personal', source_type: 'document', owner_id: 'test'
+            })
+        """, uuid=entity_uuid, gid=test_prefix, now=now)
+
+    yield entity_uuid
+
+    # Cleanup
+    with neo4j_driver.session() as session:
+        session.run(
+            "MATCH (n:Entity {uuid: $uuid}) "
+            "OPTIONAL MATCH (n)-[:HAS_REVISION]->(r) "
+            "DETACH DELETE r, n",
+            uuid=entity_uuid,
+        )
+
 class TestReconciliationService:
     """Test the ReconciliationService data consistency checks."""
-
-    @pytest.fixture
-    def recon_service(self, neo4j_driver):
-        from app.storage.reconciliation_service import ReconciliationService
-        svc = ReconciliationService(driver=neo4j_driver)
-        yield svc
-        # Don't close — driver is session-scoped
-
-    @pytest.fixture
-    def test_entity(self, neo4j_driver, test_prefix):
-        """Create a test entity for reconciliation checks."""
-        entity_uuid = str(uuid.uuid4())
-        now = datetime.now(timezone.utc).isoformat()
-
-        with neo4j_driver.session() as session:
-            session.run("""
-                CREATE (n:Entity:Memory {
-                    uuid: $uuid, graph_id: $gid, name: 'Recon Test',
-                    name_lower: 'recon test', salience: 0.5,
-                    access_count: 1, last_accessed: $now, created_at: $now,
-                    scope: 'personal', source_type: 'document', owner_id: 'test'
-                })
-            """, uuid=entity_uuid, gid=test_prefix, now=now)
-
-        yield entity_uuid
-
-        # Cleanup
-        with neo4j_driver.session() as session:
-            session.run(
-                "MATCH (n:Entity {uuid: $uuid}) "
-                "OPTIONAL MATCH (n)-[:HAS_REVISION]->(r) "
-                "DETACH DELETE r, n",
-                uuid=entity_uuid,
-            )
 
     def test_quick_check_returns_valid_structure(self, recon_service):
         """Quick check returns expected fields."""

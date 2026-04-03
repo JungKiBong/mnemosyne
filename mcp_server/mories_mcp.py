@@ -250,9 +250,195 @@ TOOLS = [
         },
     ),
     Tool(
+        name="mories_record_preference",
+        description="Record a user preference (e.g., 'always speak in Korean').",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "domain": {"type": "string", "description": "Domain of the preference (e.g. 'communication', 'code_style')"},
+                "preference_key": {"type": "string", "description": "Key identifier for the preference"},
+                "preference_value": {"type": "string", "description": "The value of the preference"},
+                "description": {"type": "string", "description": "Optional description/context"},
+                "weight": {"type": "number", "default": 1.0, "description": "Importance weight"},
+                "is_negative": {"type": "boolean", "default": False, "description": "Whether this is a negative preference (something to avoid)"},
+            },
+            "required": ["domain", "preference_key", "preference_value"],
+        },
+    ),
+    Tool(
+        name="mories_recall_preferences",
+        description="Recall user preferences.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "domain": {"type": "string", "description": "Optional domain filter"},
+            },
+        },
+    ),
+    Tool(
+        name="mories_record_instruction",
+        description="Record an instructional rule (e.g., 'write tests first').",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "rule": {"type": "string", "description": "The instructional rule"},
+                "category": {"type": "string", "default": "general", "description": "Category of the rule"},
+                "strictness": {"type": "string", "default": "should", "enum": ["must", "should", "suggested"]},
+                "description": {"type": "string", "description": "Optional description/context"},
+            },
+            "required": ["rule"],
+        },
+    ),
+    Tool(
+        name="mories_recall_instructions",
+        description="Recall instructional rules.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "category": {"type": "string", "description": "Optional category filter"},
+            },
+        },
+    ),
+    Tool(
+        name="mories_record_reflection",
+        description="Record a reflection or lesson learned (e.g., to prevent repeating mistakes).",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "event": {"type": "string", "description": "The event that occurred"},
+                "lesson": {"type": "string", "description": "The lesson learned from the event"},
+                "domain": {"type": "string", "default": "general"},
+                "severity": {"type": "string", "default": "low", "enum": ["low", "medium", "high", "critical"]},
+                "description": {"type": "string"},
+            },
+            "required": ["event", "lesson"],
+        },
+    ),
+    Tool(
+        name="mories_recall_reflections",
+        description="Recall previously learned reflections/lessons.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "domain": {"type": "string", "description": "Optional domain filter"},
+                "severity": {"type": "string", "description": "Optional severity filter"},
+            },
+        },
+    ),
+    Tool(
+        name="mories_record_conditional",
+        description="Record a conditional knowledge rule (e.g., 'If Python 3.9, do not use match').",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "condition": {"type": "object", "description": "JSON object representing the condition (e.g., {\"language\": \"python\", \"version\": \"<3.10\"})"},
+                "then_action": {"type": "string", "description": "The action to take or fact that is true"},
+                "else_action": {"type": "string", "description": "Optional action if false"},
+                "description": {"type": "string", "description": "Optional summary"},
+                "subcategory": {"type": "string", "default": "contextual"},
+            },
+            "required": ["condition", "then_action"],
+        },
+    ),
+    Tool(
+        name="mories_recall_conditionals",
+        description="Recall conditional knowledge rules, optionally evaluating against a given context.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "context": {"type": "object", "description": "Optional context object to evaluate conditions against"},
+                "subcategory": {"type": "string", "description": "Optional subcategory filter"},
+            },
+        },
+    ),
+    Tool(
         name="mories_health",
         description="Check Mories server health, Neo4j connection status, and node count.",
         inputSchema={"type": "object", "properties": {}},
+    ),
+    Tool(
+        name="mories_harness_list",
+        description="List all harness (evolutionary process) patterns, optionally filtered by domain.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "domain": {"type": "string", "description": "Filter by domain (e.g., 'engineering')"},
+                "agent_id": {"type": "string", "description": "Filter by agent ID", "default": "all"},
+                "include_low_success": {"type": "boolean", "description": "Include patterns with low success rate", "default": False},
+            },
+        },
+    ),
+    Tool(
+        name="mories_harness_overview",
+        description="Dashboard overview: aggregated stats for harness patterns.",
+        inputSchema={"type": "object", "properties": {}},
+    ),
+    Tool(
+        name="mories_harness_detail",
+        description="Get detailed info for a specific harness pattern.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "uuid": {"type": "string", "description": "UUID of the harness pattern"},
+            },
+            "required": ["uuid"],
+        },
+    ),
+    Tool(
+        name="mories_harness_record",
+        description="Record a new harness pattern.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "domain": {"type": "string", "description": "Domain or context"},
+                "trigger": {"type": "string", "description": "Condition or prompt that triggered the pattern"},
+                "tool_chain": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of strings representing the tools used sequentially"
+                },
+                "description": {"type": "string"},
+                "process_type": {"type": "string", "default": "pipeline"},
+                "data_flow": {"type": "object"},
+                "tags": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                },
+                "scope": {"type": "string", "default": "tribal"},
+            },
+            "required": ["domain", "trigger", "tool_chain"],
+        },
+    ),
+    Tool(
+        name="mories_harness_execute",
+        description="Record an execution result for a harness pattern.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "uuid": {"type": "string", "description": "UUID of the harness pattern"},
+                "success": {"type": "boolean", "default": True},
+                "execution_time_ms": {"type": "integer", "default": 0},
+                "context": {"type": "object", "description": "Execution context variables"},
+            },
+            "required": ["uuid"],
+        },
+    ),
+    Tool(
+        name="mories_harness_evolve",
+        description="Evolve a harness pattern with a new tool chain.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "uuid": {"type": "string", "description": "UUID of the harness pattern"},
+                "new_tool_chain": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "The new sequence of tools"
+                },
+                "reason": {"type": "string", "description": "Reason for evolving the pattern"},
+            },
+            "required": ["uuid", "new_tool_chain", "reason"],
+        },
     ),
 ]
 
@@ -368,6 +554,109 @@ async def _dispatch(name: str, args: dict) -> dict:
     elif name == "mories_health":
         return await _api("GET", "/api/health")
 
+    # ── Cognitive Memory Categories ──
+    elif name == "mories_record_preference":
+        return await _api("POST", "/api/memory/category/preference", {
+            "domain": args["domain"],
+            "preference_key": args["preference_key"],
+            "preference_value": args["preference_value"],
+            "description": args.get("description", ""),
+            "weight": args.get("weight", 1.0),
+            "is_negative": args.get("is_negative", False),
+            "agent_id": AGENT_ID,
+        })
+    elif name == "mories_recall_preferences":
+        return await _api("GET", "/api/memory/category/preference", {
+            "domain": args.get("domain"),
+            "agent_id": AGENT_ID,
+        })
+
+    elif name == "mories_record_instruction":
+        return await _api("POST", "/api/memory/category/instruction", {
+            "rule": args["rule"],
+            "category": args.get("category", "general"),
+            "strictness": args.get("strictness", "should"),
+            "description": args.get("description", ""),
+            "agent_id": AGENT_ID,
+        })
+    elif name == "mories_recall_instructions":
+        return await _api("GET", "/api/memory/category/instruction", {
+            "category": args.get("category"),
+            "agent_id": AGENT_ID,
+        })
+
+    elif name == "mories_record_reflection":
+        return await _api("POST", "/api/memory/category/reflection", {
+            "event": args["event"],
+            "lesson": args["lesson"],
+            "domain": args.get("domain", "general"),
+            "severity": args.get("severity", "low"),
+            "description": args.get("description", ""),
+            "agent_id": AGENT_ID,
+        })
+    elif name == "mories_recall_reflections":
+        return await _api("GET", "/api/memory/category/reflection", {
+            "domain": args.get("domain"),
+            "severity": args.get("severity"),
+            "agent_id": AGENT_ID,
+        })
+
+    elif name == "mories_record_conditional":
+        return await _api("POST", "/api/memory/category/conditional", {
+            "condition": args["condition"],
+            "then_action": args["then_action"],
+            "else_action": args.get("else_action"),
+            "description": args.get("description", ""),
+            "subcategory": args.get("subcategory", "contextual"),
+            "agent_id": AGENT_ID,
+        })
+    elif name == "mories_recall_conditionals":
+        return await _api("POST", "/api/memory/category/conditional/search", {
+            "context": args.get("context"),
+            "subcategory": args.get("subcategory"),
+            "agent_id": AGENT_ID,
+        })
+
+    # ── Harness Orchestration ──
+    elif name == "mories_harness_list":
+        return await _api("GET", "/api/analytics/harness/list", {
+            "domain": args.get("domain"),
+            "agent_id": args.get("agent_id", "all"),
+            "include_low_success": str(args.get("include_low_success", False)).lower()
+        })
+
+    elif name == "mories_harness_overview":
+        return await _api("GET", "/api/analytics/harness/overview")
+
+    elif name == "mories_harness_detail":
+        return await _api("GET", f"/api/analytics/harness/{args['uuid']}")
+
+    elif name == "mories_harness_record":
+        return await _api("POST", "/api/analytics/harness/record", {
+            "domain": args["domain"],
+            "trigger": args["trigger"],
+            "tool_chain": args["tool_chain"],
+            "description": args.get("description", ""),
+            "process_type": args.get("process_type", "pipeline"),
+            "data_flow": args.get("data_flow", {}),
+            "tags": args.get("tags", []),
+            "agent_id": AGENT_ID,
+            "scope": args.get("scope", "tribal"),
+        })
+
+    elif name == "mories_harness_execute":
+        return await _api("POST", f"/api/analytics/harness/{args['uuid']}/execute", {
+            "success": args.get("success", True),
+            "execution_time_ms": args.get("execution_time_ms", 0),
+            "context": args.get("context", {}),
+        })
+
+    elif name == "mories_harness_evolve":
+        return await _api("POST", f"/api/analytics/harness/{args['uuid']}/evolve", {
+            "new_tool_chain": args["new_tool_chain"],
+            "reason": args["reason"],
+        })
+
     else:
         return {"error": f"Unknown tool: {name}"}
 
@@ -384,6 +673,9 @@ async def main():
         await app.run(read_stream, write_stream, app.create_initialization_options())
 
 
-if __name__ == "__main__":
+def cli_main():
     import asyncio
     asyncio.run(main())
+
+if __name__ == "__main__":
+    cli_main()

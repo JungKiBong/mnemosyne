@@ -941,7 +941,211 @@ def search_by_category():
     ))
 
 
-@memory_bp.route('/category/stale', methods=['GET'])
+# ──────────────────────────────────────────
+# COGNITIVE CATEGORIES API (Phase 16-C+)
+# ──────────────────────────────────────────
+
+@memory_bp.route('/category/preference', methods=['POST'])
+def record_preference():
+    """Record a user preference."""
+    data = request.get_json(silent=True) or {}
+    domain = data.get('domain')
+    preference_key = data.get('preference_key')
+    preference_value = data.get('preference_value')
+    if not domain or not preference_key or preference_value is None:
+        return jsonify({"error": "domain, preference_key, and preference_value are required"}), 400
+
+    result = _get_cat().record_preference(
+        domain=domain,
+        preference_key=preference_key,
+        preference_value=preference_value,
+        description=data.get('description', ''),
+        weight=float(data.get('weight', 1.0)),
+        is_negative=bool(data.get('is_negative', False)),
+        agent_id=data.get('agent_id', 'system'),
+    )
+    return jsonify(result), 201
+
+
+@memory_bp.route('/category/preference', methods=['GET'])
+def recall_preferences():
+    """Recall user preferences."""
+    domain = request.args.get('domain')
+    agent_id = request.args.get('agent_id', 'system')
+    return jsonify(_get_cat().recall_preferences(domain=domain, agent_id=agent_id))
+
+
+@memory_bp.route('/category/instruction', methods=['POST'])
+def record_instruction():
+    """Record an instructional rule."""
+    data = request.get_json(silent=True) or {}
+    rule = data.get('rule')
+    if not rule:
+        return jsonify({"error": "rule is required"}), 400
+
+    result = _get_cat().record_instruction(
+        rule=rule,
+        category=data.get('category', 'general'),
+        strictness=data.get('strictness', 'should'),
+        description=data.get('description', ''),
+        agent_id=data.get('agent_id', 'system'),
+    )
+    return jsonify(result), 201
+
+
+@memory_bp.route('/category/instruction', methods=['GET'])
+def recall_instructions():
+    """Recall instructional rules."""
+    category = request.args.get('category')
+    agent_id = request.args.get('agent_id', 'system')
+    return jsonify(_get_cat().recall_instructions(category=category, agent_id=agent_id))
+
+
+@memory_bp.route('/category/reflection', methods=['POST'])
+def record_reflection():
+    """Record a reflection on a past event."""
+    data = request.get_json(silent=True) or {}
+    event = data.get('event')
+    lesson = data.get('lesson')
+    if not event or not lesson:
+        return jsonify({"error": "event and lesson are required"}), 400
+
+    result = _get_cat().record_reflection(
+        event=event,
+        lesson=lesson,
+        domain=data.get('domain', 'general'),
+        severity=data.get('severity', 'low'),
+        description=data.get('description', ''),
+        agent_id=data.get('agent_id', 'system'),
+    )
+    return jsonify(result), 201
+
+
+@memory_bp.route('/category/reflection', methods=['GET'])
+def recall_reflections():
+    """Recall reflections."""
+    domain = request.args.get('domain')
+    severity = request.args.get('severity')
+    agent_id = request.args.get('agent_id', 'system')
+    return jsonify(_get_cat().recall_reflections(domain=domain, severity=severity, agent_id=agent_id))
+
+
+@memory_bp.route('/category/conditional', methods=['POST'])
+def record_conditional():
+    """Record a conditional knowledge rule."""
+    data = request.get_json(silent=True) or {}
+    condition = data.get('condition')
+    then_action = data.get('then_action')
+    if not condition or not then_action:
+        return jsonify({"error": "condition and then_action are required"}), 400
+
+    result = _get_cat().record_conditional(
+        condition=condition,
+        then_action=then_action,
+        else_action=data.get('else_action'),
+        description=data.get('description', ''),
+        subcategory=data.get('subcategory', 'contextual'),
+        confidence=float(data.get('confidence', 0.9)),
+        valid_from=data.get('valid_from'),
+        valid_until=data.get('valid_until'),
+        agent_id=data.get('agent_id', 'system'),
+    )
+    return jsonify(result), 201
+
+
+@memory_bp.route('/category/conditional/search', methods=['POST'])
+def recall_conditionals():
+    """Recall conditional rules matching a context context (using POST to pass body)."""
+    data = request.get_json(silent=True) or {}
+    context = data.get('context')
+    subcategory = data.get('subcategory')
+    agent_id = data.get('agent_id', 'system')
+    return jsonify(_get_cat().recall_conditionals(context=context, subcategory=subcategory, agent_id=agent_id))
+
+
+@memory_bp.route('/category/orchestration/handoff', methods=['POST'])
+def record_handoff():
+    """Record a multi-agent task handoff/delegation."""
+    data = request.get_json(silent=True) or {}
+    task_id = data.get('task_id')
+    task_desc = data.get('task_description')
+    from_agent = data.get('from_agent')
+    to_agent = data.get('to_agent')
+    if not all([task_id, task_desc, from_agent, to_agent]):
+         return jsonify({"error": "Missing required orchestration fields"}), 400
+    
+    result = _get_cat().record_task_handoff(
+        task_id=task_id,
+        task_description=task_desc,
+        from_agent=from_agent,
+        to_agent=to_agent,
+        context=data.get('context'),
+        parent_task_id=data.get('parent_task_id'),
+        task_type=data.get('task_type', 'handoff')
+    )
+    return jsonify(result), 201
+
+@memory_bp.route('/category/orchestration/status', methods=['POST'])
+def update_task_status():
+    """Update status of a multi-agent task."""
+    data = request.get_json(silent=True) or {}
+    task_id = data.get('task_id')
+    status = data.get('status')
+    if not task_id or not status:
+        return jsonify({"error": "task_id and status required"}), 400
+    return jsonify(_get_cat().update_task_status(task_id, status))
+
+
+@memory_bp.route('/category/harness', methods=['POST'])
+def record_harness():
+    """Record the registration of a new computational harness."""
+    data = request.get_json(silent=True) or {}
+    name = data.get('name')
+    tools = data.get('tools')
+    process = data.get('process')
+    if not all([name, tools, process]):
+        return jsonify({"error": "name, tools, and process are required for harness"}), 400
+
+    result = _get_cat().record_harness(
+        name=name,
+        description=data.get('description', ''),
+        version=data.get('version', '1.0.0'),
+        tools=tools,
+        process=process,
+        success_criteria=data.get('success_criteria'),
+        agent_id=data.get('agent_id', 'system'),
+    )
+    return jsonify(result), 201
+
+@memory_bp.route('/category/harness/<name>', methods=['GET'])
+def recall_harness(name):
+    """Recall a specific computational harness by name."""
+    agent_id = request.args.get('agent_id', 'system')
+    return jsonify(_get_cat().recall_harness(name=name, agent_id=agent_id))
+
+@memory_bp.route('/category/harness/list', methods=['GET'])
+def list_harnesses():
+    """List all available computational harnesses."""
+    agent_id = request.args.get('agent_id', 'system')
+    return jsonify(_get_cat().list_harnesses(agent_id=agent_id))
+
+@memory_bp.route('/category/harness/extract', methods=['POST'])
+def extract_harness():
+    """Extract a structural harness definition from unstructured project logs/events."""
+    data = request.get_json(silent=True) or {}
+    events = data.get('events')
+    prompt = data.get('prompt')
+    if not events:
+        return jsonify({"error": "events payload required for harness extraction"}), 400
+    
+    result = _get_cat().extract_harness_from_log(
+        events=events,
+        prompt=prompt,
+        agent_id=data.get('agent_id', 'system')
+    )
+    return jsonify(result), 200
+
+
 def detect_stale():
     """Detect stale procedural memories."""
     max_age = request.args.get('max_age_days', 90, type=int)

@@ -64,8 +64,9 @@ LIMIT $limit
 class SearchService:
     """Hybrid search combining vector similarity and keyword matching."""
 
-    VECTOR_WEIGHT = 0.7
-    KEYWORD_WEIGHT = 0.3
+    VECTOR_WEIGHT = 0.75
+    KEYWORD_WEIGHT = 0.25
+    CANDIDATE_MULTIPLIER = 5
 
     def __init__(self, embedding_service: EmbeddingService):
         self.embedding = embedding_service
@@ -86,12 +87,12 @@ class SearchService:
 
         # Vector search
         vector_results = self._run_edge_vector_search(
-            session, graph_id, query_vector, limit * 2
+            session, graph_id, query_vector, limit * self.CANDIDATE_MULTIPLIER
         )
 
         # Keyword search
         keyword_results = self._run_edge_keyword_search(
-            session, graph_id, query, limit * 2
+            session, graph_id, query, limit * self.CANDIDATE_MULTIPLIER
         )
 
         # Merge and rank
@@ -115,11 +116,11 @@ class SearchService:
         query_vector = self.embedding.embed(query)
 
         vector_results = self._run_node_vector_search(
-            session, graph_id, query_vector, limit * 2
+            session, graph_id, query_vector, limit * self.CANDIDATE_MULTIPLIER
         )
 
         keyword_results = self._run_node_keyword_search(
-            session, graph_id, query, limit * 2
+            session, graph_id, query, limit * self.CANDIDATE_MULTIPLIER
         )
 
         merged = self._merge_results(
