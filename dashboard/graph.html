@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mories — Knowledge Graph Explorer</title>
 <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <script src="/i18n.js"></script>
   <style>
@@ -64,6 +65,31 @@ select.select-modern option { background:var(--bg-1); }
 .loading-overlay.active { display:flex; flex-direction:column; gap:16px; }
 .spinner { width:32px; height:32px; border:3px solid var(--border); border-top-color:var(--accent-cyan); border-radius:50%; animation:spin 1s linear infinite; }
 @keyframes spin { to { transform:rotate(360deg); } }
+
+/* Deep Dive Modal */
+.modal-overlay { position:fixed; inset:0; background:rgba(5,5,8,0.85); backdrop-filter:blur(8px); display:none; justify-content:center; align-items:center; z-index:1000; opacity:0; transition:opacity 0.3s; }
+.modal-overlay.active { display:flex; opacity:1; }
+.modal-content { background:var(--bg-1); width:80vw; height:80vh; border-radius:16px; border:1px solid var(--accent-purple); display:flex; flex-direction:column; overflow:hidden; box-shadow:0 10px 40px rgba(139,92,246,0.2); transform:scale(0.95); transition:transform 0.3s; }
+.modal-overlay.active .modal-content { transform:scale(1); }
+.modal-header { padding:20px 24px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; background:rgba(22,22,31,0.5); }
+.modal-header h2 { font-size:1.2rem; color:white; display:flex; align-items:center; gap:10px; }
+.close-btn { background:none; border:none; color:var(--text-2); cursor:pointer; font-size:1.5rem; }
+.close-btn:hover { color:white; }
+.modal-body { display:flex; flex:1; overflow:hidden; }
+.modal-left { width:40%; border-right:1px solid var(--border); padding:24px; overflow-y:auto; }
+.modal-right { flex:1; padding:24px; display:flex; flex-direction:column; background:var(--bg-0); }
+
+/* Markdown Content Styling */
+.md-content { color:#e2e8f0; font-size:0.9rem; line-height:1.6; }
+.md-content h1, .md-content h2, .md-content h3 { color:white; margin-top:1em; margin-bottom:0.5em; font-weight:600; }
+.md-content p { margin-bottom:1em; }
+.md-content ul, .md-content ol { margin-bottom:1em; padding-left:20px; }
+.md-content li { margin-bottom:0.25em; }
+.md-content strong { color:#67e8f9; }
+.md-content code { background:rgba(255,255,255,0.1); padding:2px 4px; border-radius:4px; font-family:monospace; color:#f87171; }
+.md-content pre { background:#1e1e24; padding:12px; border-radius:8px; overflow-x:auto; margin-bottom:1em; }
+.md-content pre code { background:transparent; padding:0; color:#e2e8f0; }
+
 </style>
 <link rel="stylesheet" href="/nav-component.css">
 </head>
@@ -119,6 +145,50 @@ select.select-modern option { background:var(--bg-1); }
       <div class="legend-item"><div class="legend-dot" style="background:rgba(34,197,94,0.2); border-color:#22c55e;"></div> <span data-i18n="graph.legendSocial">Memory (Social/Tribal)</span></div>
       <div class="legend-item"><div class="legend-dot" style="background:rgba(249,115,22,0.2); border-color:#f97316;"></div> <span data-i18n="graph.legendRevision">Revision / Metadata</span></div>
       <div class="legend-item"><div class="legend-dot" style="background:rgba(139,92,246,0.3); border-color:#8b5cf6;"></div> <span data-i18n="graph.legendAgent">Synaptic Agent</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Deep Dive Modal -->
+<div class="modal-overlay" id="deepDiveModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2><span style="color:var(--accent-cyan)">🧠</span> Memory Deep Dive</h2>
+      <button class="close-btn" onclick="closeDeepDive()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-left" id="modal-details">
+        <!-- Populated dynamically -->
+      </div>
+      <div class="modal-right">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <h3 style="color:var(--accent-purple); display:flex; align-items:center; gap:8px; margin:0;">
+            💬 Oracle Chat (Up to 3-Hops Context)
+          </h3>
+          <span id="current-rev-badge" class="badge" style="display:none; cursor:pointer; background:rgba(249,115,22,0.2); color:#f97316; font-size:0.75rem;" onclick="clearRevision()" title="Clear Revision">TimeTravel: <span id="current-rev-text"></span> ×</span>
+        </div>
+        <div id="modal-chat-log" style="flex:1; overflow-y:auto; background:var(--bg-2); padding:20px; border-radius:12px; border:1px solid var(--border); margin-bottom:16px; font-size:0.9rem; line-height:1.6;">
+          <div style="color:var(--text-2); text-align:center; margin-top:20px;">
+            <p>Ask anything about this memory and its extended topological neighbors.</p>
+            <p style="font-size:0.8rem; margin-top:8px;">Example: "What events caused this failure?" or "Summarize the 3-hop context."</p>
+          </div>
+        </div>
+        <div style="display:flex; gap:12px; margin-bottom: 8px;">
+          <input type="text" id="modal-chat-input" class="input-modern" style="margin:0; font-size:1rem; padding:14px;" placeholder="Ask the Oracle..." onkeydown="if(event.key==='Enter') sendModalChat()">
+          <button class="btn btn-primary" style="width:120px; font-size:1rem;" onclick="sendModalChat()">Send</button>
+        </div>
+        
+        <h3 style="margin-top:16px; color:var(--accent-cyan); font-size: 0.95rem; border-top:1px solid var(--border); padding-top:16px; padding-bottom:10px;">
+          💡 Synthesize Insight (Hindsight Reflection)
+        </h3>
+        <div style="display:flex; gap:12px;">
+          <input type="text" id="modal-synth-input" class="input-modern" style="margin:0; font-size:0.9rem;" placeholder="What new insight did we learn from this state/history?" onkeydown="if(event.key==='Enter') synthesizeMemory(event)">
+          <button class="btn btn-primary" style="background:#22c55e; width:120px; font-size:0.9rem;" onclick="synthesizeMemory(event)">Synthesize</button>
+        </div>
+        
+        <input type="hidden" id="modal-current-uuid" value="">
+        <input type="hidden" id="modal-current-revision" value="">
+      </div>
     </div>
   </div>
 </div>
@@ -181,11 +251,15 @@ function initNetwork() {
     }
   });
 
-  // Handle double click to open clusters
+  // Handle double click to open clusters or deep dive
   network.on("doubleClick", function (params) {
     if (params.nodes.length == 1) {
       if (network.isCluster(params.nodes[0]) == true) {
         network.openCluster(params.nodes[0]);
+      } else {
+        const nodeId = params.nodes[0];
+        const nodeObj = nodesData.get(nodeId);
+        openDeepDive(nodeObj.raw);
       }
     }
   });
@@ -200,7 +274,7 @@ function initNetwork() {
   });
 }
 
-function showNodeDetails(data) {
+async function showNodeDetails(data) {
   const panel = document.getElementById('node-details');
   const uuid = data.uuid || data.revision_id || data.agent_id;
   
@@ -221,7 +295,297 @@ function showNodeDetails(data) {
     html += `<h3>Memory Snapshot</h3><div class="detail-summary">${summaryStr.replace(/\\n/g, '<br>')}</div>`;
   }
   
+  // History Timeline Skeleton
+  if(data.uuid) {
+    html += `
+      <h3 style="margin-top:20px; font-size:0.85rem; color:var(--text-1);"><span style="margin-right:6px;">⏳</span>Evolutionary History</h3>
+      <div id="rev-timeline" style="margin-top:10px; margin-bottom:20px; font-size:0.75rem; color:var(--text-2);">Loading history...</div>
+    `;
+  }
+
+  // Memory Chat Skeleton
+  if(uuid) {
+    html += `
+      <h3 style="margin-top:10px; font-size:0.85rem; color:var(--accent-purple);"><span style="margin-right:6px;">💬</span>Chat with this Memory</h3>
+      <div id="memory-chat-log" style="margin-top:10px; max-height:200px; overflow-y:auto; background:var(--bg-2); padding:10px; border-radius:8px; border:1px solid var(--border); margin-bottom:10px;">
+        <div style="color:var(--text-2); font-size:0.75rem; text-align:center;">Ask anything about this node & its neighbors. LLM will answer using semantic context.</div>
+      </div>
+      <div style="display:flex; gap:8px; padding-bottom: 30px;">
+        <input type="text" id="memory-chat-input" class="input-modern" style="margin:0;" placeholder="e.g. Why did this pivot happen?" onkeydown="if(event.key==='Enter') sendMemoryChat('${uuid}')">
+        <button class="btn btn-primary" style="width:auto; padding:0 16px;" onclick="sendMemoryChat('${uuid}')">Ask</button>
+      </div>
+    `;
+  }
+  
   panel.innerHTML = html;
+
+  // Fetch true history async
+  if(data.uuid) {
+    try {
+      const res = await fetch('/api/memory/audit/history/' + data.uuid);
+      const history = await res.json();
+      
+      const tlDiv = document.getElementById('rev-timeline');
+      if(!history || history.length === 0 || history.error) {
+          tlDiv.innerHTML = "<em>No evolutionary history found.</em>";
+      } else {
+          let thtml = '<div style="display:flex; flex-direction:column; gap:12px; border-left:2px solid var(--border); padding-left:14px; margin-left:6px;">';
+          history.forEach(h => {
+              const action = h.action || 'updated';
+              const date = new Date(h.timestamp).toLocaleString();
+              let actionColor = 'var(--text-1)';
+              if(action==='created') actionColor = '#22c55e';
+              if(action==='rollback') actionColor = '#ef4444';
+              if(action==='promoted') actionColor = '#8b5cf6';
+              
+              const reason = h.reason ? `<div style="color:#f97316; margin-top:2px;">↳ ${h.reason}</div>` : '';
+              thtml += `
+              <div style="position:relative;">
+                  <div style="position:absolute; width:10px; height:10px; border-radius:50%; background:${actionColor}; left:-20px; top:3px;"></div>
+                  <strong style="color:white; text-transform:uppercase; font-size:0.7rem; letter-spacing:0.5px;">${action}</strong> 
+                  <span style="color:var(--text-2);">by ${h.actor_id}</span>
+                  <div style="color:var(--text-2); font-size:0.7rem; margin-top:2px;">${date}</div>
+                  ${reason}
+              </div>`;
+          });
+          thtml += '</div>';
+          tlDiv.innerHTML = thtml;
+      }
+    } catch(e) {
+      document.getElementById('rev-timeline').innerHTML = "<em>Error loading history.</em>";
+    }
+  }
+}
+
+async function sendMemoryChat(uuid) {
+  const input = document.getElementById('memory-chat-input');
+  const msg = input.value.trim();
+  if(!msg) return;
+  
+  const log = document.getElementById('memory-chat-log');
+  // clear empty state prompt if exists
+  if(log.innerText.includes('Ask anything')) log.innerHTML = '';
+  
+  log.innerHTML += `<div style="margin-bottom:12px; color:white; line-height:1.4;"><strong>User:</strong> <span style="opacity:0.9">${msg}</span></div>`;
+  input.value = '';
+  
+  const typingId = "typing_" + Date.now();
+  log.innerHTML += `<div id="${typingId}" style="margin-bottom:12px; color:var(--text-2);"><em>⚡ Oracle is analyzing context...</em></div>`;
+  log.scrollTop = log.scrollHeight;
+  
+  try {
+      const res = await fetch('/api/memory/' + uuid + '/chat', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({message: msg})
+      });
+      const result = await res.json();
+      
+      const typingEl = document.getElementById(typingId);
+      if(typingEl) typingEl.remove();
+      
+      if(result.error) {
+          log.innerHTML += `<div style="margin-bottom:12px; color:#ef4444; line-height:1.4;"><strong>Error:</strong> ${result.error}</div>`;
+      } else {
+          // Format basic markdown like line breaks
+          const formattedAns = result.answer.replace(/\\n/g, '<br>');
+          log.innerHTML += `<div style="margin-bottom:12px; color:var(--accent-cyan); line-height:1.4;"><strong>Oracle:</strong> <span style="color:#e8e8f0;">${formattedAns}</span></div>`;
+      }
+  } catch(e) {
+      const typingEl = document.getElementById(typingId);
+      if(typingEl) typingEl.remove();
+      log.innerHTML += `<div style="margin-bottom:12px; color:#ef4444; line-height:1.4;"><strong>Error:</strong> Request failed</div>`;
+  }
+  
+  log.scrollTop = log.scrollHeight;
+}
+
+// Deep Dive Modal Logic
+async function openDeepDive(data) {
+  const uuid = data.uuid || data.revision_id || data.agent_id;
+  if(!uuid) return;
+  
+  document.getElementById('modal-current-uuid').value = uuid;
+  clearRevision(); // Reset revision on open
+  document.getElementById('deepDiveModal').classList.add('active');
+  
+  // Populate Left Panel (Details & History)
+  const leftPanel = document.getElementById('modal-details');
+  let html = `<div style="font-size:1.2rem; font-weight:bold; color:white; margin-bottom:16px;">${getNodeLabel(data)}</div>`;
+  
+  html += `<div style="background:var(--bg-2); padding:16px; border-radius:8px; border:1px solid var(--border); margin-bottom:24px;">`;
+  html += `<div style="color:var(--text-2); font-size:0.8rem; margin-bottom:8px;">UUID: <span style="color:white">${uuid}</span></div>`;
+  if(data.scope) html += `<div style="color:var(--text-2); font-size:0.8rem; margin-bottom:8px;">Scope: <span style="color:var(--accent-cyan)">${data.scope}</span></div>`;
+  
+  if(data.summary) {
+    let summaryStr = data.summary;
+    if (summaryStr.startsWith("{'title'")) {
+      try { const p = JSON.parse(summaryStr.replace(/'/g, '"')); summaryStr = p.body; } catch(e){}
+    }
+    // Fix escaped newlines first, then render as Markdown
+    const unescapedStr = summaryStr.replace(/\\n/g, '\n');
+    html += `<div style="margin-top:12px;" class="md-content">${marked.parse(unescapedStr)}</div>`;
+  }
+  html += `</div>`;
+  
+  html += `<h3 style="font-size:1rem; color:var(--text-0); margin-bottom:16px;">⏳ Evolutionary Timeline</h3>`;
+  html += `<div id="modal-timeline" style="font-size:0.85rem; color:var(--text-2);">Loading history...</div>`;
+  
+  leftPanel.innerHTML = html;
+  
+  // Reset Chat
+  document.getElementById('modal-chat-log').innerHTML = `
+    <div style="color:var(--text-2); text-align:center; margin-top:20px;">
+      <p>Ask anything about this memory and its extended topological neighbors.</p>
+    </div>
+  `;
+  
+  // Fetch History
+  try {
+    const res = await fetch('/api/memory/audit/history/' + uuid);
+    const history = await res.json();
+    const tlDiv = document.getElementById('modal-timeline');
+    
+    if(!history || history.length === 0 || history.error) {
+        tlDiv.innerHTML = "<em>No specific evolutionary history found in audit logs.</em>";
+    } else {
+        let thtml = '<div style="display:flex; flex-direction:column; gap:16px; border-left:2px solid var(--border); padding-left:20px; margin-left:10px;">';
+        history.forEach(h => {
+            const action = h.action || 'updated';
+            const date = new Date(h.timestamp).toLocaleString();
+            let actionColor = 'var(--text-1)';
+            if(action==='created') actionColor = '#22c55e';
+            if(action==='rollback') actionColor = '#ef4444';
+            if(action==='promoted') actionColor = '#8b5cf6';
+            
+            const reason = h.reason ? `<div style="color:#f97316; margin-top:4px; font-style:italic;">"${h.reason}"</div>` : '';
+            thtml += `
+            <div style="position:relative; background:var(--bg-0); padding:12px; border-radius:8px; border:1px solid var(--border); cursor:pointer; transition:border 0.2s;" onclick="selectRevision('${h.id}')" onmouseover="this.style.borderColor='var(--accent-cyan)'" onmouseout="this.style.borderColor='var(--border)'" title="Click to chat with this version of the memory">
+                <div style="position:absolute; width:14px; height:14px; border-radius:50%; background:${actionColor}; border:3px solid var(--bg-1); left:-28px; top:12px;"></div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <strong style="color:white; text-transform:uppercase; font-size:0.75rem; letter-spacing:0.5px;">${action}</strong>
+                  <div style="color:var(--text-2); font-size:0.75rem;">${date}</div>
+                </div>
+                <div style="color:var(--text-1); font-size:0.8rem; margin-top:4px;">Actor: ${h.actor_id}</div>
+                ${reason}
+            </div>`;
+        });
+        thtml += '</div>';
+        tlDiv.innerHTML = thtml;
+    }
+  } catch(e) {
+    document.getElementById('modal-timeline').innerHTML = "<em>Error loading history.</em>";
+  }
+}
+
+function closeDeepDive() {
+  document.getElementById('deepDiveModal').classList.remove('active');
+}
+
+function selectRevision(revId) {
+    document.getElementById('modal-current-revision').value = revId;
+    const badge = document.getElementById('current-rev-badge');
+    document.getElementById('current-rev-text').innerText = revId.substring(0,8);
+    badge.style.display = 'inline-block';
+    
+    // Add instruction to chat
+    const log = document.getElementById('modal-chat-log');
+    log.innerHTML += `<div style="margin-bottom:16px; color:var(--accent-cyan); font-style:italic; font-size:0.85rem; border:1px dashed var(--accent-cyan); padding:8px; border-radius:6px;"><strong>Time-Travel Active:</strong> The Oracle will now analyze the snapshot of this memory from revision <code>${revId.substring(0,8)}</code>. Compare it with the present!</div>`;
+    log.scrollTop = log.scrollHeight;
+}
+
+function clearRevision() {
+    document.getElementById('modal-current-revision').value = '';
+    document.getElementById('current-rev-badge').style.display = 'none';
+}
+
+async function synthesizeMemory(e) {
+  const uuid = document.getElementById('modal-current-uuid').value;
+  const input = document.getElementById('modal-synth-input');
+  const insight = input.value.trim();
+  if(!insight || !uuid) return;
+  
+  const synthBtn = typeof e.target !== 'undefined' && e.target.tagName === 'BUTTON' ? e.target : e.currentTarget;
+  const oldText = synthBtn ? synthBtn.innerText : 'Synthesize';
+  if(synthBtn) { synthBtn.innerText = "Saving..."; synthBtn.disabled = true; }
+  
+  try {
+      const res = await fetch('/api/memory/' + uuid + '/synthesize', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({insight: insight, created_by: 'user_synthesis'})
+      });
+      const result = await res.json();
+      
+      if(result.error) {
+          alert('Error: ' + result.error);
+      } else {
+          input.value = '';
+          const log = document.getElementById('modal-chat-log');
+          log.innerHTML += `<div style="margin-bottom:16px; color:#22c55e; border:1px solid #22c55e; padding:10px; border-radius:8px; line-height:1.4;">
+            <strong>Insight Synthesized! 🌟</strong><br>
+            <span style="opacity:0.9">Your reflection has been immortalized as a new permanent memory node.</span><br>
+            <span style="font-size:0.75rem; color:var(--text-2);">UUID: ${result.uuid}</span>
+          </div>`;
+          log.scrollTop = log.scrollHeight;
+          runQuery(); // refresh the background graph map
+      }
+  } catch(err) {
+      alert("Failed to synthesize: " + err.message);
+  } finally {
+      if(synthBtn) { synthBtn.innerText = oldText; synthBtn.disabled = false; }
+  }
+}
+
+async function sendModalChat() {
+  const uuid = document.getElementById('modal-current-uuid').value;
+  const revId = document.getElementById('modal-current-revision').value;
+  const input = document.getElementById('modal-chat-input');
+  const msg = input.value.trim();
+  if(!msg || !uuid) return;
+  
+  const log = document.getElementById('modal-chat-log');
+  if(log.innerText.includes('Ask anything')) log.innerHTML = '';
+  
+  log.innerHTML += `<div style="margin-bottom:16px; color:white;"><strong>User:</strong> <span style="opacity:0.9">${msg}</span></div>`;
+  input.value = '';
+  
+  const typingId = "modal_typing_" + Date.now();
+  const travelMode = revId ? ' (Time-Travel Mode)' : '';
+  log.innerHTML += `<div id="${typingId}" style="margin-bottom:16px; color:var(--text-2); display:flex; align-items:center; gap:8px;">
+    <div class="spinner" style="width:16px; height:16px; border-width:2px;"></div> Oracle is analyzing up to 3 hops${travelMode}...
+  </div>`;
+  log.scrollTop = log.scrollHeight;
+  
+  try {
+      const payload = {message: msg};
+      if(revId) payload.revision_id = revId;
+      
+      const res = await fetch('/api/memory/' + uuid + '/chat', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload)
+      });
+      const result = await res.json();
+      
+      document.getElementById(typingId)?.remove();
+      
+      if(result.error) {
+          log.innerHTML += `<div style="margin-bottom:16px; color:#ef4444;"><strong>Error:</strong> ${result.error}</div>`;
+      } else {
+          // Parse markdown response
+          const unescapedAns = result.answer.replace(/\\n/g, '\n');
+          const finalHtml = marked.parse(unescapedAns);
+          log.innerHTML += `<div style="margin-bottom:16px; background:rgba(139,92,246,0.1); padding:16px; border-radius:8px; border-left:3px solid var(--accent-purple);">
+            <strong style="color:var(--accent-cyan); display:block; margin-bottom:8px;">Oracle (Multi-Hop Context):</strong> 
+            <div class="md-content">${finalHtml}</div>
+          </div>`;
+      }
+  } catch(e) {
+      document.getElementById(typingId)?.remove();
+      log.innerHTML += `<div style="margin-bottom:16px; color:#ef4444;"><strong>Error:</strong> Request failed</div>`;
+  }
+  log.scrollTop = log.scrollHeight;
 }
 
 function toggleLoader(active) {

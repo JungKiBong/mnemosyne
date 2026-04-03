@@ -67,6 +67,143 @@ def memory_detail(uuid):
     return jsonify(mgr.get_salience_timeline(uuid))
 
 
+@memory_bp.route('/<uuid>/chat', methods=['POST'])
+def chat_with_memory(uuid):
+    """Chat intelligently with a specific memory node and its extended graph context (up to 3 hops). Supports 'revision_id' for Time-Travel Chat."""
+    data = request.get_json(silent=True) or {}
+    message = data.get('message')
+    revision_id = data.get('revision_id')
+    
+    if not message:
+        return jsonify({"error": "message is required"}), 400
+        
+    from flask import current_app
+    driver = current_app.extensions.get('neo4j_driver')
+    
+    # 1. Fetch node and contiguous context up to 3 hops using variable length path
+    with driver.session() as session:
+        if revision_id:
+            query = """
+            MATCH (n {uuid: $uuid})-[:HAS_REVISION]->(r:MemoryRevision {id: $revision_id})
+            OPTIONAL MATCH path = (n)-[*1..3]-(m)
+            RETURN n, r,
+                   collect(distinct m) as connected_nodes
+            LIMIT 1
+            """
+            result = session.run(query, {"uuid": uuid, "revision_id": revision_id}).single()
+            if not result or not result.get("r"):
+                return jsonify({"error": "Memory revision not found"}), 404
+            node_data = dict(result["n"])
+            rev_data = dict(result["r"])
+            # Override current state with historical state
+            node_data.update(rev_data)
+            connected = result.get("connected_nodes", [])
+        else:
+            query = """
+            MATCH (n {uuid: $uuid})
+            OPTIONAL MATCH path = (n)-[*1..3]-(m)
+            RETURN n, 
+                   collect(distinct m) as connected_nodes
+            LIMIT 1
+            """
+            result = session.run(query, {"uuid": uuid}).single()
+            if not result or not result["n"]:
+                return jsonify({"error": "Memory node not found"}), 404
+            node_data = dict(result["n"])
+            connected = result.get("connected_nodes", [])
+            
+    # 2. Format Context
+    import json
+    rev_label = f" (Revision: {revision_id})" if revision_id else ""
+    context_str = f"=== TARGET MEMORY NODE (Focus){rev_label} ===\n{json.dumps(node_data, indent=2, ensure_ascii=False)}\n\n"
+    
+    if connected:
+        context_str += "=== EXTENDED GRAPH CONTEXT (Up to 3-Hops) ===\n"
+        # We limit the number of connected nodes printed so we don't blow up context limit
+        for m in connected[:30]:
+            if m:
+                m_dict = dict(m)
+                # Filter out immense raw text logic if needed, but summary/label is fine
+                m_label = m_dict.get('name') or m_dict.get('title') or m_dict.get('uuid', 'Unknown')
+                m_type = m_dict.get('source_type', 'Node')
+                context_str += f"- [{m_type}] {m_label} (UUID: {m_dict.get('uuid', '...')})\n"
+                if m_dict.get('summary'):
+                    context_str += f"  Summary: {m_dict.get('summary')[:100]}...\n"
+
+    system_prompt = (
+        "You are the Oracle of the Mories Knowledge Graph. "
+        "The user is asking a question about a specific target memory node. "
+        "You are provided with BOTH the target node and its extended neighborhood (up to 3 hops away). "
+        "This allows you to answer questions about 'what caused this', 'what happened next', or deep graph traversal. "
+        "Rely ONLY on the provided context. If the answer is not in the context, clearly state that you don't know."
+    )
+    
+    if revision_id:
+        system_prompt += " NOTE: The target node data reflects a PAST HISTORICAL REVISION. You are engaging in Time-Travel Chat. Compare historical patterns implicitly if you understand the context."
+    
+    from ..utils.llm_client import LLMClient
+    from ..config.settings import Configuration
+    llm = LLMClient(api_key=Configuration.get("OPENAI_API_KEY", ""))
+    
+    messages = [
+        {"role": "system", "content": f"{system_prompt}\n\n{context_str}"},
+        {"role": "user", "content": message}
+    ]
+    
+    try:
+        reply = llm.chat(messages)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+        
+    return jsonify({"answer": reply})
+
+
+@memory_bp.route('/<uuid>/synthesize', methods=['POST'])
+def synthesize_memory(uuid):
+    """Synthesize insights from an existing memory (often historical reflection) into a new permanent memory."""
+    data = request.get_json(silent=True) or {}
+    insight = data.get('insight')
+    if not insight:
+        return jsonify({"error": "insight is required"}), 400
+        
+    created_by = data.get('created_by', 'agent_synthesis')
+    
+    from flask import current_app
+    driver = current_app.extensions.get('neo4j_driver')
+    
+    with driver.session() as session:
+        import uuid as uuid_pkg
+        new_uuid = uuid_pkg.uuid4().hex
+        query = """
+        MATCH (source {uuid: $source_uuid})
+        CREATE (n:Memory {
+            uuid: $new_uuid,
+            type: 'synthesis',
+            content: $content,
+            salience: 0.9,
+            created_at: datetime(),
+            source: 'hindsight_synthesis',
+            created_by: $created_by
+        })
+        CREATE (n)-[:SYNTHESIZED_FROM]->(source)
+        RETURN n
+        """
+        res = session.run(query, {
+            "source_uuid": uuid,
+            "new_uuid": new_uuid,
+            "content": insight,
+            "created_by": created_by
+        }).single()
+        
+        if not res:
+            return jsonify({"error": "Failed to synthesize, source node not found"}), 404
+            
+    return jsonify({"status": "synthesized", "uuid": new_uuid, "content": insight}), 201
+
+
+
 # ──────────────────────────────────────────────
 # STM Operations
 # ──────────────────────────────────────────────
