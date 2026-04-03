@@ -319,6 +319,7 @@ def create_harness_metadata(
                     "version": 1,
                     "created_at": now,
                     "tool_chain_hash": chain_hash,
+                    "tool_chain": tool_chain,
                     "success_rate": 0.0,
                     "change_reason": "initial",
                 }
@@ -1444,6 +1445,24 @@ class MemoryCategoryManager:
         conditionals: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
         """Manually register a process pattern as a harness memory."""
+        # Deduplicate identical tool chains within the same domain
+        with self._driver.session() as session:
+            existing = session.run("""
+                MATCH (e:Entity:Memory {memory_category: 'harness', harness_domain: $domain})
+                RETURN e.uuid AS uuid, e.attributes_json AS meta_json
+            """, domain=domain).data()
+
+            chain_hash = _tool_chain_hash(tool_chain)
+            for record in existing:
+                try:
+                    meta = self._safe_json_load(record["meta_json"])
+                    existing_hash = _tool_chain_hash(meta.get("harness", {}).get("tool_chain", []))
+                    if existing_hash == chain_hash:
+                        logger.info(f"Harness deduplicated: {domain}/{trigger} using existing {record['uuid']}")
+                        return {"status": "merged", "uuid": record["uuid"], "domain": domain, "reason": "exact tool_chain match exists"}
+                except Exception:
+                    pass
+
         meta = create_harness_metadata(
             domain=domain, trigger=trigger, tool_chain=tool_chain,
             process_type=process_type, data_flow=data_flow, tags=tags,
@@ -1799,7 +1818,13 @@ class MemoryCategoryManager:
                 stats["failure_count"] = stats.get("failure_count", 0) + 1
 
             total = stats["execution_count"]
-            stats["success_rate"] = round(stats.get("success_count", 0) / max(total, 1), 3)
+            # Time-weighted success rate (EMA)
+            alpha = 0.3 # weight for new execution
+            current_rate = stats.get("success_rate", 1.0 if success else 0.0)
+            if total <= 1:
+                stats["success_rate"] = 1.0 if success else 0.0
+            else:
+                stats["success_rate"] = round(current_rate * (1 - alpha) + (1.0 if success else 0.0) * alpha, 3)
 
             # Rolling average execution time
             old_avg = stats.get("avg_execution_time_ms", 0)
@@ -1820,6 +1845,7 @@ class MemoryCategoryManager:
                         "created_at": now,
                         "tool_chain_hash": new_hash,
                         "previous_hash": old_hash,
+                        "tool_chain": new_tool_chain,
                         "success_rate": stats["success_rate"],
                         "change_reason": result_summary or "tool chain updated",
                     })
@@ -1860,6 +1886,40 @@ class MemoryCategoryManager:
                 except Exception as e:
                     logger.debug(f"Harness auto-reflection skipped: {e}")
 
+                # Check for auto-rollback
+                evolution = meta.get("evolution", {})
+                history = evolution.get("history", [])
+                if len(history) >= 2:
+                    current_version = evolution.get("current_version", 1)
+                    current_entry = next((h for h in history if h["version"] == current_version), None)
+                    prev_entry = next((h for h in history if h["version"] == current_version - 1), None)
+
+                    if current_entry and prev_entry and "tool_chain" in prev_entry:
+                        if current_entry.get("success_rate", 0) < prev_entry.get("success_rate", 0) - 0.2:
+                            rb_version = current_version + 1
+                            rb_chain = prev_entry["tool_chain"]
+                            history.append({
+                                "version": rb_version,
+                                "created_at": now,
+                                "tool_chain_hash": _tool_chain_hash(rb_chain),
+                                "previous_hash": _tool_chain_hash(meta.get("harness", {}).get("tool_chain", [])),
+                                "tool_chain": rb_chain,
+                                "success_rate": stats["success_rate"],
+                                "change_reason": f"Auto-rollback to v{prev_entry['version']} due to performance degradation",
+                            })
+                            evolution["current_version"] = rb_version
+                            meta["evolution"] = evolution
+                            meta["harness"]["tool_chain"] = rb_chain
+                            evolved = True
+                            
+                            # Update DB again for rollback
+                            session.run("""
+                                MATCH (e:Entity {uuid: $uuid})
+                                SET e.attributes_json = $meta_json,
+                                    e.harness_version = $version
+                            """, uuid=harness_uuid, meta_json=json.dumps(meta, ensure_ascii=False), version=rb_version)
+                            logger.info(f"Auto-rollback triggered for harness {harness_uuid} to v{prev_entry['version']}")
+
         return {
             "status": "recorded",
             "uuid": harness_uuid,
@@ -1899,6 +1959,7 @@ class MemoryCategoryManager:
                 "created_at": now,
                 "tool_chain_hash": new_hash,
                 "previous_hash": old_hash,
+                "tool_chain": new_tool_chain,
                 "success_rate": meta.get("stats", {}).get("success_rate", 0),
                 "change_reason": change_reason,
             })
