@@ -472,6 +472,30 @@ TOOLS = [
             "required": ["uuid", "to_version"],
         },
     ),
+    Tool(
+        name="mories_harness_generate",
+        description="Use AI (LLM) to automatically generate a recommended harness tool_chain and conditionals based on natural language.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Natural language query describing the desired automation (e.g. 'PR review automation')"},
+                "domain": {"type": "string", "description": "Optional domain context (default: 'general')"}
+            },
+            "required": ["query"],
+        },
+    ),
+    Tool(
+        name="mories_harness_suggest_evolution",
+        description="Use AI (LLM) to automatically suggest an evolved tool_chain and conditionals for an existing harness pattern that might have a low success rate.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "uuid": {"type": "string", "description": "UUID of the harness pattern"},
+                "context": {"type": "string", "description": "Optional context or reason for evolution (e.g. 'Fails often due to missing dependency')"}
+            },
+            "required": ["uuid"],
+        },
+    ),
 ]
 
 
@@ -707,6 +731,17 @@ async def _dispatch(name: str, args: dict) -> dict:
     elif name == "mories_harness_rollback":
         return await _api("POST", f"/api/analytics/harness/{args['uuid']}/rollback", {
             "to_version": args["to_version"],
+        })
+
+    elif name == "mories_harness_generate":
+        return await _api("POST", "/api/analytics/harness/generate", {
+            "query": args["query"],
+            "domain": args.get("domain", "general"),
+        })
+
+    elif name == "mories_harness_suggest_evolution":
+        return await _api("POST", f"/api/analytics/harness/{args['uuid']}/suggest_evolution", {
+            "context": args.get("context", ""),
         })
 
     else:

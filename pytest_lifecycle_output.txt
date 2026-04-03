@@ -1,0 +1,193 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.13.5, pytest-9.0.2, pluggy-1.6.0 -- /Users/jungkibong/Projects/tmp/mirofish-supermemory/.venv/bin/python3.13
+cachedir: .pytest_cache
+rootdir: /Users/jungkibong/Projects/tmp/mirofish-supermemory
+configfile: pytest.ini
+plugins: anyio-4.13.0
+collecting ... collected 19 items
+
+tests/integration/test_memory_lifecycle.py::TestSTMLifecycle::test_stm_add_and_list ERROR [  5%]
+tests/integration/test_memory_lifecycle.py::TestSTMLifecycle::test_stm_evaluate_promote ERROR [ 10%]
+tests/integration/test_memory_lifecycle.py::TestSTMLifecycle::test_stm_evaluate_discard ERROR [ 15%]
+tests/integration/test_memory_lifecycle.py::TestSTMLifecycle::test_stm_evaluate_hitl ERROR [ 21%]
+tests/integration/test_memory_lifecycle.py::TestSTMLifecycle::test_stm_ttl_expiry PASSED [ 26%]
+tests/integration/test_memory_lifecycle.py::TestSTMLifecycle::test_stm_discard ERROR [ 31%]
+tests/integration/test_memory_lifecycle.py::TestSTMtoLTMPromotion::test_promote_creates_neo4j_node ERROR [ 36%]
+tests/integration/test_memory_lifecycle.py::TestSTMtoLTMPromotion::test_promote_not_found ERROR [ 42%]
+tests/integration/test_memory_lifecycle.py::TestDecayAndBoost::test_decay_reduces_salience ERROR [ 47%]
+tests/integration/test_memory_lifecycle.py::TestDecayAndBoost::test_dry_run_no_change ERROR [ 52%]
+tests/integration/test_memory_lifecycle.py::TestDecayAndBoost::test_retrieval_boost_increases_salience ERROR [ 57%]
+tests/integration/test_memory_lifecycle.py::TestDecayAndBoost::test_manual_boost ERROR [ 63%]
+tests/integration/test_memory_lifecycle.py::TestAuditTrailIntegration::test_promote_creates_audit_record ERROR [ 68%]
+tests/integration/test_memory_lifecycle.py::TestAuditTrailIntegration::test_boost_creates_audit_record ERROR [ 73%]
+tests/integration/test_memory_lifecycle.py::TestAuditTrailIntegration::test_rollback_restores_salience ERROR [ 78%]
+tests/integration/test_memory_lifecycle.py::TestScopePromotion::test_personal_to_tribal_promotion ERROR [ 84%]
+tests/integration/test_memory_lifecycle.py::TestScopePromotion::test_cannot_demote_scope ERROR [ 89%]
+tests/integration/test_memory_lifecycle.py::TestScopePromotion::test_scope_summary ERROR [ 94%]
+tests/integration/test_memory_lifecycle.py::TestOverviewAPI::test_memory_overview_structure ERROR [100%]
+
+==================================== ERRORS ====================================
+___________ ERROR at setup of TestSTMLifecycle.test_stm_add_and_list ___________
+file /Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py, line 18
+      def test_stm_add_and_list(self, memory_manager):
+E       fixture 'memory_manager' not found
+>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, app, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, clear_prometheus_registry, client, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py:18
+_________ ERROR at setup of TestSTMLifecycle.test_stm_evaluate_promote _________
+file /Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py, line 35
+      def test_stm_evaluate_promote(self, memory_manager):
+E       fixture 'memory_manager' not found
+>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, app, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, clear_prometheus_registry, client, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py:35
+_________ ERROR at setup of TestSTMLifecycle.test_stm_evaluate_discard _________
+file /Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py, line 43
+      def test_stm_evaluate_discard(self, memory_manager):
+E       fixture 'memory_manager' not found
+>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, app, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, clear_prometheus_registry, client, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py:43
+__________ ERROR at setup of TestSTMLifecycle.test_stm_evaluate_hitl ___________
+file /Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py, line 50
+      def test_stm_evaluate_hitl(self, memory_manager):
+E       fixture 'memory_manager' not found
+>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, app, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, clear_prometheus_registry, client, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py:50
+_____________ ERROR at setup of TestSTMLifecycle.test_stm_discard ______________
+file /Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py, line 72
+      def test_stm_discard(self, memory_manager):
+E       fixture 'memory_manager' not found
+>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, app, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, clear_prometheus_registry, client, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py:72
+___ ERROR at setup of TestSTMtoLTMPromotion.test_promote_creates_neo4j_node ____
+file /Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py, line 87
+      def test_promote_creates_neo4j_node(self, memory_manager, test_prefix):
+E       fixture 'memory_manager' not found
+>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, app, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, clear_prometheus_registry, client, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py:87
+________ ERROR at setup of TestSTMtoLTMPromotion.test_promote_not_found ________
+file /Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py, line 122
+      def test_promote_not_found(self, memory_manager):
+E       fixture 'memory_manager' not found
+>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, app, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, clear_prometheus_registry, client, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py:122
+_______ ERROR at setup of TestDecayAndBoost.test_decay_reduces_salience ________
+file /Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py, line 162
+      def test_decay_reduces_salience(self, memory_manager, test_prefix):
+E       fixture 'memory_manager' not found
+>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, app, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, clear_prometheus_registry, client, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py:162
+__________ ERROR at setup of TestDecayAndBoost.test_dry_run_no_change __________
+file /Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py, line 190
+      def test_dry_run_no_change(self, memory_manager, test_prefix):
+E       fixture 'memory_manager' not found
+>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, app, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, clear_prometheus_registry, client, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py:190
+_ ERROR at setup of TestDecayAndBoost.test_retrieval_boost_increases_salience __
+file /Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py, line 212
+      def test_retrieval_boost_increases_salience(self, memory_manager, test_prefix):
+E       fixture 'memory_manager' not found
+>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, app, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, clear_prometheus_registry, client, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py:212
+____________ ERROR at setup of TestDecayAndBoost.test_manual_boost _____________
+file /Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py, line 237
+      def test_manual_boost(self, memory_manager, test_prefix):
+E       fixture 'memory_manager' not found
+>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, app, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, clear_prometheus_registry, client, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py:237
+_ ERROR at setup of TestAuditTrailIntegration.test_promote_creates_audit_record _
+file /Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py, line 259
+      def test_promote_creates_audit_record(self, memory_manager, test_prefix):
+E       fixture 'memory_manager' not found
+>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, app, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, clear_prometheus_registry, client, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py:259
+_ ERROR at setup of TestAuditTrailIntegration.test_boost_creates_audit_record __
+file /Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py, line 285
+      def test_boost_creates_audit_record(self, memory_manager, test_prefix):
+E       fixture 'memory_manager' not found
+>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, app, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, clear_prometheus_registry, client, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py:285
+_ ERROR at setup of TestAuditTrailIntegration.test_rollback_restores_salience __
+file /Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py, line 318
+      def test_rollback_restores_salience(self, memory_manager, test_prefix):
+E       fixture 'memory_manager' not found
+>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, app, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, clear_prometheus_registry, client, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py:318
+____ ERROR at setup of TestScopePromotion.test_personal_to_tribal_promotion ____
+file /Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py, line 368
+      def test_personal_to_tribal_promotion(self, scope_manager, test_prefix, neo4j_driver):
+E       fixture 'scope_manager' not found
+>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, app, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, clear_prometheus_registry, client, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py:368
+________ ERROR at setup of TestScopePromotion.test_cannot_demote_scope _________
+file /Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py, line 409
+      def test_cannot_demote_scope(self, scope_manager, test_prefix, neo4j_driver):
+E       fixture 'scope_manager' not found
+>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, app, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, clear_prometheus_registry, client, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py:409
+___________ ERROR at setup of TestScopePromotion.test_scope_summary ____________
+file /Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py, line 435
+      def test_scope_summary(self, scope_manager):
+E       fixture 'scope_manager' not found
+>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, app, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, clear_prometheus_registry, client, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py:435
+_______ ERROR at setup of TestOverviewAPI.test_memory_overview_structure _______
+file /Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py, line 446
+      def test_memory_overview_structure(self, memory_manager):
+E       fixture 'memory_manager' not found
+>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, app, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, clear_prometheus_registry, client, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_memory_lifecycle.py:446
+=========================== short test summary info ============================
+ERROR tests/integration/test_memory_lifecycle.py::TestSTMLifecycle::test_stm_add_and_list
+ERROR tests/integration/test_memory_lifecycle.py::TestSTMLifecycle::test_stm_evaluate_promote
+ERROR tests/integration/test_memory_lifecycle.py::TestSTMLifecycle::test_stm_evaluate_discard
+ERROR tests/integration/test_memory_lifecycle.py::TestSTMLifecycle::test_stm_evaluate_hitl
+ERROR tests/integration/test_memory_lifecycle.py::TestSTMLifecycle::test_stm_discard
+ERROR tests/integration/test_memory_lifecycle.py::TestSTMtoLTMPromotion::test_promote_creates_neo4j_node
+ERROR tests/integration/test_memory_lifecycle.py::TestSTMtoLTMPromotion::test_promote_not_found
+ERROR tests/integration/test_memory_lifecycle.py::TestDecayAndBoost::test_decay_reduces_salience
+ERROR tests/integration/test_memory_lifecycle.py::TestDecayAndBoost::test_dry_run_no_change
+ERROR tests/integration/test_memory_lifecycle.py::TestDecayAndBoost::test_retrieval_boost_increases_salience
+ERROR tests/integration/test_memory_lifecycle.py::TestDecayAndBoost::test_manual_boost
+ERROR tests/integration/test_memory_lifecycle.py::TestAuditTrailIntegration::test_promote_creates_audit_record
+ERROR tests/integration/test_memory_lifecycle.py::TestAuditTrailIntegration::test_boost_creates_audit_record
+ERROR tests/integration/test_memory_lifecycle.py::TestAuditTrailIntegration::test_rollback_restores_salience
+ERROR tests/integration/test_memory_lifecycle.py::TestScopePromotion::test_personal_to_tribal_promotion
+ERROR tests/integration/test_memory_lifecycle.py::TestScopePromotion::test_cannot_demote_scope
+ERROR tests/integration/test_memory_lifecycle.py::TestScopePromotion::test_scope_summary
+ERROR tests/integration/test_memory_lifecycle.py::TestOverviewAPI::test_memory_overview_structure
+========================= 1 passed, 18 errors in 1.01s =========================

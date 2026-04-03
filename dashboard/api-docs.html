@@ -616,6 +616,12 @@ const API_REGISTRY = {
     { id:"harness_rollback", method:"POST", path:"/api/analytics/harness/{uuid}/rollback", name:"Rollback Harness", desc:"패턴을 이전 버전(tool_chain)으로 수동 롤백하고 히스토리를 갱신합니다.",
       params:[{name:"uuid",type:"string",required:true,desc:"하네스 패턴 UUID"}],
       body: '{"to_version": 1}' },
+    { id:"harness_suggest", method:"POST", path:"/api/analytics/harness/{uuid}/suggest_evolution", name:"Suggest Evolution(AI)", desc:"낮은 성공률의 하네스 패턴을 최적화하기 위해, AI(LLM)가 tool_chain의 새로운 진화 형태를 제안합니다.",
+      params:[{name:"uuid",type:"string",required:true,desc:"하네스 패턴 UUID"}],
+      body: '{"context": "최근 잦은 타임아웃 오류 해결 목적"}' },
+    { id:"harness_evolve", method:"POST", path:"/api/analytics/harness/{uuid}/evolve", name:"Evolve Harness", desc:"하네스 패턴의 전체 tool_chain을 새로운 형태로 진화(업데이트)시킵니다.",
+      params:[{name:"uuid",type:"string",required:true,desc:"하네스 패턴 UUID"}],
+      body: '{"new_tool_chain": [{"tool_name": "...", "tool_type": "..."}], "reason": "Optimized by AI"}' },
   ],
 
   "Maturity": [

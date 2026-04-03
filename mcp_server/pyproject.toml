@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mories-mcp"
+version = "0.1.0"
+description = "Mories Memory System MCP Server"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp>=1.0.0",
+    "httpx>=0.24.0",
+]
+
+[project.scripts]
+mories-mcp = "mories_mcp:cli_main"
+
+[tool.setuptools]
+py-modules = ["mories_mcp", "config", "server", "tools"]

@@ -1,5 +1,6 @@
 import logging
 from flask import Blueprint, request, jsonify, current_app
+from ..utils.llm_client import LLMClient
 
 logger = logging.getLogger('mirofish.api.analytics')
 analytics_bp = Blueprint('analytics', __name__)
@@ -1105,6 +1106,69 @@ def evolve_harness(uuid):
         return jsonify({"error": str(e)}), 500
 
 
+@analytics_bp.route('/harness/<uuid>/suggest_evolution', methods=['POST'])
+def suggest_harness_evolution(uuid):
+    """Use AI to suggest an evolved tool_chain and conditionals based on the current harness."""
+    try:
+        data = request.get_json(force=True) if request.data else {}
+        context = data.get('context', '')
+        
+        mgr = _get_category_mgr()
+        # Get existing harness
+        harness = mgr.get_harness(uuid)
+        if not harness:
+            return jsonify({"error": "Harness not found"}), 404
+            
+        current_chain = harness.get('tool_chain', [])
+        current_conds = harness.get('conditionals', [])
+        trigger = harness.get('trigger', '')
+        desc = harness.get('description', '')
+        stats = harness.get('stats', {})
+        
+        from app.utils.llm_client import LLMClient
+        llm = LLMClient()
+        
+        prompt = f"""
+        You are an AI Evolutionary Orchestrator. 
+        Analyze the current harness (an agentic process pattern) and suggest improvements to its tool_chain and conditionals.
+        
+        ## Current Pattern Context
+        - Trigger/Objective: {trigger}
+        - Description: {desc}
+        - Success Rate: {stats.get('success_rate', 0) * 100}%
+        - Execution Count: {stats.get('execution_count', 0)}
+        
+        ## Current Tool Chain
+        {current_chain}
+        
+        ## Current Conditionals
+        {current_conds}
+        
+        ## Additional Context / Reason for Evolution
+        {context}
+        
+        Provide a JSON object with:
+        1. "tool_chain": A list of objects with {{"tool_name": "...", "tool_type": "..."}}. Only include necessary steps.
+        2. "conditionals": A list of object with {{"type": "fallback|retry|handoff", "condition": "...", "then_action": "..."}}.
+        3. "change_reason": A short explanation of what you changed and why, optimizing for better success and performance.
+        """
+        
+        res = llm.chat_json(prompt)
+        # Parse JSON fallback manually if llm client didn't process
+        import json
+        if isinstance(res, str):
+            res = json.loads(res)
+            
+        return jsonify({
+            "suggested_evolution": res,
+            "original_harness_id": uuid
+        })
+    except Exception as e:
+        logger.error(f"Harness evolution suggestion failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+
 @analytics_bp.route('/harness/<uuid>/compare', methods=['GET'])
 def compare_harness(uuid):
     """Compare two versions of a harness pattern."""
@@ -1158,22 +1222,64 @@ def recommend_harness():
 
 @analytics_bp.route('/harness/<uuid>/rollback', methods=['POST'])
 def rollback_harness(uuid):
-    """Manually rollback a harness to a specific previous version."""
-    data = request.get_json(force=True)
+    """Rollback a harness pattern to a specific version manually."""
+    data = request.json or {}
     to_version = data.get('to_version')
-    if to_version is None:
-        return jsonify({"error": "to_version is required"}), 400
+    
+    if not to_version:
+        return jsonify({"error": "Missing 'to_version'"}), 400
 
     try:
         mgr = _get_category_mgr()
         result = mgr.rollback_harness(
             harness_uuid=uuid,
-            to_version=int(to_version),
+            to_version=to_version,
+            reason=data.get("reason", "Manual rollback initiated via API")
         )
-        if 'error' in result:
-            return jsonify(result), 404
         return jsonify(result)
     except Exception as e:
         logger.error(f"Harness rollback failed: {e}")
         return jsonify({"error": str(e)}), 500
 
+
+@analytics_bp.route('/harness/generate', methods=['POST'])
+def generate_harness():
+    """Use AI (LLM) to automatically generate a harness tool_chain and conditionals based on natural language."""
+    data = request.json or {}
+    query = data.get('query')
+    domain = data.get('domain', 'general')
+
+    if not query:
+        return jsonify({"error": "Missing 'query' parameter for generation"}), 400
+
+    try:
+        llm = LLMClient()
+        
+        system_prompt = (
+            "You are an AI orchestration engineer. Your task is to design an optimal tool chain (Harness Pattern) "
+            "for the given objective. Respond in JSON with the following structure:\n"
+            "{\n"
+            "  \"tool_chain\": [\"tool_name_1\", \"tool_name_2\"],\n"
+            "  \"conditionals\": [{\"type\": \"retry\", \"condition\": \"failure reason\", \"then_action\": \"action to take\"}],\n"
+            "  \"description\": \"A concise strategy description.\"\n"
+            "}\n"
+            "Use tools typically available to system agents (e.g., read_file, run_command, search_nodes, request_feedback, search_web, etc.)."
+        )
+        
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Domain: {domain}\\nObjective: {query}"}
+        ]
+
+        logger.info(f"Generating harness via LLM for query: {query}")
+        result = llm.chat_json(messages=messages, temperature=0.2)
+        
+        return jsonify({
+            "status": "success",
+            "query": query,
+            "domain": domain,
+            "generated_harness": result
+        })
+    except Exception as e:
+        logger.error(f"Harness generation via LLM failed: {e}")
+        return jsonify({"error": str(e)}), 500

@@ -36,7 +36,7 @@ a { color: var(--accent); text-decoration: none; }
 .endpoint-item:hover { background: var(--bg-surface); color: var(--text); }
 
 .markdown-body { font-size: 15px; line-height: 1.7; color: var(--text); max-width: 900px; margin: 0 auto; }
-.markdown-body h1 { font-size: 32px; margin-bottom: 24px; font-weight: 700; background: linear-gradient(135deg, #fff, #94a3b8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.markdown-body h1 { font-size: 32px; margin-bottom: 24px; font-weight: 700; background: linear-gradient(135deg, #fff, #94a3b8); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
 .markdown-body h2 { font-size: 24px; margin-top: 48px; margin-bottom: 16px; font-weight: 600; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
 .markdown-body h3 { font-size: 18px; margin-top: 32px; margin-bottom: 12px; font-weight: 600; color: #fff; }
 .markdown-body p { margin-bottom: 16px; color: var(--text-dim); }
@@ -671,7 +671,11 @@ curl http://localhost:5050/api/harness/list?domain=engineering
 <li><code>mories_harness_record</code>: 새로운 프로세스 패턴(도구 체인 및 조건부 로직 등) 등록</li>
 <li><code>mories_harness_detail</code>: 특정 UUID를 식별자로 사용하여 하네스 패턴의 세부 정보를 조회</li>
 <li><code>mories_harness_execute</code>: 지정된 하네스 패턴의 실행 통계를 업데이트(성공/실패 여부, 소요 시간, 실행 컨텍스트)</li>
-<li><code>mories_harness_evolve</code>: 효율성 향상, 에러 수정 등의 사유로 하네스 패턴 구조를 진화(신규 버전 생성)</li>
+<li><code>mories_harness_evolve</code>: 효율성 향상, 에러 수정 등의 사유로 하네스 패턴 구조를 수동 진화(신규 버전 생성)</li>
+<li><code>mories_harness_recommend</code>: 자연어(query)로 관련 하네스 패턴을 의미론적 검색 후 추천</li>
+<li><code>mories_harness_generate</code>: 자연어로 새로운 하네스 패턴(tool_chain, conditionals)을 AI(LLM)가 대신 자동 생성</li>
+<li><code>mories_harness_suggest_evolution</code>: 기존 패턴의 성공률 향상을 위해 AI(LLM)가 진화(tool_chain/conditionals)안을 제안</li>
+<li><code>mories_harness_rollback</code>: 특정 과거 버전으로 패턴을 즉각 롤백하여 복구</li>
 </ul>
 <hr />
 <h2 id="_5">📋 주요 환경 변수 정리</h2>

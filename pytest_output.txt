@@ -1,0 +1,84 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.13.5, pytest-9.0.2, pluggy-1.6.0 -- /Users/jungkibong/Projects/tmp/mirofish-supermemory/.venv/bin/python3.13
+cachedir: .pytest_cache
+rootdir: /Users/jungkibong/Projects/tmp/mirofish-supermemory
+configfile: pytest.ini
+plugins: anyio-4.13.0
+collecting ... collected 6 items
+
+tests/integration/test_reconciliation.py::TestReconciliationService::test_quick_check_returns_valid_structure ERROR [ 16%]
+tests/integration/test_reconciliation.py::TestReconciliationService::test_full_run_returns_result ERROR [ 33%]
+tests/integration/test_reconciliation.py::TestReconciliationService::test_auto_fix_scope ERROR [ 50%]
+tests/integration/test_reconciliation.py::TestReconciliationService::test_run_history_persistence ERROR [ 66%]
+tests/integration/test_reconciliation.py::TestReconciliationService::test_health_score_calculation ERROR [ 83%]
+tests/integration/test_reconciliation.py::TestReconciliationService::test_missing_audit_detected ERROR [100%]
+
+==================================== ERRORS ====================================
+_ ERROR at setup of TestReconciliationService.test_quick_check_returns_valid_structure _
+file /Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_reconciliation.py, line 49
+      def test_quick_check_returns_valid_structure(self, recon_service):
+file /Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_reconciliation.py, line 12
+  @pytest.fixture
+  def recon_service(neo4j_driver):
+E       fixture 'neo4j_driver' not found
+>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, app, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, clear_prometheus_registry, client, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, recon_service, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, test_entity, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_reconciliation.py:12
+___ ERROR at setup of TestReconciliationService.test_full_run_returns_result ___
+file /Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_reconciliation.py, line 60
+      def test_full_run_returns_result(self, recon_service, test_entity):
+file /Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_reconciliation.py, line 12
+  @pytest.fixture
+  def recon_service(neo4j_driver):
+E       fixture 'neo4j_driver' not found
+>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, app, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, clear_prometheus_registry, client, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, recon_service, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, test_entity, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_reconciliation.py:12
+_______ ERROR at setup of TestReconciliationService.test_auto_fix_scope ________
+file /Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_reconciliation.py, line 69
+      def test_auto_fix_scope(self, neo4j_driver, test_prefix, recon_service):
+E       fixture 'neo4j_driver' not found
+>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, app, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, clear_prometheus_registry, client, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, recon_service, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, test_entity, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_reconciliation.py:69
+___ ERROR at setup of TestReconciliationService.test_run_history_persistence ___
+file /Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_reconciliation.py, line 102
+      def test_run_history_persistence(self, recon_service, neo4j_driver, test_entity):
+file /Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_reconciliation.py, line 12
+  @pytest.fixture
+  def recon_service(neo4j_driver):
+E       fixture 'neo4j_driver' not found
+>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, app, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, clear_prometheus_registry, client, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, recon_service, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, test_entity, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_reconciliation.py:12
+__ ERROR at setup of TestReconciliationService.test_health_score_calculation ___
+file /Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_reconciliation.py, line 119
+      def test_health_score_calculation(self, recon_service):
+file /Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_reconciliation.py, line 12
+  @pytest.fixture
+  def recon_service(neo4j_driver):
+E       fixture 'neo4j_driver' not found
+>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, app, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, clear_prometheus_registry, client, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, recon_service, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, test_entity, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_reconciliation.py:12
+___ ERROR at setup of TestReconciliationService.test_missing_audit_detected ____
+file /Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_reconciliation.py, line 137
+      def test_missing_audit_detected(self, neo4j_driver, test_prefix, recon_service):
+E       fixture 'neo4j_driver' not found
+>       available fixtures: anyio_backend, anyio_backend_name, anyio_backend_options, app, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, clear_prometheus_registry, client, doctest_namespace, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, recon_service, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, test_entity, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/jungkibong/Projects/tmp/mirofish-supermemory/tests/integration/test_reconciliation.py:137
+=========================== short test summary info ============================
+ERROR tests/integration/test_reconciliation.py::TestReconciliationService::test_quick_check_returns_valid_structure
+ERROR tests/integration/test_reconciliation.py::TestReconciliationService::test_full_run_returns_result
+ERROR tests/integration/test_reconciliation.py::TestReconciliationService::test_auto_fix_scope
+ERROR tests/integration/test_reconciliation.py::TestReconciliationService::test_run_history_persistence
+ERROR tests/integration/test_reconciliation.py::TestReconciliationService::test_health_score_calculation
+ERROR tests/integration/test_reconciliation.py::TestReconciliationService::test_missing_audit_detected
+============================== 6 errors in 0.01s ===============================

@@ -269,6 +269,7 @@ a:hover{text-decoration:underline}
     <div class="recommend-search">
       <input type="text" id="recommendInput" placeholder="작업 설명을 입력하면 적합한 패턴을 추천합니다... (e.g. 'PR review automation')">
       <button class="btn btn-primary" onclick="searchRecommend()">🔮 추천</button>
+      <button class="btn btn-outline" onclick="generateHarness()">⚙️ AI 자동 생성</button>
     </div>
     <div id="recommendResults">
       <div class="empty-state">
@@ -727,6 +728,19 @@ window.openDetail = async function(uuid) {
       </div>`;
     }
 
+    // AI Evolution Suggestion Area
+    body += `
+    <div id="aiEvolveArea" style="margin-top:20px; padding:12px; background:var(--bg); border:1px solid var(--accent); border-radius:10px;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h4 style="margin:0; font-size:14px; display:flex; align-items:center; gap:6px;">✨ AI 진화 제안</h4>
+          <p style="margin:4px 0 0 0; font-size:12px; color:var(--muted);">성공률이 낮거나 오래된 패턴인가요? LLM이 더 나은 워크플로우를 제안합니다.</p>
+        </div>
+        <button class="btn btn-sm btn-outline" style="border-color:var(--accent); color:var(--accent);" onclick="suggestEvolve('${uuid}')">제안 받기</button>
+      </div>
+      <div id="aiEvolveResult" style="margin-top: 12px; display: none;"></div>
+    </div>`;
+
     document.getElementById('modalBody').innerHTML = body;
     document.getElementById('detailModal').classList.add('show');
   } catch (e) {
@@ -887,6 +901,72 @@ async function searchRecommend() {
   }
 }
 window.searchRecommend = searchRecommend;
+window.generateHarness = generateHarness;
+
+async function generateHarness() {
+  const input = document.getElementById('recommendInput');
+  const query = input.value.trim();
+  if (!query) {
+    showToast('작업 설명을 입력해 주세요.', 'error');
+    return;
+  }
+  
+  const resultsDiv = document.getElementById('recommendResults');
+  resultsDiv.innerHTML = '<div class="empty-state"><div class="icon">⏳</div><p>LLM을 통해 하네스 패턴을 생성하고 있습니다...</p><p style="font-size: 13px; color: var(--text-muted);">이 작업은 수십 초 정도 소요될 수 있습니다.</p></div>';
+
+  try {
+    const res = await fetch('/api/analytics/harness/generate', {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: query, domain: 'general' })
+    });
+    
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Generate Failed');
+    
+    if (!data.generated_harness) {
+      resultsDiv.innerHTML = '<div class="empty-state"><div class="icon">❌</div><p>결과를 생성하지 못했습니다.</p></div>';
+      return;
+    }
+    
+    const harness = data.generated_harness;
+    const toolChain = harness.tool_chain || [];
+    const conditionals = harness.conditionals || [];
+    
+    resultsDiv.innerHTML = `
+      <div style="margin-bottom: 16px; font-size: 14px; display: flex; align-items: center; justify-content: space-between;">
+        <span><strong>자동 생성 결과</strong> (도메인: general)</span>
+      </div>
+      <div class="harness-card" style="border: 1px solid var(--accent)">
+        <div class="h-header">
+          <span class="h-domain">Generated</span>
+          <span class="h-type">Pipeline</span>
+        </div>
+        <div class="h-trigger">${query}</div>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">${harness.description || ''}</p>
+        
+        <div class="mini-waterfall">
+          ${toolChain.map((t, idx) => `
+            <div class="wf-step">
+              <span class="step-num">${idx+1}</span>
+              <span class="step-tool">${typeof t === 'string' ? t : t.name || t.tool_name}</span>
+            </div>
+          `).join('')}
+        </div>
+        
+        <div style="margin-top: 12px; display:flex; gap: 8px;">
+          <span style="font-size: 12px; background: rgba(255,255,255,0.05); padding: 2px 8px; border-radius: 4px;">
+            Conditionals: ${conditionals.length}
+          </span>
+        </div>
+      </div>
+    `;
+    
+  } catch(err) {
+    showToast(err.message, 'error');
+    resultsDiv.innerHTML = '<div class="empty-state"><div class="icon">❌</div><p>생성 중 오류가 발생했습니다.</p></div>';
+  }
+}
 
 // Handle Enter key on recommend input
 document.addEventListener('DOMContentLoaded', () => {

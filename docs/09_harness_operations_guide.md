@@ -34,6 +34,8 @@ Through `mcp_server/mories_mcp.py`, tools can proactively log logic transitions 
 ## 5. Automation & Recovery Capabilities (Version 2)
 To maximize intelligence and self-healing:
 - **AI Recommendation (`recommend_harness`)**: Retrieves the most relevant harness patterns from the knowledge graph based on natural language queries, keyword matching, and execution success rates.
+- **AI Pattern Generation (`generate_harness`)**: Automatically generates a complete `tool_chain` and `conditionals` mapping using an LLM to bootstrap new processes from natural language objectives.
+- **AI Evolution Suggestion (`suggest_evolution`)**: Suggests optimized tool chains for existing underperforming patterns based on evolutionary stats.
 - **Manual Rollback (`rollback_harness`)**: Identifies structural degradation in a pattern (e.g., lower success rate after evolution) and restores its `tool_chain` back to a previously known working state via the evolution history.
 
 The Dashboard `harness.html` provides a direct UI for these capabilities.
