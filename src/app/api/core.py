@@ -38,7 +38,7 @@ def serve_synaptic_path():
 @core_bp.route('/api-docs')
 @core_bp.route('/api-explorer')
 def serve_api_explorer():
-    return send_from_directory(get_dashboard_dir(), 'api.html')
+    return send_from_directory(get_dashboard_dir(), 'api-docs.html')
 
 @core_bp.route('/workflows')
 @core_bp.route('/n8n-workflows')

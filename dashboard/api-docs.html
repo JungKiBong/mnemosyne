@@ -360,6 +360,54 @@ a { color: var(--accent); text-decoration: none; }
             <strong>Params:</strong> action (create|stop|list), stream_id (string), query (string)
           </div>
         </div>
+
+        <div class="mcp-tool">
+          <h4>mories_harness_list</h4>
+          <p>모든 하네스(진화형 프로세스) 패턴 목록을 조회합니다. 도메인 및 에이전트 ID로 필터링 가능합니다.</p>
+          <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">
+            <strong>Params:</strong> domain (string, optional), agent_id (string, optional), include_low_success (bool, optional)
+          </div>
+        </div>
+
+        <div class="mcp-tool">
+          <h4>mories_harness_overview</h4>
+          <p>하네스 패턴에 대한 누적 통계가 포함된 대시보드 개요 데이터를 반환합니다.</p>
+          <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">
+            <strong>Params:</strong> None
+          </div>
+        </div>
+
+        <div class="mcp-tool">
+          <h4>mories_harness_record</h4>
+          <p>새로운 하네스 패턴을 기록합니다. 실패-조건부-회복 메커니즘 등을 지정할 수 있습니다.</p>
+          <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">
+            <strong>Params:</strong> domain (string), trigger (string), tool_chain (list), description (string, optional), scope (string, optional)
+          </div>
+        </div>
+
+        <div class="mcp-tool">
+          <h4>mories_harness_detail</h4>
+          <p>특정 식별자를 사용하는 하네스 패턴의 세부 정보(데이터 흐름, 진화 내역, 조건 등)를 조회합니다.</p>
+          <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">
+            <strong>Params:</strong> uuid (string, required)
+          </div>
+        </div>
+
+        <div class="mcp-tool">
+          <h4>mories_harness_execute</h4>
+          <p>하네스 패턴 실행 결과를 기록하여 작동 내역, 성공률 및 통계를 누적 업데이트합니다.</p>
+          <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">
+            <strong>Params:</strong> uuid (string, required), success (bool, required), execution_time_ms (int, optional), result_summary (string, optional), new_tool_chain (list, optional)
+          </div>
+        </div>
+
+        <div class="mcp-tool">
+          <h4>mories_harness_evolve</h4>
+          <p>기존 하네스 패턴을 진화시켜 새로운 도구 체인과 실행 내역을 가진 신규 버전을 생성합니다.</p>
+          <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">
+            <strong>Params:</strong> uuid (string, required), new_tool_chain (list, required), reason (string, required)
+          </div>
+        </div>
       </div>
 
       <div class="section">
@@ -537,6 +585,16 @@ const API_REGISTRY = {
     { id:"graph_data", method:"GET", path:"/api/graph/data/{graph_id}", name:"Graph Data", desc:"특정 그래프의 노드/관계 데이터를 조회합니다." },
     { id:"graph_build", method:"POST", path:"/api/graph/build", name:"Build Graph", desc:"텍스트에서 지식 그래프를 구축합니다." },
     { id:"graph_ontology", method:"POST", path:"/api/graph/ontology/generate", name:"Generate Ontology", desc:"텍스트에서 온톨로지를 자동 생성합니다." },
+  ],
+
+  "Harness Analytics": [
+    { id:"harness_overview", method:"GET", path:"/api/analytics/harness/overview", name:"Harness Overview", desc:"하네스 프로세스 패턴에 대한 전반적인 통계 및 요약을 제공합니다." },
+    { id:"harness_list", method:"GET", path:"/api/analytics/harness/list", name:"List Harness Patterns", desc:"추출된 하네스 패턴 목록을 조회합니다.",
+      query:[{name:"domain",type:"string",desc:"특정 도메인 필터링"},{name:"agent_id",type:"string",desc:"특정 에이전트 필터링"}] },
+    { id:"harness_record", method:"POST", path:"/api/analytics/harness/record", name:"Record Harness", desc:"새로운 하네스 프로세스 패턴 또는 실행 결과를 기록합니다.",
+      body: '{"uuid":"...", "domain":"engineering", "trigger":"...", "process_type":"harness", "tool_chain":["t1", "t2"], "conditionals":[{"type":"retry","condition":"Timeout","then_action":"Retry specific step"}], "execution_time_ms":120, "success":true}' },
+    { id:"harness_detail", method:"GET", path:"/api/analytics/harness/{uuid}", name:"Harness Detail", desc:"특정 UUID를 가진 하네스 패턴의 상세 정보를 조회합니다.",
+      params:[{name:"uuid",type:"string",required:true,desc:"하네스 패턴 UUID"}] },
   ],
 
   "Maturity": [

@@ -1006,13 +1006,30 @@ def get_harness_detail(uuid):
     """Get detailed info for a specific harness pattern."""
     try:
         mgr = _get_category_mgr()
-        result = mgr.recall_harness(harness_uuid=uuid)
-        if result.get('error'):
-            return jsonify(result), 404
-        return jsonify({"status": "success", "harness": result})
+        results = mgr.recall_harness(harness_uuid=uuid)
+        if not results:
+            return jsonify({"error": f"Harness pattern {uuid} not found."}), 404
+        # Since it returns a list, return the first matching item.
+        return jsonify({"status": "success", "harness": results[0]})
     except Exception as e:
         logger.error(f"Harness detail failed: {e}")
         return jsonify({"error": str(e)}), 500
+
+
+def _normalize_tool_chain(raw_chain: list) -> list:
+    """Normalize tool chain: accept both string list and dict list."""
+    normalized = []
+    for i, item in enumerate(raw_chain):
+        if isinstance(item, str):
+            normalized.append({"tool_name": item, "tool": item, "order": i})
+        elif isinstance(item, dict):
+            entry = dict(item)  # avoid mutating caller's data
+            entry.setdefault("tool", entry.get("tool_name", f"step_{i}"))
+            entry.setdefault("order", i)
+            normalized.append(entry)
+        else:
+            normalized.append({"tool_name": str(item), "tool": str(item), "order": i})
+    return normalized
 
 
 @analytics_bp.route('/harness/record', methods=['POST'])
@@ -1030,13 +1047,14 @@ def record_harness():
         result = mgr.record_harness(
             domain=domain,
             trigger=trigger,
-            tool_chain=tool_chain,
+            tool_chain=_normalize_tool_chain(tool_chain),
             description=data.get('description', ''),
             process_type=data.get('process_type', 'pipeline'),
             data_flow=data.get('data_flow'),
             tags=data.get('tags'),
             agent_id=data.get('agent_id', 'system'),
             scope=data.get('scope', 'tribal'),
+            conditionals=data.get('conditionals')
         )
         return jsonify(result), 201
     except Exception as e:
@@ -1054,7 +1072,8 @@ def record_harness_execution(uuid):
             harness_uuid=uuid,
             success=data.get('success', True),
             execution_time_ms=data.get('execution_time_ms', 0),
-            context=data.get('context', {}),
+            result_summary=data.get('result_summary', ''),
+            new_tool_chain=data.get('new_tool_chain'),
         )
         return jsonify(result)
     except Exception as e:
@@ -1075,7 +1094,7 @@ def evolve_harness(uuid):
         mgr = _get_category_mgr()
         result = mgr.evolve_harness(
             harness_uuid=uuid,
-            new_tool_chain=new_chain,
+            new_tool_chain=_normalize_tool_chain(new_chain),
             change_reason=reason,
         )
         return jsonify(result)

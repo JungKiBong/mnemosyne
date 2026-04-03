@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mories — Harness Process Patterns</title>
   <link rel="stylesheet" href="/assets/css/tokens.css">
-  <script src="/i18n.js"></script>
+  <script src="/i18n.js?v=2"></script>
   <style>
 *{margin:0;padding:0;box-sizing:border-box}
 
@@ -548,13 +548,12 @@ window.openDetail = async function(uuid) {
     if (data.error) { toast(data.error, 'error'); return; }
 
     const h = data.harness || {};
-    const harness = h.harness || {};
     const stats = h.stats || {};
     const evolution = h.evolution || {};
     const extraction = h.extraction || {};
-    const dataFlow = harness.data_flow || {};
+    const dataFlow = h.data_flow || {};
 
-    document.getElementById('modalTitle').textContent = h.name || harness.trigger || uuid;
+    document.getElementById('modalTitle').textContent = h.name || h.trigger || uuid;
 
     let body = '';
 
@@ -562,14 +561,14 @@ window.openDetail = async function(uuid) {
     body += `<div style="margin-bottom:20px">
       <p style="color:var(--muted);font-size:13px;margin-bottom:8px">${escHtml(h.description || '')}</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <span class="tag tag-type">${harness.process_type || '-'}</span>
+        <span class="tag tag-type">${h.process_type || '-'}</span>
         <span class="tag tag-scope">${h.scope || '-'}</span>
-        ${(harness.tags || []).map(t => `<span class="tag tag-custom">${t}</span>`).join('')}
+        ${(h.tags || []).map(t => `<span class="tag tag-custom">${t}</span>`).join('')}
       </div>
     </div>`;
 
     // Tool Chain
-    const chain = harness.tool_chain || [];
+    const chain = h.tool_chain || [];
     if (chain.length > 0) {
       body += `<h4 style="margin-bottom:8px;font-size:14px">${window.t('harness.toolChain')}</h4>`;
       body += '<div class="tc-flow">';
@@ -596,8 +595,48 @@ window.openDetail = async function(uuid) {
       body += '</div>';
     }
 
+    // Conditionals (Orchestration & Fallback Logic)
+    const conditionals = h.conditionals || [];
+    if (conditionals.length > 0) {
+      body += `<h4 style="margin:16px 0 8px;font-size:14px">${window.t ? window.t('harness.conditionals') || '조건부 & 오케스트레이션 로직' : '조건부 & 오케스트레이션 로직'}</h4>`;
+      body += '<div class="evo-timeline" style="border-left: 3px solid var(--border);">';
+      
+      conditionals.forEach(cond => {
+        let typeColor = '#ff9800'; // Default Fallback (orange)
+        let typeLabel = cond.type ? cond.type.toUpperCase() : 'FALLBACK';
+        let icon = '⚠️';
+        let bgStyle = 'rgba(255, 152, 0, 0.05)';
+        
+        if (cond.type === 'fallback' || !cond.type) {
+            typeColor = '#ff9800';
+            icon = '⚠️';
+            bgStyle = 'rgba(255, 152, 0, 0.05)';
+        } else if (cond.type === 'retry') {
+            typeColor = '#2196f3';
+            icon = '🔄';
+            bgStyle = 'rgba(33, 150, 243, 0.05)';
+        } else if (cond.type === 'handoff') {
+            typeColor = '#9c27b0';
+            icon = '🤝';
+            bgStyle = 'rgba(156, 39, 176, 0.05)';
+        }
+
+        body += `<div class="evo-entry" style="border-left: none; background: ${bgStyle}; margin-bottom: 8px;">
+          <span class="v-badge" style="background:${typeColor};">${escHtml(typeLabel)}</span>
+          <div class="v-info">
+            <div style="font-size:13px; font-weight:600;">${icon} ${escHtml(cond.condition)}</div>
+            <div class="reason" style="color:var(--muted); margin-top:4px;">
+              → <strong>${window.t ? window.t('harness.thenAction') || 'Then action:' : 'Then action:'}</strong> ${escHtml(cond.then_action)}
+              ${cond.target ? `<span style="background:var(--bg); border: 1px solid var(--border); padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-left: 6px;">🎯 ${escHtml(cond.target)}</span>` : ''}
+            </div>
+          </div>
+        </div>`;
+      });
+      body += '</div>';
+    }
+
     // Stats
-    body += `<h4 style="margin:20px 0 8px;font-size:14px">📊 Stats</h4>
+    body += `<h4 style="margin:20px 0 8px;font-size:14px">📊 ${window.t ? window.t('harness.statsTitle') || 'Stats' : 'Stats'}</h4>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px">
       <div style="background:var(--bg);padding:10px;border-radius:8px;text-align:center">
         <div style="font-size:20px;font-weight:800">${stats.execution_count || 0}</div>

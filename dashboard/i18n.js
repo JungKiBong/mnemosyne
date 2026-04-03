@@ -403,6 +403,9 @@
     'harness.domainDistrib': { ko: '📊 도메인 분포', en: '📊 Domain Distribution' },
     'harness.typeDistrib':  { ko: '📊 프로세스 유형 분포', en: '📊 Process Type Distribution' },
     'harness.recentExec':   { ko: '📈 최근 실행 현황', en: '📈 Recent Executions' },
+    'harness.conditionals': { ko: '조건부 & 오케스트레이션 로직', en: 'Conditionals & Orchestration Logic' },
+    'harness.thenAction':   { ko: '다음 동작:', en: 'Then action:' },
+    'harness.statsTitle':   { ko: '통계', en: 'Stats' },
   };
 
 

@@ -400,6 +400,11 @@ TOOLS = [
                 "description": {"type": "string"},
                 "process_type": {"type": "string", "default": "pipeline"},
                 "data_flow": {"type": "object"},
+                "conditionals": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "description": "List of objects like {'type': 'retry'|'fallback'|'handoff', 'condition': 'description', 'then_action': 'action'}"
+                },
                 "tags": {
                     "type": "array",
                     "items": {"type": "string"}
@@ -418,7 +423,8 @@ TOOLS = [
                 "uuid": {"type": "string", "description": "UUID of the harness pattern"},
                 "success": {"type": "boolean", "default": True},
                 "execution_time_ms": {"type": "integer", "default": 0},
-                "context": {"type": "object", "description": "Execution context variables"},
+                "result_summary": {"type": "string", "description": "Summary of the execution result"},
+                "new_tool_chain": {"type": "array", "items": {"type": "string"}, "description": "Optional new tool chain if the chain changed during execution"},
             },
             "required": ["uuid"],
         },
@@ -639,17 +645,21 @@ async def _dispatch(name: str, args: dict) -> dict:
             "description": args.get("description", ""),
             "process_type": args.get("process_type", "pipeline"),
             "data_flow": args.get("data_flow", {}),
+            "conditionals": args.get("conditionals", []),
             "tags": args.get("tags", []),
             "agent_id": AGENT_ID,
             "scope": args.get("scope", "tribal"),
         })
 
     elif name == "mories_harness_execute":
-        return await _api("POST", f"/api/analytics/harness/{args['uuid']}/execute", {
+        payload = {
             "success": args.get("success", True),
             "execution_time_ms": args.get("execution_time_ms", 0),
-            "context": args.get("context", {}),
-        })
+            "result_summary": args.get("result_summary", ""),
+        }
+        if args.get("new_tool_chain"):
+            payload["new_tool_chain"] = args["new_tool_chain"]
+        return await _api("POST", f"/api/analytics/harness/{args['uuid']}/execute", payload)
 
     elif name == "mories_harness_evolve":
         return await _api("POST", f"/api/analytics/harness/{args['uuid']}/evolve", {

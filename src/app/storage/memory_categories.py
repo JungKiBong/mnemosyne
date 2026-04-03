@@ -262,12 +262,18 @@ def create_orchestration_metadata(
 # Harness Memory Schema (Evolutionary Process Patterns)
 # ──────────────────────────────────────────────
 
-def _tool_chain_hash(tool_chain: List[Dict[str, Any]]) -> str:
+def _tool_chain_hash(tool_chain: List) -> str:
     """Compute a stable hash of a tool chain for version comparison."""
     import hashlib
-    canonical = json.dumps(
-        [{"tool": t.get("tool"), "order": t.get("order")} for t in tool_chain],
-        sort_keys=True)
+    items = []
+    for i, t in enumerate(tool_chain):
+        if isinstance(t, str):
+            items.append({"tool": t, "order": i})
+        elif isinstance(t, dict):
+            items.append({"tool": t.get("tool") or t.get("tool_name", f"step_{i}"), "order": t.get("order", i)})
+        else:
+            items.append({"tool": str(t), "order": i})
+    canonical = json.dumps(items, sort_keys=True)
     return hashlib.sha256(canonical.encode()).hexdigest()[:12]
 
 
@@ -282,6 +288,7 @@ def create_harness_metadata(
     auto_extracted: bool = False,
     extraction_confidence: float = 1.0,
     source_log_ids: Optional[List[str]] = None,
+    conditionals: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Create structured metadata for a harness (evolutionary process pattern) memory."""
     now = datetime.now(timezone.utc).isoformat()
@@ -295,6 +302,7 @@ def create_harness_metadata(
             "tool_chain": tool_chain,
             "data_flow": data_flow or {"input": "", "intermediate": [], "output": ""},
             "tags": tags or [],
+            "conditionals": conditionals or [],
         },
         "stats": {
             "execution_count": 0,
@@ -1433,12 +1441,13 @@ class MemoryCategoryManager:
         tags: Optional[List[str]] = None,
         agent_id: str = "system",
         scope: str = "tribal",
+        conditionals: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
         """Manually register a process pattern as a harness memory."""
         meta = create_harness_metadata(
             domain=domain, trigger=trigger, tool_chain=tool_chain,
             process_type=process_type, data_flow=data_flow, tags=tags,
-            source_agent=agent_id, auto_extracted=False)
+            source_agent=agent_id, auto_extracted=False, conditionals=conditionals)
         node_uuid = str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat()
 
@@ -1512,17 +1521,40 @@ class MemoryCategoryManager:
                 })
             last_tool = tool_name
 
-        # Extract potential conditional knowledge (fallback patterns from failures)
+        # Extract conditional and orchestration knowledge (retries, fallbacks, handoffs)
         extracted_conditionals = []
         for i in range(len(steps) - 1):
-            if not steps[i].get("success", True):
-                failed_tool = steps[i].get("tool", "unknown")
-                error_msg = steps[i].get("error", "Unknown error")
-                next_tool = steps[i+1].get("tool", "unknown")
+            current_step = steps[i]
+            next_step = steps[i+1]
+            
+            # 1. Check for orchestration (role/agent handoff)
+            curr_role = current_step.get("role", "processing")
+            next_role = next_step.get("role", "processing")
+            if curr_role != next_role or current_step.get("type") == "handoff":
                 extracted_conditionals.append({
-                    "condition": f"If tool '{failed_tool}' fails with '{error_msg}'",
-                    "then_action": f"Fallback to using tool '{next_tool}'"
+                    "type": "handoff",
+                    "condition": f"Role shift from '{curr_role}' to '{next_role}'",
+                    "then_action": f"Handoff task to role '{next_role}' ({next_step.get('tool', 'unknown')})"
                 })
+
+            # 2. Check for failure recovery (Retry vs Fallback)
+            if not current_step.get("success", True):
+                failed_tool = current_step.get("tool", "unknown")
+                error_msg = current_step.get("error", "Unknown error")
+                next_tool = next_step.get("tool", "unknown")
+                
+                if failed_tool == next_tool:
+                    extracted_conditionals.append({
+                        "type": "retry",
+                        "condition": f"If tool '{failed_tool}' fails with '{error_msg}'",
+                        "then_action": f"Retry execution of tool '{next_tool}'"
+                    })
+                else:
+                    extracted_conditionals.append({
+                        "type": "fallback",
+                        "condition": f"If tool '{failed_tool}' fails with '{error_msg}'",
+                        "then_action": f"Fallback to using tool '{next_tool}'"
+                    })
 
         trigger = execution_log.get("trigger", "unknown")
         log_id = execution_log.get("log_id", str(uuid.uuid4())[:8])
@@ -1567,7 +1599,7 @@ class MemoryCategoryManager:
             domain=domain, trigger=trigger, tool_chain=tool_chain,
             data_flow=data_flow, source_agent=agent_id,
             auto_extracted=True, extraction_confidence=0.75,
-            source_log_ids=[log_id])
+            source_log_ids=[log_id], conditionals=extracted_conditionals)
 
         # Record initial execution stats
         overall_success = execution_log.get("overall_success", True)
@@ -1648,11 +1680,15 @@ class MemoryCategoryManager:
         agent_id: str = "system",
         min_success_rate: float = 0.0,
         limit: int = 10,
+        harness_uuid: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Recall suitable harness patterns for a given domain/trigger."""
         clauses = ["e.memory_category = 'harness'"]
         params: Dict[str, Any] = {"limit": limit}
 
+        if harness_uuid:
+            clauses.append("e.uuid = $harness_uuid")
+            params["harness_uuid"] = harness_uuid
         if domain:
             clauses.append("e.harness_domain = $domain")
             params["domain"] = domain
@@ -1711,6 +1747,7 @@ class MemoryCategoryManager:
                 "tool_chain": harness.get("tool_chain", []),
                 "data_flow": harness.get("data_flow", {}),
                 "tags": harness.get("tags", []),
+                "conditionals": harness.get("conditionals", []),
                 "stats": stats,
                 "current_version": evolution.get("current_version", 1),
                 "auto_extracted": extraction.get("auto_extracted", False),
@@ -1782,6 +1819,7 @@ class MemoryCategoryManager:
                         "version": new_version,
                         "created_at": now,
                         "tool_chain_hash": new_hash,
+                        "previous_hash": old_hash,
                         "success_rate": stats["success_rate"],
                         "change_reason": result_summary or "tool chain updated",
                     })
@@ -1790,8 +1828,10 @@ class MemoryCategoryManager:
                     meta["harness"]["tool_chain"] = new_tool_chain
                     evolved = True
 
-            # Adjust salience based on success rate
-            new_salience = min(0.99, 0.5 + stats["success_rate"] * 0.4)
+            # Salience: base (0.5) + success contribution + execution frequency bonus
+            exec_count = stats.get("execution_count", 0)
+            freq_bonus = min(0.1, exec_count * 0.01)  # up to +0.1 for well-used patterns
+            new_salience = min(0.99, 0.5 + stats["success_rate"] * 0.35 + freq_bonus)
 
             session.run("""
                 MATCH (e:Entity {uuid: $uuid})
@@ -1849,6 +1889,7 @@ class MemoryCategoryManager:
                 return {"error": f"Harness {harness_uuid} not found"}
 
             meta = self._safe_json_load(existing["meta_json"])
+            old_hash = _tool_chain_hash(meta.get("harness", {}).get("tool_chain", []))
             new_hash = _tool_chain_hash(new_tool_chain)
 
             evolution = meta.get("evolution", {"current_version": 1, "history": []})
@@ -1857,6 +1898,7 @@ class MemoryCategoryManager:
                 "version": new_version,
                 "created_at": now,
                 "tool_chain_hash": new_hash,
+                "previous_hash": old_hash,
                 "success_rate": meta.get("stats", {}).get("success_rate", 0),
                 "change_reason": change_reason,
             })

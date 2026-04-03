@@ -53,7 +53,10 @@ mirofish-supermemory/
 │   ├── 03_integration_plan.md           ← 단계별 구현 계획
 │   ├── 04_api_mapping.md                ← API 매핑 (GraphStorage ↔ Supermemory)
 │   ├── 05_data_sources_design.md        ← 데이터 소스 확장 & 스트림 연계
-│   └── 06_reliability_security.md       ← 신뢰성 & 보안 설계
+│   ├── 06_reliability_security.md       ← 신뢰성 & 보안 설계
+│   ├── 07_troubleshooting_and_deployment.md  ← 트러블슈팅 및 배포
+│   ├── 08_project_handover.md           ← 인수인계 및 규칙 가이드
+│   └── 09_harness_operations_guide.md   ← 하네스(Harness) 운영 및 모니터링 가이드
 │
 ├── references/                          ← 참조 프로젝트 (git clone)
 │   ├── MiroFish-Offline/                ← nikmcfly/MiroFish-Offline
