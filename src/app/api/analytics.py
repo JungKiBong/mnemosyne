@@ -920,10 +920,12 @@ Harness API — Process Pattern Management
 Endpoints:
   GET  /api/analytics/harness/list        — List all harness patterns
   GET  /api/analytics/harness/overview     — Dashboard overview stats
+  GET  /api/analytics/harness/recommend    — AI-powered pattern recommendation
   GET  /api/analytics/harness/<uuid>       — Get harness detail
   POST /api/analytics/harness/record       — Record a new harness pattern
   POST /api/analytics/harness/<uuid>/execute — Record an execution
   POST /api/analytics/harness/<uuid>/evolve  — Evolve a harness pattern
+  POST /api/analytics/harness/<uuid>/rollback — Rollback to a previous version
   GET  /api/analytics/harness/<uuid>/compare — Compare versions
 """
 
@@ -1119,5 +1121,59 @@ def compare_harness(uuid):
         return jsonify(result)
     except Exception as e:
         logger.error(f"Harness compare failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@analytics_bp.route('/harness/recommend', methods=['GET'])
+def recommend_harness():
+    """Recommend harness patterns based on a natural-language query."""
+    query = request.args.get('q', '')
+    if not query:
+        return jsonify({"error": "Query parameter 'q' is required"}), 400
+
+    domain = request.args.get('domain', None)
+    cross_domain = request.args.get('cross_domain', 'true') == 'true'
+    limit = request.args.get('limit', 5, type=int)
+
+    try:
+        mgr = _get_category_mgr()
+        results = mgr.recommend_harness(
+            query=query,
+            domain=domain,
+            cross_domain=cross_domain,
+            limit=min(limit, 20),
+        )
+        return jsonify({
+            "status": "success",
+            "query": query,
+            "domain": domain,
+            "cross_domain": cross_domain,
+            "count": len(results),
+            "recommendations": results,
+        })
+    except Exception as e:
+        logger.error(f"Harness recommend failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@analytics_bp.route('/harness/<uuid>/rollback', methods=['POST'])
+def rollback_harness(uuid):
+    """Manually rollback a harness to a specific previous version."""
+    data = request.get_json(force=True)
+    to_version = data.get('to_version')
+    if to_version is None:
+        return jsonify({"error": "to_version is required"}), 400
+
+    try:
+        mgr = _get_category_mgr()
+        result = mgr.rollback_harness(
+            harness_uuid=uuid,
+            to_version=int(to_version),
+        )
+        if 'error' in result:
+            return jsonify(result), 404
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Harness rollback failed: {e}")
         return jsonify({"error": str(e)}), 500
 

@@ -2089,6 +2089,173 @@ class MemoryCategoryManager:
             "total_versions": len(history),
         }
 
+    def recommend_harness(
+        self,
+        query: str,
+        domain: Optional[str] = None,
+        cross_domain: bool = True,
+        limit: int = 5,
+    ) -> List[Dict[str, Any]]:
+        """Recommend harness patterns based on a natural-language query.
+
+        Scoring: keyword relevance + success_rate bonus + execution frequency bonus.
+        When cross_domain=True, includes patterns from all domains.
+        """
+        import re
+        query_lower = query.lower()
+        query_tokens = set(re.findall(r'\w+', query_lower))
+        if not query_tokens:
+            return []
+
+        clauses = ["e.memory_category = 'harness'"]
+        params: Dict[str, Any] = {}
+
+        if domain and not cross_domain:
+            clauses.append("e.harness_domain = $domain")
+            params["domain"] = domain
+
+        where = " AND ".join(clauses)
+        with self._driver.session() as session:
+            records = session.run(f"""
+                MATCH (e:Entity) WHERE {where}
+                RETURN e.uuid AS uuid, e.name AS name,
+                       e.summary AS description,
+                       e.harness_domain AS domain,
+                       e.harness_process_type AS process_type,
+                       e.harness_version AS version,
+                       e.salience AS salience,
+                       e.scope AS scope,
+                       e.attributes_json AS meta_json
+                ORDER BY e.salience DESC
+            """, **params).data()
+
+        scored_results = []
+        for r in records:
+            meta = self._safe_json_load(r.get("meta_json", "{}"))
+            harness = meta.get("harness", {})
+            stats = meta.get("stats", {})
+
+            # Build searchable text from harness fields
+            trigger = harness.get("trigger", "")
+            tags = harness.get("tags", [])
+            desc = r.get("description", "")
+            tool_names = " ".join(
+                t.get("tool_name", t.get("name", str(t))) if isinstance(t, dict) else str(t)
+                for t in harness.get("tool_chain", [])
+            )
+            searchable = f"{trigger} {desc} {' '.join(tags)} {tool_names} {r.get('domain', '')}".lower()
+            searchable_tokens = set(re.findall(r'\w+', searchable))
+
+            # Token overlap scoring (Jaccard-like)
+            overlap = query_tokens & searchable_tokens
+            if not overlap:
+                continue
+            text_score = len(overlap) / len(query_tokens)
+
+            # Bonuses
+            success_rate = stats.get("success_rate", 0)
+            exec_count = stats.get("execution_count", 0)
+            freq_bonus = min(0.15, exec_count * 0.01)
+            success_bonus = success_rate * 0.3
+
+            # Domain match bonus
+            domain_bonus = 0.1 if (domain and r.get("domain") == domain) else 0
+
+            final_score = round(text_score * 0.5 + success_bonus + freq_bonus + domain_bonus, 3)
+
+            scored_results.append({
+                "uuid": r["uuid"],
+                "name": r["name"],
+                "domain": r["domain"],
+                "process_type": r["process_type"],
+                "version": r["version"],
+                "trigger": trigger,
+                "tool_count": len(harness.get("tool_chain", [])),
+                "tool_chain": harness.get("tool_chain", []),
+                "tags": tags,
+                "success_rate": success_rate,
+                "execution_count": exec_count,
+                "scope": r["scope"],
+                "relevance_score": final_score,
+                "match_tokens": list(overlap),
+            })
+
+        scored_results.sort(key=lambda x: x["relevance_score"], reverse=True)
+        return scored_results[:limit]
+
+    def rollback_harness(
+        self,
+        harness_uuid: str,
+        to_version: int,
+    ) -> Dict[str, Any]:
+        """Manually rollback a harness to a specific previous version."""
+        now = datetime.now(timezone.utc).isoformat()
+
+        with self._driver.session() as session:
+            existing = session.run("""
+                MATCH (e:Entity {uuid: $uuid, memory_category: 'harness'})
+                RETURN e.uuid AS uuid, e.attributes_json AS meta_json
+            """, uuid=harness_uuid).single()
+
+            if not existing:
+                return {"error": f"Harness {harness_uuid} not found"}
+
+            meta = self._safe_json_load(existing["meta_json"])
+            evolution = meta.get("evolution", {"current_version": 1, "history": []})
+            history = evolution.get("history", [])
+
+            # Find target version entry
+            target_entry = next((h for h in history if h["version"] == to_version), None)
+            if not target_entry:
+                return {"error": f"Version {to_version} not found in history"}
+
+            if "tool_chain" not in target_entry:
+                return {"error": f"Version {to_version} does not contain tool_chain data (pre-enhancement version)"}
+
+            current_version = evolution.get("current_version", 1)
+            if to_version == current_version:
+                return {"status": "no_change", "message": f"Already at version {to_version}"}
+
+            # Create rollback entry
+            rb_version = current_version + 1
+            rb_chain = target_entry["tool_chain"]
+            old_hash = _tool_chain_hash(meta.get("harness", {}).get("tool_chain", []))
+            new_hash = _tool_chain_hash(rb_chain)
+
+            history.append({
+                "version": rb_version,
+                "created_at": now,
+                "tool_chain_hash": new_hash,
+                "previous_hash": old_hash,
+                "tool_chain": rb_chain,
+                "success_rate": meta.get("stats", {}).get("success_rate", 0),
+                "change_reason": f"Manual rollback to v{to_version}",
+            })
+            evolution["current_version"] = rb_version
+            meta["evolution"] = evolution
+            meta["harness"]["tool_chain"] = rb_chain
+
+            # Reset failure stats on rollback
+            meta["stats"]["failure_count"] = 0
+
+            session.run("""
+                MATCH (e:Entity {uuid: $uuid})
+                SET e.attributes_json = $meta_json,
+                    e.harness_version = $version,
+                    e.last_accessed = $now
+            """, uuid=harness_uuid,
+                meta_json=json.dumps(meta, ensure_ascii=False),
+                version=rb_version, now=now)
+
+        logger.info(f"Harness {harness_uuid} manually rolled back to v{to_version} (new version: v{rb_version})")
+        return {
+            "status": "rolled_back",
+            "uuid": harness_uuid,
+            "from_version": current_version,
+            "to_version": to_version,
+            "new_version": rb_version,
+        }
+
     # ──────────────────────────────────────────
     # Decay Modifier (for integration with MemoryManager)
     # ──────────────────────────────────────────

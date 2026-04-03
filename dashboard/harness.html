@@ -96,6 +96,20 @@ a:hover{text-decoration:underline}
 .empty-state .icon{font-size:48px;margin-bottom:16px;opacity:.4}
 .empty-state p{font-size:14px;line-height:1.6}
 
+/* ── Recommend Panel ── */
+.recommend-search{display:flex;gap:12px;margin-bottom:24px;align-items:center}
+.recommend-search input{flex:1;padding:12px 16px;background:var(--card);border:1px solid var(--border);border-radius:12px;color:var(--text);font-size:14px;outline:none;transition:.2s}
+.recommend-search input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(99,102,241,.15)}
+.recommend-search .btn{white-space:nowrap}
+.rec-result{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:12px;transition:.3s;cursor:pointer}
+.rec-result:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 24px rgba(99,102,241,.08)}
+.rec-score{font-size:24px;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--accent-cyan));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.rec-match{display:inline-block;font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(99,102,241,.1);color:var(--accent);margin-right:4px;font-weight:600}
+
+/* ── Rollback badge in evolution ── */
+.evo-entry.rollback{border-left:3px solid var(--red)}
+.evo-entry.rollback .v-badge{background:var(--red)}
+
 /* ── Record Form ── */
 .form-section{max-width:700px;margin:0 auto}
 .form-group{margin-bottom:20px}
@@ -214,6 +228,7 @@ a:hover{text-decoration:underline}
   <div class="tabs">
     <div class="tab active" data-tab="overview" data-i18n="harness.tabOverview">📊 개요</div>
     <div class="tab" data-tab="patterns" data-i18n="harness.tabPatterns">♞ 패턴 목록</div>
+    <div class="tab" data-tab="recommend" data-i18n="harness.tabRecommend">🔮 AI 추천</div>
     <div class="tab" data-tab="record" data-i18n="harness.tabRecord">➕ 패턴 등록</div>
   </div>
 
@@ -247,6 +262,20 @@ a:hover{text-decoration:underline}
       <select id="filterDomain"></select>
     </div>
     <div class="pattern-grid" id="patternGrid"></div>
+  </div>
+
+  <!-- ═══ Tab: AI Recommend ═══ -->
+  <div class="tab-content" id="tab-recommend">
+    <div class="recommend-search">
+      <input type="text" id="recommendInput" placeholder="작업 설명을 입력하면 적합한 패턴을 추천합니다... (e.g. 'PR review automation')">
+      <button class="btn btn-primary" onclick="searchRecommend()">🔮 추천</button>
+    </div>
+    <div id="recommendResults">
+      <div class="empty-state">
+        <div class="icon">🔮</div>
+        <p>자연어로 작업을 설명하면 적합한 프로세스 패턴을 AI가 추천합니다.</p>
+      </div>
+    </div>
   </div>
 
   <!-- ═══ Tab: Record Form ═══ -->
@@ -368,6 +397,7 @@ function setupTabs() {
 
 // ── Fetch data ──
 async function loadData() {
+  window._harness_loadData = loadData;
   try {
     const [overviewRes, listRes] = await Promise.all([
       fetch(BASE + '/overview').then(r => r.json()),
@@ -656,22 +686,37 @@ window.openDetail = async function(uuid) {
       </div>
     </div>`;
 
-    // Evolution history
+    // Evolution history — with rollback visualization
     const history = evolution.history || [];
     if (history.length > 0) {
       body += `<h4 style="margin:20px 0 8px;font-size:14px">${window.t('harness.evolution')}</h4>`;
       body += '<div class="evo-timeline">';
       history.slice().reverse().forEach(ev => {
-        body += `<div class="evo-entry">
+        const isRollback = (ev.change_reason || '').toLowerCase().includes('rollback');
+        const rollbackClass = isRollback ? ' rollback' : '';
+        const icon = isRollback ? '⏪' : '';
+        body += `<div class="evo-entry${rollbackClass}">
           <span class="v-badge">v${ev.version}</span>
           <div class="v-info">
             <span class="rate">${((ev.success_rate || 0)*100).toFixed(1)}% success</span>
-            <div class="reason">${escHtml(ev.change_reason || '-')}</div>
+            <div class="reason">${icon} ${escHtml(ev.change_reason || '-')}</div>
             <div style="font-size:11px;color:var(--muted);margin-top:2px">${ev.created_at || ''}</div>
           </div>
         </div>`;
       });
       body += '</div>';
+
+      // Rollback UI button (if version > 1)
+      if (evolution.current_version > 1) {
+        body += `<div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+          <select id="rollbackVersion" style="background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 12px;font-size:13px">
+            ${history.filter(h => h.version !== evolution.current_version && h.tool_chain).map(h => 
+              `<option value="${h.version}">v${h.version} — ${escHtml((h.change_reason || '').substring(0,40))}</option>`
+            ).join('')}
+          </select>
+          <button class="btn btn-sm btn-danger" onclick="doRollback('${uuid}')">⏪ Rollback</button>
+        </div>`;
+      }
     }
 
     // Extraction info
@@ -768,7 +813,11 @@ window.submitRecord = async function() {
     });
     const data = await res.json();
     if (data.error) { toast(data.error, 'error'); return; }
-    toast(`Pattern recorded: ${data.uuid}`, 'success');
+    if (data.status === 'merged') {
+      toast(`🔄 기존 패턴에 머지됨: ${data.uuid}`, 'success');
+    } else {
+      toast(`✅ Pattern recorded: ${data.uuid}`, 'success');
+    }
     // Reset form
     document.getElementById('recDomain').value = '';
     document.getElementById('recTrigger').value = '';
@@ -799,6 +848,77 @@ function escHtml(s) {
 }
 
 })();
+
+// ── Recommend Search (global scope) ──
+async function searchRecommend() {
+  const q = document.getElementById('recommendInput').value.trim();
+  if (!q) return;
+  const container = document.getElementById('recommendResults');
+  container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">Searching...</div>';
+
+  try {
+    const BASE = '/api/analytics/harness';
+    const res = await fetch(`${BASE}/recommend?q=${encodeURIComponent(q)}&limit=8`);
+    const data = await res.json();
+    if (!data.recommendations || data.recommendations.length === 0) {
+      container.innerHTML = '<div class="empty-state"><div class="icon">🤷</div><p>일치하는 패턴이 없습니다. 다른 키워드로 다시 시도해보세요.</p></div>';
+      return;
+    }
+    container.innerHTML = data.recommendations.map(r => {
+      const pct = (r.success_rate * 100).toFixed(0);
+      const cls = r.success_rate >= .8 ? 'good' : r.success_rate >= .5 ? 'warn' : 'bad';
+      const tokens = (r.match_tokens || []).map(t => `<span class="rec-match">${t}</span>`).join('');
+      return `<div class="rec-result" onclick="openDetail('${r.uuid}')">
+        <div style="display:flex;gap:16px;align-items:center">
+          <div class="rec-score">${(r.relevance_score * 100).toFixed(0)}</div>
+          <div style="flex:1">
+            <div style="font-weight:700;font-size:15px;margin-bottom:4px">${r.name || r.trigger}</div>
+            <span class="tag tag-type">${r.domain}</span>
+            <span class="tag tag-scope">${r.process_type}</span>
+            <span style="font-size:12px;color:var(--muted);margin-left:8px">🔧 ${r.tool_count} tools · ▶ ${r.execution_count}x</span>
+            <span class="${cls}" style="font-size:12px;font-weight:600;margin-left:8px">${pct}%</span>
+          </div>
+        </div>
+        <div style="margin-top:8px;font-size:12px">${tokens}</div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    container.innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`;
+  }
+}
+window.searchRecommend = searchRecommend;
+
+// Handle Enter key on recommend input
+document.addEventListener('DOMContentLoaded', () => {
+  const recInput = document.getElementById('recommendInput');
+  if (recInput) recInput.addEventListener('keypress', e => { if (e.key === 'Enter') searchRecommend(); });
+});
+
+// ── Rollback (global scope) ──
+async function doRollback(uuid) {
+  const sel = document.getElementById('rollbackVersion');
+  if (!sel || !sel.value) return;
+  if (!confirm(`Version ${sel.value}로 롤백하시겠습니까?`)) return;
+
+  try {
+    const BASE = '/api/analytics/harness';
+    const res = await fetch(`${BASE}/${uuid}/rollback`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({to_version: parseInt(sel.value)}),
+    });
+    const data = await res.json();
+    if (data.error) { alert(data.error); return; }
+    alert(`✅ Rolled back: v${data.from_version} → v${data.to_version} (new: v${data.new_version})`);
+    document.getElementById('detailModal').classList.remove('show');
+    // Reload
+    const loadDataFn = window._harness_loadData;
+    if (loadDataFn) await loadDataFn();
+  } catch (e) {
+    alert('Rollback failed: ' + e.message);
+  }
+}
+window.doRollback = doRollback;
 </script>
 </body>
 </html>

@@ -166,3 +166,96 @@ def test_harness_evolve(memory_category_manager, neo4j_driver):
     finally:
         with neo4j_driver.session() as session:
             session.run("MATCH (n:Entity {uuid: $uuid}) DETACH DELETE n", uuid=harness_uuid)
+
+
+def test_harness_recommend(memory_category_manager, neo4j_driver):
+    """Test AI-powered harness recommendation by keyword relevance."""
+    domain = "test_recommend"
+
+    # Create two harnesses with different triggers
+    r1 = memory_category_manager.record_harness(
+        domain=domain,
+        trigger="PR review automation with code analysis",
+        tool_chain=[{"tool_name": "grep_search"}, {"tool_name": "read_file"}],
+        description="Review pull requests automatically",
+        tags=["review", "automation"],
+    )
+    r2 = memory_category_manager.record_harness(
+        domain=domain,
+        trigger="deploy production server monitoring",
+        tool_chain=[{"tool_name": "run_command"}, {"tool_name": "health_check"}],
+        description="Deploy and monitor production servers",
+        tags=["deploy", "monitoring"],
+    )
+
+    try:
+        # Search for "review" should match r1 preferentially
+        results = memory_category_manager.recommend_harness(query="code review automation")
+        assert len(results) > 0
+        # The review-related harness should appear
+        found_uuids = [r["uuid"] for r in results]
+        assert r1["uuid"] in found_uuids, f"Expected {r1['uuid']} in {found_uuids}"
+
+        # Search for "deploy" should match r2
+        results2 = memory_category_manager.recommend_harness(query="deploy server")
+        found_uuids2 = [r["uuid"] for r in results2]
+        assert r2["uuid"] in found_uuids2
+
+        # Unrelated search should return empty or not match
+        results3 = memory_category_manager.recommend_harness(query="quantum computing")
+        assert r1["uuid"] not in [r["uuid"] for r in results3]
+
+    finally:
+        with neo4j_driver.session() as session:
+            session.run("MATCH (n:Entity {uuid: $uuid}) DETACH DELETE n", uuid=r1["uuid"])
+            session.run("MATCH (n:Entity {uuid: $uuid}) DETACH DELETE n", uuid=r2["uuid"])
+
+
+def test_harness_rollback(memory_category_manager, neo4j_driver):
+    """Test manual rollback to a specific harness version."""
+    domain = "test_rollback"
+    original_chain = [{"tool_name": "step_a"}]
+
+    result = memory_category_manager.record_harness(
+        domain=domain,
+        trigger="rollback test",
+        tool_chain=original_chain,
+    )
+    harness_uuid = result["uuid"]
+
+    try:
+        # Evolve to v2
+        memory_category_manager.evolve_harness(
+            harness_uuid=harness_uuid,
+            new_tool_chain=[{"tool_name": "step_a"}, {"tool_name": "step_b"}],
+            change_reason="Add step B",
+        )
+
+        # Verify v2
+        h = memory_category_manager.recall_harness(harness_uuid=harness_uuid)[0]
+        assert h["version"] == 2
+        assert len(h["tool_chain"]) == 2
+
+        # Rollback to v1
+        rb_result = memory_category_manager.rollback_harness(
+            harness_uuid=harness_uuid,
+            to_version=1,
+        )
+        assert rb_result["status"] == "rolled_back"
+        assert rb_result["from_version"] == 2
+        assert rb_result["to_version"] == 1
+        assert rb_result["new_version"] == 3
+
+        # Verify rolled-back state
+        h2 = memory_category_manager.recall_harness(harness_uuid=harness_uuid)[0]
+        assert h2["version"] == 3
+        assert len(h2["tool_chain"]) == 1  # Back to original
+
+        # Verify evolution history
+        compare = memory_category_manager.compare_harness_versions(harness_uuid)
+        assert compare["total_versions"] == 3
+        assert "rollback" in compare["version_b"]["change_reason"].lower()
+
+    finally:
+        with neo4j_driver.session() as session:
+            session.run("MATCH (n:Entity {uuid: $uuid}) DETACH DELETE n", uuid=harness_uuid)

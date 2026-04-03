@@ -446,6 +446,32 @@ TOOLS = [
             "required": ["uuid", "new_tool_chain", "reason"],
         },
     ),
+    Tool(
+        name="mories_harness_recommend",
+        description="Recommend harness patterns based on a natural-language query. Returns scored results ranked by relevance, success rate, and execution frequency.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Natural language query describing the task or process (e.g. 'PR review automation')"},
+                "domain": {"type": "string", "description": "Optional domain filter"},
+                "cross_domain": {"type": "boolean", "default": True, "description": "Include results from other domains"},
+                "limit": {"type": "integer", "default": 5, "description": "Max results to return"},
+            },
+            "required": ["query"],
+        },
+    ),
+    Tool(
+        name="mories_harness_rollback",
+        description="Manually rollback a harness pattern to a specific previous version. Creates a new version entry with the rolled-back tool chain.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "uuid": {"type": "string", "description": "UUID of the harness pattern"},
+                "to_version": {"type": "integer", "description": "Target version number to rollback to"},
+            },
+            "required": ["uuid", "to_version"],
+        },
+    ),
 ]
 
 
@@ -665,6 +691,22 @@ async def _dispatch(name: str, args: dict) -> dict:
         return await _api("POST", f"/api/analytics/harness/{args['uuid']}/evolve", {
             "new_tool_chain": args["new_tool_chain"],
             "reason": args["reason"],
+        })
+
+    elif name == "mories_harness_recommend":
+        params = {"q": args["query"]}
+        if args.get("domain"):
+            params["domain"] = args["domain"]
+        if "cross_domain" in args:
+            params["cross_domain"] = "true" if args["cross_domain"] else "false"
+        if args.get("limit"):
+            params["limit"] = str(args["limit"])
+        query_string = "&".join(f"{k}={v}" for k, v in params.items())
+        return await _api("GET", f"/api/analytics/harness/recommend?{query_string}")
+
+    elif name == "mories_harness_rollback":
+        return await _api("POST", f"/api/analytics/harness/{args['uuid']}/rollback", {
+            "to_version": args["to_version"],
         })
 
     else:
