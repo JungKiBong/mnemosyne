@@ -259,6 +259,74 @@ def create_orchestration_metadata(
 
 
 # ──────────────────────────────────────────────
+# Harness Memory Schema (Evolutionary Process Patterns)
+# ──────────────────────────────────────────────
+
+def _tool_chain_hash(tool_chain: List[Dict[str, Any]]) -> str:
+    """Compute a stable hash of a tool chain for version comparison."""
+    import hashlib
+    canonical = json.dumps(
+        [{"tool": t.get("tool"), "order": t.get("order")} for t in tool_chain],
+        sort_keys=True)
+    return hashlib.sha256(canonical.encode()).hexdigest()[:12]
+
+
+def create_harness_metadata(
+    domain: str,
+    trigger: str,
+    tool_chain: List[Dict[str, Any]],
+    process_type: str = "pipeline",  # pipeline | fan_out | expert_pool | producer_reviewer | supervisor | hierarchical
+    data_flow: Optional[Dict[str, Any]] = None,
+    tags: Optional[List[str]] = None,
+    source_agent: str = "user",
+    auto_extracted: bool = False,
+    extraction_confidence: float = 1.0,
+    source_log_ids: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """Create structured metadata for a harness (evolutionary process pattern) memory."""
+    now = datetime.now(timezone.utc).isoformat()
+    chain_hash = _tool_chain_hash(tool_chain)
+    return {
+        "category": "harness",
+        "harness": {
+            "domain": domain,
+            "trigger": trigger,
+            "process_type": process_type,
+            "tool_chain": tool_chain,
+            "data_flow": data_flow or {"input": "", "intermediate": [], "output": ""},
+            "tags": tags or [],
+        },
+        "stats": {
+            "execution_count": 0,
+            "success_count": 0,
+            "failure_count": 0,
+            "success_rate": 0.0,
+            "avg_execution_time_ms": 0,
+            "last_executed": None,
+        },
+        "evolution": {
+            "current_version": 1,
+            "history": [
+                {
+                    "version": 1,
+                    "created_at": now,
+                    "tool_chain_hash": chain_hash,
+                    "success_rate": 0.0,
+                    "change_reason": "initial",
+                }
+            ],
+        },
+        "extraction": {
+            "auto_extracted": auto_extracted,
+            "source_log_ids": source_log_ids or [],
+            "extraction_confidence": extraction_confidence,
+            "user_verified": not auto_extracted,
+            "source_agent": source_agent,
+        },
+    }
+
+
+# ──────────────────────────────────────────────
 # Category Extension Manager
 # ──────────────────────────────────────────────
 
@@ -1351,6 +1419,534 @@ class MemoryCategoryManager:
         return results
 
     # ──────────────────────────────────────────
+    # Harness Memory — Evolutionary Process Patterns
+    # ──────────────────────────────────────────
+
+    def record_harness(
+        self,
+        domain: str,
+        trigger: str,
+        tool_chain: List[Dict[str, Any]],
+        description: str = "",
+        process_type: str = "pipeline",
+        data_flow: Optional[Dict[str, Any]] = None,
+        tags: Optional[List[str]] = None,
+        agent_id: str = "system",
+        scope: str = "tribal",
+    ) -> Dict[str, Any]:
+        """Manually register a process pattern as a harness memory."""
+        meta = create_harness_metadata(
+            domain=domain, trigger=trigger, tool_chain=tool_chain,
+            process_type=process_type, data_flow=data_flow, tags=tags,
+            source_agent=agent_id, auto_extracted=False)
+        node_uuid = str(uuid.uuid4())
+        now = datetime.now(timezone.utc).isoformat()
+
+        with self._driver.session() as session:
+            session.run("""
+                CREATE (e:Entity:Memory {
+                    uuid: $uuid,
+                    name: $name, name_lower: $name_lower,
+                    summary: $desc,
+                    memory_category: 'harness',
+                    harness_domain: $domain,
+                    harness_process_type: $process_type,
+                    harness_version: 1,
+                    attributes_json: $meta_json,
+                    salience: 0.85,
+                    access_count: 0, last_accessed: $now,
+                    created_at: $now, owner_id: $agent_id,
+                    scope: $scope
+                })
+            """, uuid=node_uuid,
+                name=f"[HARNESS] {domain}: {trigger[:50]}",
+                name_lower=f"[harness] {domain}: {trigger[:50]}".lower(),
+                desc=description or f"Process pattern for {domain} triggered by: {trigger}",
+                domain=domain, process_type=process_type,
+                meta_json=json.dumps(meta, ensure_ascii=False),
+                now=now, agent_id=agent_id, scope=scope)
+
+        logger.info(f"Harness recorded: {domain}/{trigger} ({len(tool_chain)} tools)")
+        return {"status": "created", "uuid": node_uuid, "domain": domain,
+                "trigger": trigger, "tool_count": len(tool_chain), "version": 1}
+
+    def extract_harness_from_log(
+        self,
+        execution_log: Dict[str, Any],
+        domain: str = "general",
+        agent_id: str = "system",
+        min_tools: int = 2,
+    ) -> Dict[str, Any]:
+        """Auto-extract a harness pattern from an execution log.
+
+        Expected log format:
+        {
+            "steps": [
+                {"tool": "git_diff", "type": "shell", "input": "...", "output": "...", "success": true},
+                {"tool": "llm_call", "type": "api", "input": "...", "output": "...", "success": true}
+            ],
+            "trigger": "PR review request",
+            "overall_success": true,
+            "execution_time_ms": 4500
+        }
+        """
+        steps = execution_log.get("steps", [])
+        if len(steps) < min_tools:
+            return {"status": "skipped", "reason": f"Only {len(steps)} tools < min {min_tools}"}
+
+        # Build tool chain from log steps
+        tool_chain = []
+        for i, step in enumerate(steps, 1):
+            tool_chain.append({
+                "tool": step.get("tool", "unknown"),
+                "type": step.get("type", "unknown"),
+                "order": i,
+                "role": step.get("role", "processing"),
+            })
+
+        trigger = execution_log.get("trigger", "unknown")
+        log_id = execution_log.get("log_id", str(uuid.uuid4())[:8])
+
+        # Check for existing similar harness (same domain + similar tool chain)
+        existing = self._find_similar_harness(domain, tool_chain)
+        if existing:
+            # Merge: record as additional execution of existing harness
+            return self.record_harness_execution(
+                harness_uuid=existing["uuid"],
+                success=execution_log.get("overall_success", True),
+                execution_time_ms=execution_log.get("execution_time_ms", 0),
+                result_summary=f"Auto-merged from log {log_id}",
+            )
+
+        # Build data flow from input/output
+        data_flow = {
+            "input": steps[0].get("input", "")[:200] if steps else "",
+            "intermediate": [s.get("output", "")[:100] for s in steps[1:-1]] if len(steps) > 2 else [],
+            "output": steps[-1].get("output", "")[:200] if steps else "",
+        }
+
+        meta = create_harness_metadata(
+            domain=domain, trigger=trigger, tool_chain=tool_chain,
+            data_flow=data_flow, source_agent=agent_id,
+            auto_extracted=True, extraction_confidence=0.7,
+            source_log_ids=[log_id])
+
+        # Record initial execution stats
+        overall_success = execution_log.get("overall_success", True)
+        meta["stats"]["execution_count"] = 1
+        meta["stats"]["success_count"] = 1 if overall_success else 0
+        meta["stats"]["failure_count"] = 0 if overall_success else 1
+        meta["stats"]["success_rate"] = 1.0 if overall_success else 0.0
+        meta["stats"]["avg_execution_time_ms"] = execution_log.get("execution_time_ms", 0)
+        meta["stats"]["last_executed"] = datetime.now(timezone.utc).isoformat()
+
+        node_uuid = str(uuid.uuid4())
+        now = datetime.now(timezone.utc).isoformat()
+
+        with self._driver.session() as session:
+            session.run("""
+                CREATE (e:Entity:Memory {
+                    uuid: $uuid,
+                    name: $name, name_lower: $name_lower,
+                    summary: $desc,
+                    memory_category: 'harness',
+                    harness_domain: $domain,
+                    harness_process_type: 'pipeline',
+                    harness_version: 1,
+                    attributes_json: $meta_json,
+                    salience: 0.7,
+                    access_count: 0, last_accessed: $now,
+                    created_at: $now, owner_id: $agent_id,
+                    scope: 'tribal'
+                })
+            """, uuid=node_uuid,
+                name=f"[HARNESS:AUTO] {domain}: {trigger[:50]}",
+                name_lower=f"[harness:auto] {domain}: {trigger[:50]}".lower(),
+                desc=f"Auto-extracted process pattern ({len(tool_chain)} tools) from log {log_id}",
+                domain=domain,
+                meta_json=json.dumps(meta, ensure_ascii=False),
+                now=now, agent_id=agent_id)
+
+        logger.info(f"Harness auto-extracted: {domain}/{trigger} ({len(tool_chain)} tools)")
+        return {"status": "extracted", "uuid": node_uuid, "domain": domain,
+                "trigger": trigger, "tool_count": len(tool_chain),
+                "auto_extracted": True, "confidence": 0.7}
+
+    def _find_similar_harness(
+        self, domain: str, tool_chain: List[Dict[str, Any]]
+    ) -> Optional[Dict[str, Any]]:
+        """Find an existing harness with >= 70% tool overlap in the same domain."""
+        new_tools = {t.get("tool") for t in tool_chain}
+        if not new_tools:
+            return None
+
+        with self._driver.session() as session:
+            records = session.run("""
+                MATCH (e:Entity)
+                WHERE e.memory_category = 'harness'
+                  AND e.harness_domain = $domain
+                RETURN e.uuid AS uuid, e.attributes_json AS meta_json
+                ORDER BY e.salience DESC
+                LIMIT 20
+            """, domain=domain).data()
+
+        for r in records:
+            meta = self._safe_json_load(r.get("meta_json", "{}"))
+            existing_tools = {t.get("tool") for t in meta.get("harness", {}).get("tool_chain", [])}
+            if not existing_tools:
+                continue
+            overlap = len(new_tools & existing_tools) / max(len(new_tools), len(existing_tools))
+            if overlap >= 0.7:
+                return {"uuid": r["uuid"], "overlap": overlap}
+        return None
+
+    def recall_harness(
+        self,
+        domain: Optional[str] = None,
+        trigger: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        agent_id: str = "system",
+        min_success_rate: float = 0.0,
+        limit: int = 10,
+    ) -> List[Dict[str, Any]]:
+        """Recall suitable harness patterns for a given domain/trigger."""
+        clauses = ["e.memory_category = 'harness'"]
+        params: Dict[str, Any] = {"limit": limit}
+
+        if domain:
+            clauses.append("e.harness_domain = $domain")
+            params["domain"] = domain
+        if trigger:
+            clauses.append("(toLower(e.summary) CONTAINS toLower($trigger) OR toLower(e.name) CONTAINS toLower($trigger))")
+            params["trigger"] = trigger
+        if agent_id != "all":
+            clauses.append("(e.owner_id = $agent_id OR e.scope IN ['tribal', 'global'])")
+            params["agent_id"] = agent_id
+
+        where = " AND ".join(clauses)
+        with self._driver.session() as session:
+            records = session.run(f"""
+                MATCH (e:Entity) WHERE {where}
+                RETURN e.uuid AS uuid, e.name AS name,
+                       e.summary AS description,
+                       e.harness_domain AS domain,
+                       e.harness_process_type AS process_type,
+                       e.harness_version AS version,
+                       e.salience AS salience,
+                       e.owner_id AS owner_id,
+                       e.scope AS scope,
+                       e.attributes_json AS meta_json
+                ORDER BY e.salience DESC, e.harness_version DESC
+                LIMIT $limit
+            """, **params).data()
+
+        results = []
+        for r in records:
+            meta = self._safe_json_load(r.get("meta_json", "{}"))
+            stats = meta.get("stats", {})
+            sr = stats.get("success_rate", 0)
+            if sr < min_success_rate:
+                continue
+
+            harness = meta.get("harness", {})
+            evolution = meta.get("evolution", {})
+            extraction = meta.get("extraction", {})
+
+            # Filter by tags if specified
+            if tags:
+                harness_tags = set(harness.get("tags", []))
+                if not harness_tags.intersection(set(tags)):
+                    continue
+
+            results.append({
+                "uuid": r["uuid"],
+                "name": r["name"],
+                "description": r["description"],
+                "domain": r["domain"],
+                "process_type": r["process_type"],
+                "version": r["version"],
+                "salience": r["salience"],
+                "owner_id": r["owner_id"],
+                "scope": r["scope"],
+                "tool_chain": harness.get("tool_chain", []),
+                "data_flow": harness.get("data_flow", {}),
+                "tags": harness.get("tags", []),
+                "stats": stats,
+                "current_version": evolution.get("current_version", 1),
+                "auto_extracted": extraction.get("auto_extracted", False),
+                "user_verified": extraction.get("user_verified", True),
+            })
+
+        # Boost salience on retrieval
+        if results:
+            uuids = [r["uuid"] for r in results]
+            with self._driver.session() as session:
+                session.run("""
+                    UNWIND $uuids AS uid
+                    MATCH (e:Entity {uuid: uid})
+                    SET e.access_count = COALESCE(e.access_count, 0) + 1,
+                        e.last_accessed = $now
+                """, uuids=uuids, now=datetime.now(timezone.utc).isoformat())
+
+        return results
+
+    def record_harness_execution(
+        self,
+        harness_uuid: str,
+        success: bool,
+        execution_time_ms: int = 0,
+        result_summary: str = "",
+        new_tool_chain: Optional[List[Dict[str, Any]]] = None,
+    ) -> Dict[str, Any]:
+        """Record execution result and auto-evolve if tool chain changed."""
+        now = datetime.now(timezone.utc).isoformat()
+
+        with self._driver.session() as session:
+            existing = session.run("""
+                MATCH (e:Entity {uuid: $uuid, memory_category: 'harness'})
+                RETURN e.uuid AS uuid, e.attributes_json AS meta_json,
+                       e.harness_version AS version, e.salience AS salience
+            """, uuid=harness_uuid).single()
+
+            if not existing:
+                return {"error": f"Harness {harness_uuid} not found"}
+
+            meta = self._safe_json_load(existing["meta_json"])
+            stats = meta.get("stats", {})
+
+            # Update execution stats
+            stats["execution_count"] = stats.get("execution_count", 0) + 1
+            if success:
+                stats["success_count"] = stats.get("success_count", 0) + 1
+            else:
+                stats["failure_count"] = stats.get("failure_count", 0) + 1
+
+            total = stats["execution_count"]
+            stats["success_rate"] = round(stats.get("success_count", 0) / max(total, 1), 3)
+
+            # Rolling average execution time
+            old_avg = stats.get("avg_execution_time_ms", 0)
+            stats["avg_execution_time_ms"] = int((old_avg * (total - 1) + execution_time_ms) / total)
+            stats["last_executed"] = now
+            meta["stats"] = stats
+
+            # Auto-evolve if new tool chain provided and different
+            evolved = False
+            if new_tool_chain:
+                old_hash = _tool_chain_hash(meta.get("harness", {}).get("tool_chain", []))
+                new_hash = _tool_chain_hash(new_tool_chain)
+                if old_hash != new_hash:
+                    evolution = meta.get("evolution", {"current_version": 1, "history": []})
+                    new_version = evolution["current_version"] + 1
+                    evolution["history"].append({
+                        "version": new_version,
+                        "created_at": now,
+                        "tool_chain_hash": new_hash,
+                        "success_rate": stats["success_rate"],
+                        "change_reason": result_summary or "tool chain updated",
+                    })
+                    evolution["current_version"] = new_version
+                    meta["evolution"] = evolution
+                    meta["harness"]["tool_chain"] = new_tool_chain
+                    evolved = True
+
+            # Adjust salience based on success rate
+            new_salience = min(0.99, 0.5 + stats["success_rate"] * 0.4)
+
+            session.run("""
+                MATCH (e:Entity {uuid: $uuid})
+                SET e.attributes_json = $meta_json,
+                    e.harness_version = $version,
+                    e.salience = $sal,
+                    e.last_accessed = $now,
+                    e.access_count = COALESCE(e.access_count, 0) + 1
+            """, uuid=harness_uuid,
+                meta_json=json.dumps(meta, ensure_ascii=False),
+                version=meta.get("evolution", {}).get("current_version", 1),
+                sal=new_salience, now=now)
+
+            # Auto-reflect on 3+ consecutive failures
+            if not success and stats.get("failure_count", 0) >= 3 and stats["success_rate"] < 0.5:
+                try:
+                    domain = meta.get("harness", {}).get("domain", "unknown")
+                    self.record_reflection(
+                        event=f"Harness {domain} failure rate critical: {stats['success_rate']:.0%}",
+                        lesson=f"Process pattern in {domain} needs revision — consider alternative tool chain",
+                        severity="high",
+                        domain=domain,
+                        subcategory="process_failure",
+                        agent_id=meta.get("extraction", {}).get("source_agent", "system"),
+                    )
+                except Exception as e:
+                    logger.debug(f"Harness auto-reflection skipped: {e}")
+
+        return {
+            "status": "recorded",
+            "uuid": harness_uuid,
+            "success": success,
+            "stats": stats,
+            "evolved": evolved,
+            "new_version": meta.get("evolution", {}).get("current_version", 1) if evolved else None,
+        }
+
+    def evolve_harness(
+        self,
+        harness_uuid: str,
+        new_tool_chain: List[Dict[str, Any]],
+        change_reason: str,
+        new_data_flow: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Manually evolve a harness to a new version with an updated tool chain."""
+        now = datetime.now(timezone.utc).isoformat()
+
+        with self._driver.session() as session:
+            existing = session.run("""
+                MATCH (e:Entity {uuid: $uuid, memory_category: 'harness'})
+                RETURN e.uuid AS uuid, e.attributes_json AS meta_json
+            """, uuid=harness_uuid).single()
+
+            if not existing:
+                return {"error": f"Harness {harness_uuid} not found"}
+
+            meta = self._safe_json_load(existing["meta_json"])
+            new_hash = _tool_chain_hash(new_tool_chain)
+
+            evolution = meta.get("evolution", {"current_version": 1, "history": []})
+            new_version = evolution["current_version"] + 1
+            evolution["history"].append({
+                "version": new_version,
+                "created_at": now,
+                "tool_chain_hash": new_hash,
+                "success_rate": meta.get("stats", {}).get("success_rate", 0),
+                "change_reason": change_reason,
+            })
+            evolution["current_version"] = new_version
+            meta["evolution"] = evolution
+            meta["harness"]["tool_chain"] = new_tool_chain
+            if new_data_flow:
+                meta["harness"]["data_flow"] = new_data_flow
+
+            # Mark user-verified on manual evolution
+            meta["extraction"]["user_verified"] = True
+
+            # Reset failure count on evolution (fresh start)
+            meta["stats"]["failure_count"] = 0
+
+            session.run("""
+                MATCH (e:Entity {uuid: $uuid})
+                SET e.attributes_json = $meta_json,
+                    e.harness_version = $version,
+                    e.last_accessed = $now
+            """, uuid=harness_uuid,
+                meta_json=json.dumps(meta, ensure_ascii=False),
+                version=new_version, now=now)
+
+        logger.info(f"Harness evolved to v{new_version}: {change_reason}")
+        return {"status": "evolved", "uuid": harness_uuid,
+                "new_version": new_version, "change_reason": change_reason}
+
+    def list_harnesses(
+        self,
+        domain: Optional[str] = None,
+        agent_id: str = "system",
+        include_low_success: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """List all harness patterns, optionally filtered by domain."""
+        clauses = ["e.memory_category = 'harness'"]
+        params: Dict[str, Any] = {}
+
+        if domain:
+            clauses.append("e.harness_domain = $domain")
+            params["domain"] = domain
+        if agent_id != "all":
+            clauses.append("(e.owner_id = $agent_id OR e.scope IN ['tribal', 'global'])")
+            params["agent_id"] = agent_id
+
+        where = " AND ".join(clauses)
+        with self._driver.session() as session:
+            records = session.run(f"""
+                MATCH (e:Entity) WHERE {where}
+                RETURN e.uuid AS uuid, e.name AS name,
+                       e.summary AS description,
+                       e.harness_domain AS domain,
+                       e.harness_process_type AS process_type,
+                       e.harness_version AS version,
+                       e.salience AS salience,
+                       e.scope AS scope,
+                       e.attributes_json AS meta_json
+                ORDER BY e.salience DESC
+            """, **params).data()
+
+        results = []
+        for r in records:
+            meta = self._safe_json_load(r.get("meta_json", "{}"))
+            stats = meta.get("stats", {})
+            if not include_low_success and stats.get("success_rate", 0) < 0.3 and stats.get("execution_count", 0) > 5:
+                continue
+            harness = meta.get("harness", {})
+            results.append({
+                "uuid": r["uuid"],
+                "name": r["name"],
+                "domain": r["domain"],
+                "process_type": r["process_type"],
+                "version": r["version"],
+                "trigger": harness.get("trigger", ""),
+                "tool_count": len(harness.get("tool_chain", [])),
+                "tags": harness.get("tags", []),
+                "success_rate": stats.get("success_rate", 0),
+                "execution_count": stats.get("execution_count", 0),
+                "scope": r["scope"],
+            })
+        return results
+
+    def compare_harness_versions(
+        self,
+        harness_uuid: str,
+        version_a: Optional[int] = None,
+        version_b: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Compare two versions of a harness's evolution history."""
+        with self._driver.session() as session:
+            existing = session.run("""
+                MATCH (e:Entity {uuid: $uuid, memory_category: 'harness'})
+                RETURN e.attributes_json AS meta_json,
+                       e.harness_domain AS domain
+            """, uuid=harness_uuid).single()
+
+        if not existing:
+            return {"error": f"Harness {harness_uuid} not found"}
+
+        meta = self._safe_json_load(existing["meta_json"])
+        evolution = meta.get("evolution", {})
+        history = evolution.get("history", [])
+
+        if len(history) < 2:
+            return {"status": "no_history", "message": "Only 1 version exists",
+                    "current": history[0] if history else {}}
+
+        # Default: compare latest two versions
+        if version_a is None:
+            version_a = history[-2]["version"] if len(history) >= 2 else 1
+        if version_b is None:
+            version_b = history[-1]["version"]
+
+        entry_a = next((h for h in history if h["version"] == version_a), None)
+        entry_b = next((h for h in history if h["version"] == version_b), None)
+
+        if not entry_a or not entry_b:
+            return {"error": f"Version {version_a} or {version_b} not found"}
+
+        improvement = (entry_b.get("success_rate", 0) - entry_a.get("success_rate", 0))
+        return {
+            "domain": existing["domain"],
+            "version_a": entry_a,
+            "version_b": entry_b,
+            "success_rate_delta": round(improvement, 3),
+            "improved": improvement > 0,
+            "total_versions": len(history),
+        }
+
+    # ──────────────────────────────────────────
     # Decay Modifier (for integration with MemoryManager)
     # ──────────────────────────────────────────
 
@@ -1399,6 +1995,35 @@ class MemoryCategoryManager:
             if status in ("completed", "failed"):
                 return 0.7
             return 1.0
+
+        if memory_category == 'harness':
+            stats = meta.get("stats", {})
+            extraction = meta.get("extraction", {})
+            success_rate = stats.get("success_rate", 0.5)
+
+            if success_rate > 0.8:
+                modifier = 1.1
+            elif success_rate < 0.5:
+                modifier = 0.8
+            else:
+                modifier = 1.0
+
+            # Stale harness penalty (30+ days unused)
+            last_exec = stats.get("last_executed")
+            if last_exec:
+                try:
+                    le_dt = datetime.fromisoformat(last_exec.replace("Z", "+00:00"))
+                    days_since = (datetime.now(timezone.utc) - le_dt).days
+                    if days_since > 30:
+                        modifier *= 0.9
+                except Exception:
+                    pass
+
+            # User-verified bonus
+            if extraction.get("user_verified", False):
+                modifier = min(1.15, modifier + 0.05)
+
+            return modifier
 
         if memory_category == 'procedural':
             stats = meta.get("stats", {})

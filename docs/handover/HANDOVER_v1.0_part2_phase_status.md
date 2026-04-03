@@ -93,10 +93,10 @@ git push origin main
 - `POST /api/ingest/batch/async` — 비동기 멀티스레드 기반 배치 처리 구현
 - Background Worker (ThreadPoolExecutor) 및 n8n Webhook 연동 완료
 
-### [TASK-6] 보안 강화 (2h) - ✅ 완료
+### [TASK-6] 보안 강화 (2h) - ✅ 완전 완료
 - Rate Limiting (Flask-Limiter) 도입 완료 (`/api/ingest` 계열에 리미트 적용)
-- CORS 프로덕션 등 추가 점검 필요
-- API Key 자동 회전 UI (`src/app/security/memory_encryption.py` 참조)
+- CORS 프로덕션 설정 완료 (`CORS_ORIGINS` 환경변수 연동)
+- API Key 자동 회전 - `memory_encryption.py`를 통한 암호화 키 전체 회전/갱신 로직 및 API(`/api/admin/security/rotate`) 구현 완료
 
 ---
 

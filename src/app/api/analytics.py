@@ -887,3 +887,218 @@ def catalog():
         ],
         "version": "1.1.0",
     })
+
+@analytics_bp.route('/salience_trend', methods=['GET'])
+def get_salience_trend():
+    """Returns memory salience distribution and trend over time."""
+    driver = current_app.extensions.get('neo4j_driver')
+    if not driver:
+        return jsonify({"error": "Neo4j driver not initialized"}), 500
+
+    query = """
+    MATCH (e:Entity)
+    WHERE e.last_accessed IS NOT NULL
+    WITH substring(toString(e.last_accessed), 0, 10) AS access_date, avg(e.salience) AS avg_salience, count(e) AS memory_count
+    RETURN access_date, avg_salience, memory_count
+    ORDER BY access_date DESC
+    LIMIT 30
+    """
+    
+    with driver.session() as session:
+        records = session.run(query).data()
+    
+    return jsonify({
+        "status": "success",
+        "trend_data": records
+    })
+
+
+# --- Harness (Evolutionary Process Patterns) API ---
+"""
+Harness API — Process Pattern Management
+
+Endpoints:
+  GET  /api/analytics/harness/list        — List all harness patterns
+  GET  /api/analytics/harness/overview     — Dashboard overview stats
+  GET  /api/analytics/harness/<uuid>       — Get harness detail
+  POST /api/analytics/harness/record       — Record a new harness pattern
+  POST /api/analytics/harness/<uuid>/execute — Record an execution
+  POST /api/analytics/harness/<uuid>/evolve  — Evolve a harness pattern
+  GET  /api/analytics/harness/<uuid>/compare — Compare versions
+"""
+
+
+def _get_category_mgr():
+    """Lazy-load MemoryCategoryManager."""
+    from ..storage.memory_categories import MemoryCategoryManager
+    return MemoryCategoryManager()
+
+
+@analytics_bp.route('/harness/list', methods=['GET'])
+def list_harnesses():
+    """List all harness patterns, optionally filtered by domain."""
+    domain = request.args.get('domain', None)
+    agent_id = request.args.get('agent_id', 'all')
+    include_low = request.args.get('include_low_success', 'false') == 'true'
+
+    try:
+        mgr = _get_category_mgr()
+        patterns = mgr.list_harnesses(
+            domain=domain,
+            agent_id=agent_id,
+            include_low_success=include_low,
+        )
+        return jsonify({
+            "status": "success",
+            "count": len(patterns),
+            "patterns": patterns,
+        })
+    except Exception as e:
+        logger.error(f"Harness list failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@analytics_bp.route('/harness/overview', methods=['GET'])
+def harness_overview():
+    """Dashboard overview: aggregated stats for harness patterns."""
+    try:
+        mgr = _get_category_mgr()
+        all_patterns = mgr.list_harnesses(agent_id='all', include_low_success=True)
+
+        domains = {}
+        process_types = {}
+        total_executions = 0
+        total_success = 0
+        total_failure = 0
+
+        for p in all_patterns:
+            d = p.get('domain', 'unknown')
+            pt = p.get('process_type', 'unknown')
+            domains[d] = domains.get(d, 0) + 1
+            process_types[pt] = process_types.get(pt, 0) + 1
+            total_executions += p.get('execution_count', 0)
+            sr = p.get('success_rate', 0)
+            ec = p.get('execution_count', 0)
+            total_success += int(sr * ec)
+            total_failure += int((1 - sr) * ec)
+
+        avg_success_rate = (total_success / total_executions) if total_executions > 0 else 0
+
+        return jsonify({
+            "status": "success",
+            "overview": {
+                "total_patterns": len(all_patterns),
+                "total_executions": total_executions,
+                "avg_success_rate": round(avg_success_rate, 3),
+                "total_success": total_success,
+                "total_failure": total_failure,
+                "domains": domains,
+                "process_types": process_types,
+            }
+        })
+    except Exception as e:
+        logger.error(f"Harness overview failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@analytics_bp.route('/harness/<uuid>', methods=['GET'])
+def get_harness_detail(uuid):
+    """Get detailed info for a specific harness pattern."""
+    try:
+        mgr = _get_category_mgr()
+        result = mgr.recall_harness(harness_uuid=uuid)
+        if result.get('error'):
+            return jsonify(result), 404
+        return jsonify({"status": "success", "harness": result})
+    except Exception as e:
+        logger.error(f"Harness detail failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@analytics_bp.route('/harness/record', methods=['POST'])
+def record_harness():
+    """Record a new harness pattern."""
+    data = request.get_json(force=True)
+    domain = data.get('domain')
+    trigger = data.get('trigger')
+    tool_chain = data.get('tool_chain', [])
+    if not domain or not trigger or not tool_chain:
+        return jsonify({"error": "domain, trigger, and tool_chain are required"}), 400
+
+    try:
+        mgr = _get_category_mgr()
+        result = mgr.record_harness(
+            domain=domain,
+            trigger=trigger,
+            tool_chain=tool_chain,
+            description=data.get('description', ''),
+            process_type=data.get('process_type', 'pipeline'),
+            data_flow=data.get('data_flow'),
+            tags=data.get('tags'),
+            agent_id=data.get('agent_id', 'system'),
+            scope=data.get('scope', 'tribal'),
+        )
+        return jsonify(result), 201
+    except Exception as e:
+        logger.error(f"Harness record failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@analytics_bp.route('/harness/<uuid>/execute', methods=['POST'])
+def record_harness_execution(uuid):
+    """Record an execution result for a harness pattern."""
+    data = request.get_json(force=True)
+    try:
+        mgr = _get_category_mgr()
+        result = mgr.record_harness_execution(
+            harness_uuid=uuid,
+            success=data.get('success', True),
+            execution_time_ms=data.get('execution_time_ms', 0),
+            context=data.get('context', {}),
+        )
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Harness execution record failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@analytics_bp.route('/harness/<uuid>/evolve', methods=['POST'])
+def evolve_harness(uuid):
+    """Evolve a harness pattern with a new tool chain."""
+    data = request.get_json(force=True)
+    new_chain = data.get('new_tool_chain', [])
+    reason = data.get('reason', '')
+    if not new_chain:
+        return jsonify({"error": "new_tool_chain is required"}), 400
+
+    try:
+        mgr = _get_category_mgr()
+        result = mgr.evolve_harness(
+            harness_uuid=uuid,
+            new_tool_chain=new_chain,
+            change_reason=reason,
+        )
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Harness evolve failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@analytics_bp.route('/harness/<uuid>/compare', methods=['GET'])
+def compare_harness(uuid):
+    """Compare two versions of a harness pattern."""
+    version_a = request.args.get('version_a', type=int)
+    version_b = request.args.get('version_b', type=int)
+
+    try:
+        mgr = _get_category_mgr()
+        result = mgr.compare_harness_versions(
+            harness_uuid=uuid,
+            version_a=version_a,
+            version_b=version_b,
+        )
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Harness compare failed: {e}")
+        return jsonify({"error": str(e)}), 500
+

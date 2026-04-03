@@ -6,7 +6,8 @@
     <title>Mories — Knowledge Maturity & Security</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-      <link rel="stylesheet" href="/dashboard/assets/css/tokens.css">
+      <link rel="stylesheet" href="/assets/css/tokens.css">
+  <script src="/i18n.js"></script>
   <style>
         
 
@@ -113,7 +114,7 @@
         @media (max-width: 1200px) { .stats-grid { grid-template-columns: repeat(3, 1fr); } .rules-grid { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 768px) { .stats-grid { grid-template-columns: 1fr 1fr; } .charts-row { grid-template-columns: 1fr; } .rules-grid { grid-template-columns: 1fr; } }
     </style>
-<link rel="stylesheet" href="/dashboard/nav-component.css">
+<link rel="stylesheet" href="/nav-component.css">
 </head>
 <body>
 
@@ -126,32 +127,32 @@
     <div class="stats-grid" id="stats-grid">
         <div class="stat-card total">
             <div class="stat-emoji">📊</div>
-            <div class="stat-label">Total Memories</div>
+            <div class="stat-label" data-i18n="mat.totalMemories">Total Memories</div>
             <div class="stat-value" id="stat-total">—</div>
         </div>
         <div class="stat-card learning">
             <div class="stat-emoji">🌱</div>
             <div class="stat-label">Learning</div>
             <div class="stat-value" id="stat-learning">—</div>
-            <div class="stat-sub">개인 전용 · 접근 차단</div>
+            <div class="stat-sub" data-i18n="mat.learningSub">개인 전용 · 접근 차단</div>
         </div>
         <div class="stat-card unstable">
             <div class="stat-emoji">⚡</div>
             <div class="stat-label">Unstable</div>
             <div class="stat-value" id="stat-unstable">—</div>
-            <div class="stat-sub">검증 대기 · 팀 읽기만</div>
+            <div class="stat-sub" data-i18n="mat.unstableSub">검증 대기 · 팀 읽기만</div>
         </div>
         <div class="stat-card mature">
             <div class="stat-emoji">✅</div>
             <div class="stat-label">Mature</div>
             <div class="stat-value" id="stat-mature">—</div>
-            <div class="stat-sub">공유 가능 · 집단 지성</div>
+            <div class="stat-sub" data-i18n="mat.matureSub">공유 가능 · 집단 지성</div>
         </div>
         <div class="stat-card secret">
             <div class="stat-emoji">🔒</div>
             <div class="stat-label">Secret</div>
             <div class="stat-value" id="stat-secret">—</div>
-            <div class="stat-sub">암호화 · Admin만 접근</div>
+            <div class="stat-sub" data-i18n="mat.secretSub">암호화 · Admin만 접근</div>
         </div>
     </div>
 
@@ -160,52 +161,52 @@
         <div class="rule-card">
             <div class="rule-emoji">🌱</div>
             <div class="rule-level">Learning</div>
-            <div class="rule-item">👤 <span class="rule-yes">Owner만 접근</span></div>
-            <div class="rule-item">🔍 <span class="rule-no">검색 불가</span></div>
-            <div class="rule-item">📤 <span class="rule-no">공유 불가</span></div>
-            <div class="rule-item">🔐 <span class="rule-no">암호화 없음</span></div>
+            <div class="rule-item">👤 <span class="rule-yes" data-i18n="mat.rule.ownerOnly">Owner만 접근</span></div>
+            <div class="rule-item">🔍 <span class="rule-no" data-i18n="mat.rule.noSearch">검색 불가</span></div>
+            <div class="rule-item">📤 <span class="rule-no" data-i18n="mat.rule.noShare">공유 불가</span></div>
+            <div class="rule-item">🔐 <span class="rule-no" data-i18n="mat.rule.noEncrypt">암호화 없음</span></div>
         </div>
         <div class="rule-card">
             <div class="rule-emoji">⚡</div>
             <div class="rule-level">Unstable</div>
-            <div class="rule-item">👥 <span class="rule-yes">팀원 읽기 가능</span></div>
-            <div class="rule-item">🔍 <span class="rule-no">검색 제외</span></div>
-            <div class="rule-item">📤 <span class="rule-no">공유 불가</span></div>
-            <div class="rule-item">🔐 <span class="rule-no">암호화 없음</span></div>
+            <div class="rule-item">👥 <span class="rule-yes" data-i18n="mat.rule.teamRead">팀원 읽기 가능</span></div>
+            <div class="rule-item">🔍 <span class="rule-no" data-i18n="mat.rule.searchExcl">검색 제외</span></div>
+            <div class="rule-item">📤 <span class="rule-no" data-i18n="mat.rule.noShare">공유 불가</span></div>
+            <div class="rule-item">🔐 <span class="rule-no" data-i18n="mat.rule.noEncrypt">암호화 없음</span></div>
         </div>
         <div class="rule-card">
             <div class="rule-emoji">✅</div>
             <div class="rule-level">Mature</div>
-            <div class="rule-item">🌐 <span class="rule-yes">전체 접근 가능</span></div>
-            <div class="rule-item">🔍 <span class="rule-yes">검색 포함</span></div>
-            <div class="rule-item">📤 <span class="rule-yes">공유 가능</span></div>
-            <div class="rule-item">🔐 <span class="rule-no">암호화 선택</span></div>
+            <div class="rule-item">🌐 <span class="rule-yes" data-i18n="mat.rule.fullAccess">전체 접근 가능</span></div>
+            <div class="rule-item">🔍 <span class="rule-yes" data-i18n="mat.rule.searchIncl">검색 포함</span></div>
+            <div class="rule-item">📤 <span class="rule-yes" data-i18n="mat.rule.shareable">공유 가능</span></div>
+            <div class="rule-item">🔐 <span class="rule-no" data-i18n="mat.rule.encryptOpt">암호화 선택</span></div>
         </div>
         <div class="rule-card">
             <div class="rule-emoji">🔒</div>
             <div class="rule-level">Secret</div>
-            <div class="rule-item">🛡️ <span class="rule-yes">Admin만 접근</span></div>
-            <div class="rule-item">🔍 <span class="rule-no">검색 제외</span></div>
-            <div class="rule-item">📤 <span class="rule-no">공유 불가</span></div>
-            <div class="rule-item">🔐 <span class="rule-yes">자동 암호화</span></div>
+            <div class="rule-item">🛡️ <span class="rule-yes" data-i18n="mat.rule.adminOnly">Admin만 접근</span></div>
+            <div class="rule-item">🔍 <span class="rule-no" data-i18n="mat.rule.searchExcl">검색 제외</span></div>
+            <div class="rule-item">📤 <span class="rule-no" data-i18n="mat.rule.noShare">공유 불가</span></div>
+            <div class="rule-item">🔐 <span class="rule-yes" data-i18n="mat.rule.autoEncrypt">자동 암호화</span></div>
         </div>
     </div>
 
     <!-- Charts -->
     <div class="charts-row">
         <div class="chart-card">
-            <div class="chart-title">📊 성숙도 분포</div>
+            <div class="chart-title" data-i18n-html="mat.maturityDistrib">📊 성숙도 분포</div>
             <canvas id="maturityChart" height="200"></canvas>
         </div>
         <div class="chart-card">
-            <div class="chart-title">🗂️ 스코프 × 성숙도 매트릭스</div>
+            <div class="chart-title" data-i18n-html="mat.scopeMatrix">🗂️ 스코프 × 성숙도 매트릭스</div>
             <canvas id="matrixChart" height="200"></canvas>
         </div>
     </div>
 
     <!-- Tabs + Memory List -->
     <div class="tabs">
-        <button class="tab active" data-level="all" onclick="switchTab('all',this)">전체</button>
+        <button class="tab active" data-level="all" onclick="switchTab('all',this)" data-i18n="mat.allMemories">전체</button>
         <button class="tab" data-level="learning" onclick="switchTab('learning',this)">🌱 Learning</button>
         <button class="tab" data-level="unstable" onclick="switchTab('unstable',this)">⚡ Unstable</button>
         <button class="tab" data-level="mature" onclick="switchTab('mature',this)">✅ Mature</button>
@@ -214,22 +215,22 @@
 
     <div class="memory-list">
         <div class="list-header">
-            <span class="list-title" id="list-title">전체 기억</span>
+            <span class="list-title" id="list-title" data-i18n="mat.allMemories">전체 기억</span>
             <div style="display:flex;gap:8px;">
-                <button class="btn btn-success btn-sm" onclick="runPromotions()">⬆️ 자동 승격 실행</button>
-                <button class="btn btn-outline btn-sm" onclick="openSetModal()">✏️ 성숙도 변경</button>
+                <button class="btn btn-success btn-sm" onclick="runPromotions()" data-i18n-html="mat.autoPromote">⬆️ 자동 승격 실행</button>
+                <button class="btn btn-outline btn-sm" onclick="openSetModal()" data-i18n-html="mat.changeMaturity">✏️ 성숙도 변경</button>
             </div>
         </div>
         <table>
             <thead>
                 <tr>
-                    <th>성숙도</th>
-                    <th>이름</th>
-                    <th>Salience</th>
-                    <th>스코프</th>
-                    <th>접근 수</th>
-                    <th>암호화</th>
-                    <th>작업</th>
+                    <th data-i18n="mat.maturity">성숙도</th>
+                    <th data-i18n="name">이름</th>
+                    <th data-i18n="mat.salience">Salience</th>
+                    <th data-i18n="mat.scope">스코프</th>
+                    <th data-i18n="mat.accessCount">접근 수</th>
+                    <th data-i18n="mat.encryption">암호화</th>
+                    <th data-i18n="actions">작업</th>
                 </tr>
             </thead>
             <tbody id="memory-tbody"></tbody>
@@ -238,10 +239,10 @@
 
     <!-- Recent Changes -->
     <div class="matrix-card">
-        <div class="chart-title">📜 최근 성숙도 변경 이력</div>
+        <div class="chart-title" data-i18n-html="mat.recentChanges">📜 최근 성숙도 변경 이력</div>
         <table>
             <thead>
-                <tr><th>이름</th><th>성숙도</th><th>스코프</th><th>Salience</th><th>변경자</th><th>시간</th></tr>
+                <tr><th data-i18n="name">이름</th><th data-i18n="mat.maturity">성숙도</th><th data-i18n="mat.scope">스코프</th><th data-i18n="mat.salience">Salience</th><th data-i18n="mat.changedBy">변경자</th><th data-i18n="time">시간</th></tr>
             </thead>
             <tbody id="changes-tbody"></tbody>
         </table>
@@ -249,7 +250,7 @@
 
     <!-- Scope Matrix Table -->
     <div class="matrix-card">
-        <div class="chart-title">🗂️ 스코프 × 성숙도 상세 매트릭스</div>
+        <div class="chart-title" data-i18n-html="mat.scopeMatrixDetail">🗂️ 스코프 × 성숙도 상세 매트릭스</div>
         <table id="scope-matrix-table">
             <thead>
                 <tr><th>Scope</th><th>🌱 Learning</th><th>⚡ Unstable</th><th>✅ Mature</th><th>🔒 Secret</th><th>Total</th></tr>
@@ -536,6 +537,6 @@ async function submitSetMaturity() {
 })();
 </script>
 
-<script src="/dashboard/nav-component.js"></script>
+<script src="/nav-component.js?v=2"></script>
 </body>
 </html>

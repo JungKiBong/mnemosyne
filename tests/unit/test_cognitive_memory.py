@@ -1,14 +1,15 @@
 """
 Comprehensive tests for Cognitive Memory Categories (Phase 16-C+)
 
-Tests all 5 new memory categories:
+Tests all 6 memory categories:
 - Preference: Record, upsert, recall
 - Instructional: Record, PM auto-promote, recall with priority ordering
 - Reflective: Record, reinforcement on repeat, recall
 - Conditional: Record, context-matching recall, expiry detection
 - Orchestration: Task handoff, status update, auto-reflection on failure, active tasks
+- Harness: Process pattern CRUD, auto-extraction, evolution, decay
 
-Also tests the enhanced decay modifier for all 8 categories.
+Also tests the enhanced decay modifier for all 9 categories.
 """
 
 import json
@@ -109,6 +110,37 @@ class TestSchemaCreators:
         assert meta["task"]["parent_task_id"] == "epic-001"
         assert meta["stats"]["handoff_count"] == 0
 
+    def test_create_harness_metadata(self):
+        from src.app.storage.memory_categories import create_harness_metadata
+
+        tool_chain = [
+            {"tool": "git_diff", "type": "shell", "order": 1, "role": "input"},
+            {"tool": "llm_call", "type": "api", "order": 2, "role": "analysis"},
+            {"tool": "comment_post", "type": "api", "order": 3, "role": "output"},
+        ]
+        meta = create_harness_metadata(
+            domain="development",
+            trigger="PR이 올라왔을 때",
+            tool_chain=tool_chain,
+            process_type="pipeline",
+            tags=["code_review", "automation"],
+            source_agent="test_agent")
+
+        assert meta["category"] == "harness"
+        assert meta["harness"]["domain"] == "development"
+        assert meta["harness"]["trigger"] == "PR이 올라왔을 때"
+        assert len(meta["harness"]["tool_chain"]) == 3
+        assert meta["harness"]["process_type"] == "pipeline"
+        assert "code_review" in meta["harness"]["tags"]
+        assert meta["stats"]["execution_count"] == 0
+        assert meta["stats"]["success_rate"] == 0.0
+        assert meta["evolution"]["current_version"] == 1
+        assert len(meta["evolution"]["history"]) == 1
+        assert meta["evolution"]["history"][0]["change_reason"] == "initial"
+        assert meta["extraction"]["auto_extracted"] is False
+        assert meta["extraction"]["user_verified"] is True
+        assert meta["extraction"]["source_agent"] == "test_agent"
+
 
 # ──────────────────────────────────────────
 # Decay Modifier Tests (All 8 Categories)
@@ -179,6 +211,30 @@ class TestDecayModifier:
         result = self._calc("procedural", meta)
         assert result == pytest.approx(0.9, abs=0.01)  # 1.0 * 0.9
 
+    # ── Harness Decay Tests ──
+
+    def test_harness_high_success(self):
+        meta = {"stats": {"success_rate": 0.9}, "extraction": {"user_verified": False}}
+        assert self._calc("harness", meta) == 1.1
+
+    def test_harness_low_success(self):
+        meta = {"stats": {"success_rate": 0.3}, "extraction": {"user_verified": False}}
+        assert self._calc("harness", meta) == 0.8
+
+    def test_harness_verified_bonus(self):
+        meta = {"stats": {"success_rate": 0.9}, "extraction": {"user_verified": True}}
+        result = self._calc("harness", meta)
+        assert result == pytest.approx(1.15, abs=0.01)  # 1.1 + 0.05, capped at 1.15
+
+    def test_harness_stale(self):
+        old = (datetime.now(timezone.utc) - timedelta(days=45)).isoformat()
+        meta = {
+            "stats": {"success_rate": 0.7, "last_executed": old},
+            "extraction": {"user_verified": False}
+        }
+        result = self._calc("harness", meta)
+        assert result == pytest.approx(0.9, abs=0.01)  # 1.0 * 0.9
+
 
 # ──────────────────────────────────────────
 # MCP Tool Registration Tests
@@ -213,13 +269,27 @@ class TestToolRegistration:
         for name in expected:
             assert name in toolkit.get_tool_names(), f"Missing tool: {name}"
 
+    def test_harness_tools_registered(self, toolkit):
+        expected = [
+            "memory_harness_record", "memory_harness_extract",
+            "memory_harness_recall", "memory_harness_execute",
+            "memory_harness_evolve", "memory_harness_list",
+            "memory_harness_compare",
+        ]
+        for name in expected:
+            assert name in toolkit.get_tool_names(), f"Missing tool: {name}"
+
+    def test_harness_tool_has_correct_category(self, toolkit):
+        desc = toolkit.get_tool_description("memory_harness_record")
+        assert desc["category"] == "harness"
+
     def test_total_tool_count(self, toolkit):
-        # 15 existing + 11 new = 26
-        assert len(toolkit.get_tool_names()) == 26
+        # 15 existing + 11 cognitive + 7 harness = 33
+        assert len(toolkit.get_tool_names()) == 33
 
     def test_tool_schemas_export(self, toolkit):
         schemas = toolkit.get_all_schemas(format="openai")
-        assert len(schemas) == 26
+        assert len(schemas) == 33
         # Verify each has function.name and function.parameters
         for schema in schemas:
             assert "function" in schema

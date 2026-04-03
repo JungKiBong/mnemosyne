@@ -24,6 +24,9 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'mirofish-secret-key')
     DEBUG = os.environ.get('FLASK_DEBUG', 'True').lower() == 'true'
 
+    # CORS configuration
+    CORS_ORIGINS = [org.strip() for org in os.environ.get('CORS_ORIGINS', '*').split(',') if org.strip()]
+
     # JSON configuration - disable ASCII escaping to display Chinese directly (not as \uXXXX)
     JSON_AS_ASCII = False
 
@@ -39,6 +42,9 @@ class Config:
 
     # Storage Backend
     STORAGE_BACKEND = os.environ.get('STORAGE_BACKEND', 'neo4j')
+
+    # Rate Limiting configuration
+    RATELIMIT_STORAGE_URI = os.environ.get('RATELIMIT_STORAGE_URI', 'memory://')
 
     # Embedding configuration
     EMBEDDING_MODEL = os.environ.get('EMBEDDING_MODEL', 'nomic-embed-text')

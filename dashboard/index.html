@@ -6,7 +6,8 @@
   <title>Mories — Memory Intelligence Dashboard</title>
   <meta name="description" content="MiroFish × Supermemory Hybrid Memory System Dashboard">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/dashboard/assets/css/tokens.css">
+    <link rel="stylesheet" href="/assets/css/tokens.css">
+  <script src="/i18n.js"></script>
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -36,50 +37,8 @@
     @keyframes float { 0%,100% { transform: translate(0,0); } 50% { transform: translate(-80px, 80px); } }
 
     /* ========== LAYOUT ========== */
-    .app { position: relative; z-index: 1; }
-
-    .topbar {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 16px 32px; border-bottom: 1px solid var(--border);
-      background: var(--glass); backdrop-filter: blur(20px);
-      position: sticky; top: 0; z-index: 100;
-    }
-    .topbar-brand {
-      display: flex; align-items: center; gap: 12px;
-    }
-    .topbar-brand .logo {
-      width: 32px; height: 32px; border-radius: 8px;
-      background: var(--gradient-primary);
-      display: flex; align-items: center; justify-content: center;
-      font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px;
-    }
-    .topbar-brand h1 {
-      font-size: 18px; font-weight: 700; letter-spacing: -0.3px;
-    }
-    .topbar-brand span {
-      font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;
-      background: var(--bg-card); padding: 2px 8px; border-radius: 4px;
-    }
-
-    .topbar-status {
-      display: flex; gap: 16px; align-items: center;
-    }
-    .status-pill {
-      display: flex; align-items: center; gap: 6px;
-      padding: 6px 14px; border-radius: 20px; font-size: 12px;
-      font-family: 'JetBrains Mono', monospace; font-weight: 500;
-      background: var(--bg-card); border: 1px solid var(--border);
-    }
-    .status-dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      animation: pulse-dot 2s ease-in-out infinite;
-    }
-    .status-dot.green { background: var(--accent-green); }
-    .status-dot.yellow { background: var(--accent-orange); }
-    .status-dot.red { background: var(--accent-red); }
-    @keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
-
-    .main-content { padding: 24px 32px; max-width: 1600px; margin: 0 auto; }
+    .app { position: relative; z-index: 1; display: flex; flex-direction: column; min-height: 100vh; }
+    .main-content { padding: 24px 32px; max-width: 1600px; margin: 0 auto; width: 100%; flex: 1; }
 
     /* ========== TABS ========== */
     .tabs {
@@ -150,7 +109,7 @@
     .timeline { display: flex; flex-direction: column; gap: 0; }
     .timeline-item {
       display: flex; gap: 16px; padding: 12px 0;
-      border-bottom: 1px solid rgba(42,42,58,0.5);
+      border-bottom: 1px solid var(--border);
       transition: background 0.2s; cursor: default;
     }
     .timeline-item:hover { background: var(--bg-card-hover); margin: 0 -20px; padding: 12px 20px; }
@@ -220,7 +179,7 @@
     /* ========== SYSTEM PANEL ========== */
     .system-item {
       display: flex; justify-content: space-between; align-items: center;
-      padding: 10px 0; border-bottom: 1px solid rgba(42,42,58,0.4);
+      padding: 10px 0; border-bottom: 1px solid var(--border);
     }
     .system-item:last-child { border-bottom: none; }
     .system-label { font-size: 12px; color: var(--text-secondary); }
@@ -239,7 +198,7 @@
     .setting-group h3 { font-size: 15px; font-weight: 600; margin-bottom: 16px; }
     .setting-row {
       display: flex; justify-content: space-between; align-items: center;
-      padding: 12px 0; border-bottom: 1px solid rgba(42,42,58,0.3);
+      padding: 12px 0; border-bottom: 1px solid var(--border);
     }
     .setting-row:last-child { border-bottom: none; }
     .setting-label { font-size: 13px; }
@@ -278,8 +237,6 @@
     }
     @media (max-width: 640px) {
       .stats-grid { grid-template-columns: 1fr; }
-      .topbar { padding: 12px 16px; }
-      .topbar-brand h1 { font-size: 15px; }
       .agents-grid { grid-template-columns: 1fr; }
     }
 
@@ -288,7 +245,7 @@
     .tab-content.active { display: block; animation: fadeIn 0.3s ease; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
   </style>
-<link rel="stylesheet" href="/dashboard/nav-component.css">
+<link rel="stylesheet" href="/nav-component.css">
 </head>
 <body>
   <div class="bg-grid"></div>
@@ -301,35 +258,35 @@
     <main class="main-content">
       <!-- TABS -->
       <div class="tabs">
-        <button class="tab active" data-tab="overview">Overview</button>
-        <button class="tab" data-tab="agents">Agent Profiles</button>
-        <button class="tab" data-tab="projects">Projects & Scopes</button>
-        <button class="tab" data-tab="access">Access Keys</button>
-        <button class="tab" data-tab="settings">Settings</button>
+        <button class="tab active" data-tab="overview" data-i18n="tab.overview">Overview</button>
+        <button class="tab" data-tab="agents" data-i18n="tab.agents">Agent Profiles</button>
+        <button class="tab" data-tab="projects" data-i18n="tab.projects">Projects & Scopes</button>
+        <button class="tab" data-tab="access" data-i18n="tab.access">Access Keys</button>
+        <button class="tab" data-tab="settings" data-i18n="tab.settings">Settings</button>
       </div>
 
       <!-- OVERVIEW TAB -->
       <div class="tab-content active" id="tab-overview">
         <div class="stats-grid">
           <div class="stat-card">
-            <div class="label">Total Agents</div>
+            <div class="label" data-i18n="stat.totalAgents">Total Agents</div>
             <div class="value" id="stat-agents">0</div>
-            <div class="change">Active in simulation</div>
+            <div class="change" data-i18n="stat.activeSimulation">Active in simulation</div>
           </div>
           <div class="stat-card">
-            <div class="label">Memories Stored</div>
+            <div class="label" data-i18n="stat.memoriesStored">Memories Stored</div>
             <div class="value" id="stat-memories">0</div>
             <div class="change" id="stat-memories-rate"></div>
           </div>
           <div class="stat-card">
-            <div class="label">Graph Nodes</div>
+            <div class="label" data-i18n="stat.graphNodes">Graph Nodes</div>
             <div class="value" id="stat-nodes">0</div>
-            <div class="change">entities + episodes</div>
+            <div class="change" data-i18n="stat.entitiesEpisodes">entities + episodes</div>
           </div>
           <div class="stat-card">
-            <div class="label">Avg Search Latency</div>
+            <div class="label" data-i18n="stat.avgLatency">Avg Search Latency</div>
             <div class="value" id="stat-latency">—</div>
-            <div class="change">ASMR 3-way parallel</div>
+            <div class="change" data-i18n="stat.asmrParallel">ASMR 3-way parallel</div>
           </div>
         </div>
 
@@ -339,7 +296,7 @@
             <div class="panel-header">
               <div class="panel-title">
                 <div class="icon" style="background:rgba(139,92,246,0.15);">🧠</div>
-                Memory Timeline
+                <span data-i18n="panel.memoryTimeline">Memory Timeline</span>
               </div>
               <div class="panel-badge">LIVE</div>
             </div>
@@ -355,40 +312,40 @@
             <div class="panel-header">
               <div class="panel-title">
                 <div class="icon" style="background:rgba(34,197,94,0.15);">⚡</div>
-                System Status
+                <span data-i18n="panel.systemStatus">System Status</span>
               </div>
             </div>
             <div class="panel-body">
               <div class="system-item">
-                <span class="system-label">Storage Backend</span>
+                <span class="system-label" data-i18n="sys.storageBackend">Storage Backend</span>
                 <span class="system-value good" id="sys-backend">—</span>
               </div>
               <div class="system-item">
-                <span class="system-label">Neo4j Connection</span>
+                <span class="system-label" data-i18n="sys.neo4jConnection">Neo4j Connection</span>
                 <span class="system-value good" id="sys-neo4j">—</span>
               </div>
               <div class="system-item">
-                <span class="system-label">Supermemory</span>
+                <span class="system-label" data-i18n="sys.supermemory">Supermemory</span>
                 <span class="system-value" id="sys-sm">—</span>
               </div>
               <div class="system-item">
-                <span class="system-label">Circuit Breaker</span>
+                <span class="system-label" data-i18n="sys.circuitBreaker">Circuit Breaker</span>
                 <span class="system-value good" id="sys-cb">—</span>
               </div>
               <div class="system-item">
-                <span class="system-label">Outbox Queue</span>
+                <span class="system-label" data-i18n="sys.outboxQueue">Outbox Queue</span>
                 <span class="system-value" id="sys-outbox">—</span>
               </div>
               <div class="system-item">
-                <span class="system-label">Observer Agents</span>
+                <span class="system-label" data-i18n="sys.observerAgents">Observer Agents</span>
                 <span class="system-value" id="sys-observers">—</span>
               </div>
               <div class="system-item">
-                <span class="system-label">LLM Provider</span>
+                <span class="system-label" data-i18n="sys.llmProvider">LLM Provider</span>
                 <span class="system-value" id="sys-llm">—</span>
               </div>
               <div class="system-item">
-                <span class="system-label">Data Adapters</span>
+                <span class="system-label" data-i18n="sys.dataAdapters">Data Adapters</span>
                 <span class="system-value good" id="sys-adapters">11 registered</span>
               </div>
             </div>
@@ -408,7 +365,7 @@
         <div class="settings-grid">
           <div class="setting-group" style="grid-column:1/-1">
             <h3 style="display:flex;justify-content:space-between;align-items:center;">
-              Memory Projects (Graphs)
+              <span data-i18n="projects.title">Memory Projects (Graphs)</span>
               <button onclick="loadGraphs()" style="padding:4px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-primary);cursor:pointer;font-size:12px;transition:background 0.2s" onmouseover="this.style.background='var(--bg-card)'" onmouseout="this.style.background='var(--bg-secondary)'">🔄 Refresh</button>
             </h3>
             <div id="projects-list" style="margin-top:16px;">
@@ -423,7 +380,7 @@
         <div class="settings-grid">
           <div class="setting-group" style="grid-column:1/-1">
             <h3 style="display:flex;justify-content:space-between;align-items:center;">
-              API Tokens (Access Control)
+              <span data-i18n="access.title">API Tokens (Access Control)</span>
               <button onclick="loadApiKeys()" style="padding:4px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-primary);cursor:pointer;font-size:12px;transition:background 0.2s" onmouseover="this.style.background='var(--bg-card)'" onmouseout="this.style.background='var(--bg-secondary)'">🔄 Refresh</button>
             </h3>
             <div style="display:flex;gap:12px;margin:16px 0;padding:16px;background:var(--bg-secondary);border-radius:8px;border:1px solid var(--border)">
@@ -436,7 +393,7 @@
                 <option value="365">1 Year</option>
                 <option value="0">Never</option>
               </select>
-              <button onclick="createApiKey()" style="padding:8px 16px;border-radius:6px;border:none;background:var(--accent-blue);color:white;cursor:pointer;font-weight:600;transition:transform 0.2s" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">Generate Key</button>
+              <button onclick="createApiKey()" style="padding:8px 16px;border-radius:6px;border:none;background:var(--accent-blue);color:white;cursor:pointer;font-weight:600;transition:transform 0.2s" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'" data-i18n="access.generateKey">Generate Key</button>
             </div>
             <div id="keys-list">
               <div style="padding:20px;text-align:center;color:var(--text-muted)">Loading access keys...</div>
@@ -449,11 +406,11 @@
       <div class="tab-content" id="tab-settings">
         <div class="settings-grid">
           <div class="setting-group">
-            <h3>Storage Backend</h3>
+            <h3 data-i18n="settings.storageBackend">Storage Backend</h3>
             <div class="setting-row">
               <div>
-                <div class="setting-label">Backend Mode</div>
-                <div class="setting-desc">Switch between Neo4j only or Hybrid mode</div>
+                <div class="setting-label" data-i18n="settings.backendMode">Backend Mode</div>
+                <div class="setting-desc" data-i18n="settings.backendModeDesc">Switch between Neo4j only or Hybrid mode</div>
               </div>
               <select class="setting-select" id="setting-backend">
                 <option value="neo4j">Neo4j Only</option>
@@ -462,8 +419,8 @@
             </div>
             <div class="setting-row">
               <div>
-                <div class="setting-label">CircuitBreaker Threshold</div>
-                <div class="setting-desc">Failures before opening circuit</div>
+                <div class="setting-label" data-i18n="settings.cbThreshold">CircuitBreaker Threshold</div>
+                <div class="setting-desc" data-i18n="settings.cbThresholdDesc">Failures before opening circuit</div>
               </div>
               <select class="setting-select" id="setting-cb-threshold">
                 <option value="3">3 failures</option>
@@ -474,11 +431,11 @@
           </div>
 
           <div class="setting-group">
-            <h3>ASMR Agents</h3>
+            <h3 data-i18n="settings.asmrAgents">ASMR Agents</h3>
             <div class="setting-row">
               <div>
-                <div class="setting-label">Observer Agents</div>
-                <div class="setting-desc">Personal / Event / Social extraction</div>
+                <div class="setting-label" data-i18n="settings.observerAgents">Observer Agents</div>
+                <div class="setting-desc" data-i18n="settings.observerDesc">Personal / Event / Social extraction</div>
               </div>
               <label class="toggle">
                 <input type="checkbox" checked id="setting-observers">
@@ -487,8 +444,8 @@
             </div>
             <div class="setting-row">
               <div>
-                <div class="setting-label">Search Agents</div>
-                <div class="setting-desc">Fact / Context / Timeline retrieval</div>
+                <div class="setting-label" data-i18n="settings.searchAgents">Search Agents</div>
+                <div class="setting-desc" data-i18n="settings.searchDesc">Fact / Context / Timeline retrieval</div>
               </div>
               <label class="toggle">
                 <input type="checkbox" checked id="setting-search">
@@ -497,8 +454,8 @@
             </div>
             <div class="setting-row">
               <div>
-                <div class="setting-label">Profile Caching</div>
-                <div class="setting-desc">Cache agent profiles across rounds</div>
+                <div class="setting-label" data-i18n="settings.profileCaching">Profile Caching</div>
+                <div class="setting-desc" data-i18n="settings.profileCacheDesc">Cache agent profiles across rounds</div>
               </div>
               <label class="toggle">
                 <input type="checkbox" checked id="setting-cache">
@@ -508,11 +465,11 @@
           </div>
 
           <div class="setting-group">
-            <h3>Data Ingestion</h3>
+            <h3 data-i18n="settings.dataIngestion">Data Ingestion</h3>
             <div class="setting-row">
               <div>
-                <div class="setting-label">Stream Ingestion</div>
-                <div class="setting-desc">Kafka / Webhook real-time feeds</div>
+                <div class="setting-label" data-i18n="settings.streamIngestion">Stream Ingestion</div>
+                <div class="setting-desc" data-i18n="settings.streamDesc">Kafka / Webhook real-time feeds</div>
               </div>
               <label class="toggle">
                 <input type="checkbox" id="setting-stream">
@@ -521,8 +478,8 @@
             </div>
             <div class="setting-row">
               <div>
-                <div class="setting-label">CSV Row Limit</div>
-                <div class="setting-desc">Max rows per CSV import</div>
+                <div class="setting-label" data-i18n="settings.csvRowLimit">CSV Row Limit</div>
+                <div class="setting-desc" data-i18n="settings.csvDesc">Max rows per CSV import</div>
               </div>
               <select class="setting-select" id="setting-csv-limit">
                 <option value="1000">1,000</option>
@@ -533,11 +490,11 @@
           </div>
 
           <div class="setting-group" style="grid-column:1/-1">
-            <h3>LLM Configuration</h3>
+            <h3 data-i18n="settings.llmConfig">LLM Configuration</h3>
             <div class="setting-row">
               <div>
-                <div class="setting-label">Provider</div>
-                <div class="setting-desc">LLM backend for NER, Observers, and Agents</div>
+                <div class="setting-label" data-i18n="settings.provider">Provider</div>
+                <div class="setting-desc" data-i18n="settings.providerDesc">LLM backend for NER, Observers, and Agents</div>
               </div>
               <select class="setting-select" id="setting-llm-provider" onchange="onProviderChange()">
                 <option value="ollama">Ollama (Local)</option>
@@ -1190,6 +1147,6 @@
     // Load settings on page load
     loadSettings();
   </script>
-<script src="/dashboard/nav-component.js"></script>
+<script src="/nav-component.js?v=2"></script>
 </body>
 </html>

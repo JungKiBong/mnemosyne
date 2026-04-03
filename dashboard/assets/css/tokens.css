@@ -1,69 +1,167 @@
-/* Mories CSS Tokens - Auto-extracted */
+/* Mories CSS Tokens - Refactored for Light/Dark Mode */
+
 :root {
+  /* Common Accent Colors */
   --accent: #6366f1;
-  --accent-amber: #f59e0b;
   --accent-blue: #4a7dff;
   --accent-cyan: #06b6d4;
-  --accent-glow: rgba(99,102,241,.15);
   --accent-green: #22c55e;
   --accent-orange: #f97316;
   --accent-pink: #ec4899;
   --accent-purple: #8b5cf6;
   --accent-red: #ef4444;
   --accent-rose: #f43f5e;
+  --accent-amber: #f59e0b;
   --accent2: #ff6b9d;
-  --bg: #0a0e1a;
-  --bg-0: #0a0a0f;
-  --bg-1: #12121a;
-  --bg-2: #16161f;
-  --bg-3: #334155;
-  --bg-card: #16161f;
-  --bg-card-hover: #1c1c28;
-  --bg-hover: #1f2b42;
-  --bg-primary: #0a0a0f;
-  --bg-secondary: #12121a;
-  --bg-surface: #1a2236;
-  --bg2: #12121a;
+  
   --blue: #448aff;
-  --blue-dim: rgba(59,130,246,.12);
-  --border: #2a2a3a;
-  --border-active: #4a4aff;
-  --border-bright: #3b4f73;
-  --border-color: #2d3452;
-  --card: #1a1a2e;
-  --card-hover: #1c1c28;
   --cyan: #06b6d4;
+  --green: #22c55e;
+  --orange: #ff9800;
+  --pink: #ec4899;
+  --purple: #ab47bc;
+  --red: #ff5252;
+  --yellow: #f59e0b;
+
+  /* Typography & Geometry */
   --font: 'Inter', -apple-system, sans-serif;
-  --glass: rgba(22, 22, 31, 0.7);
+  --mono: 'JetBrains Mono', monospace;
+  --radius: 12px;
+  --radius-sm: 8px;
+
+  /* Defaults (Light Mode Base) */
+  --bg: #f8fafc;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f1f5f9;
+  --bg-surface: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f8fafc;
+  --bg-hover: #e2e8f0;
+  
+  --border: #e2e8f0;
+  --border-active: #6366f1;
+  --border-bright: #cbd5e1;
+  --border-color: #e2e8f0;
+
+  --card: #ffffff;
+  --card-hover: #f1f5f9;
+  
+  --surface: #f8fafc;
+  --glass: rgba(255, 255, 255, 0.7);
+  --shadow: 0 4px 24px rgba(0,0,0,0.06);
+
+  --text: #0f172a;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --text-dim: #94a3b8;
+  --muted: #64748b;
+
+  --text-0: #020617;
+  --text-1: #1e293b;
+  --text-2: #334155;
+  --text2: #475569;
+  --text3: #64748b;
+  --bg-0: #f8fafc;
+  --bg-1: #f1f5f9;
+  --bg-2: #e2e8f0;
+  --bg-3: #cbd5e1;
+  --bg2: #f1f5f9;
+
+  --accent-glow: rgba(99,102,241,.15);
+  --blue-dim: rgba(59,130,246,.12);
+  --green-dim: rgba(34,197,94,.12);
+  --red-dim: rgba(239,68,68,.12);
+  --yellow-dim: rgba(245,158,11,.12);
+
   --grad: linear-gradient(135deg, #4a7dff 0%, #8b5cf6 100%);
   --gradient-1: linear-gradient(135deg, #4f8cff 0%, #8b5cf6 100%);
   --gradient-2: linear-gradient(135deg, #22c55e 0%, #06b6d4 100%);
   --gradient-3: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
   --gradient-primary: linear-gradient(135deg, #4a7dff 0%, #8b5cf6 100%);
   --gradient-warm: linear-gradient(135deg, #f97316 0%, #ec4899 100%);
-  --green: #22c55e;
-  --green-dim: rgba(34,197,94,.12);
-  --mono: 'JetBrains Mono', monospace;
-  --muted: #8888aa;
-  --orange: #ff9800;
-  --pink: #ec4899;
-  --purple: #ab47bc;
-  --radius: 12px;
-  --radius-sm: 8px;
-  --red: #ff5252;
-  --red-dim: rgba(239,68,68,.12);
-  --shadow: 0 4px 24px rgba(0,0,0,0.3);
+}
+
+/* Dark Mode Overrides (Default if prefers-color-scheme: dark and no data-theme set) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0a0e1a;
+    --bg-primary: #0a0a0f;
+    --bg-secondary: #12121a;
+    --bg-surface: #1a2236;
+    --bg-card: #16161f;
+    --bg-card-hover: #1c1c28;
+    --bg-hover: #1f2b42;
+    
+    --border: #2a2a3a;
+    --border-active: #4a4aff;
+    --border-bright: #3b4f73;
+    --border-color: #2d3452;
+    
+    --card: #1a1a2e;
+    --card-hover: #1c1c28;
+    
+    --surface: #12121e;
+    --glass: rgba(22, 22, 31, 0.7);
+    --shadow: 0 4px 24px rgba(0,0,0,0.3);
+    
+    --text: #e2e8f0;
+    --text-primary: #e8e8f0;
+    --text-secondary: #8888a0;
+    --text-muted: #6b6b80;
+    --text-dim: #94a3b8;
+    --muted: #8888aa;
+    
+    --text-0: #e8e8f0;
+    --text-1: #8888a0;
+    --text-2: #6b6b80;
+    --text2: #8888a0;
+    --text3: #6b6b80;
+    --bg-0: #0a0a0f;
+    --bg-1: #12121a;
+    --bg-2: #16161f;
+    --bg-3: #334155;
+    --bg2: #12121a;
+  }
+}
+
+/* Explicit Dark Mode Overrides */
+[data-theme="dark"] {
+  --bg: #0a0e1a;
+  --bg-primary: #0a0a0f;
+  --bg-secondary: #12121a;
+  --bg-surface: #1a2236;
+  --bg-card: #16161f;
+  --bg-card-hover: #1c1c28;
+  --bg-hover: #1f2b42;
+  
+  --border: #2a2a3a;
+  --border-active: #4a4aff;
+  --border-bright: #3b4f73;
+  --border-color: #2d3452;
+  
+  --card: #1a1a2e;
+  --card-hover: #1c1c28;
+  
   --surface: #12121e;
+  --glass: rgba(22, 22, 31, 0.7);
+  --shadow: 0 4px 24px rgba(0,0,0,0.3);
+  
   --text: #e2e8f0;
-  --text-0: #e8e8f0;
-  --text-1: #8888a0;
-  --text-2: #555568;
-  --text-dim: #94a3b8;
-  --text-muted: #555568;
   --text-primary: #e8e8f0;
   --text-secondary: #8888a0;
+  --text-muted: #6b6b80;
+  --text-dim: #94a3b8;
+  --muted: #8888aa;
+  
+  --text-0: #e8e8f0;
+  --text-1: #8888a0;
+  --text-2: #6b6b80;
   --text2: #8888a0;
-  --text3: #555568;
-  --yellow: #f59e0b;
-  --yellow-dim: rgba(245,158,11,.12);
+  --text3: #6b6b80;
+  --bg-0: #0a0a0f;
+  --bg-1: #12121a;
+  --bg-2: #16161f;
+  --bg-3: #334155;
+  --bg2: #12121a;
 }

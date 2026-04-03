@@ -220,7 +220,9 @@ def key_rotation():
     data = request.get_json(force=True)
     enc = _get_encryption()
     scope = data.get('scope')
-    result = enc.rotate_keys(scope)
+    execute = data.get('execute', False)
+    principal = data.get('principal', 'admin')
+    result = enc.rotate_keys(scope=scope, execute=execute, requesting_principal=principal)
     return jsonify(result)
 
 

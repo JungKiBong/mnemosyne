@@ -97,7 +97,15 @@ class TerminologyService:
         # But for high load we can cache the all-active query.
         
         now = time.time()
+        
+        try:
+            from app import cache_hits, cache_misses
+        except ImportError:
+            cache_hits = cache_misses = None
+            
         if now - self._cache['timestamp'] > self._cache_ttl:
+            if cache_misses:
+                cache_misses.labels(entity_type='terminology').inc()
             with self._driver.session() as session:
                 records = session.run("""
                     MATCH (t:TermMapping)
@@ -117,6 +125,9 @@ class TerminologyService:
                 """).data()
                 self._cache['active_mappings'] = records
                 self._cache['timestamp'] = now
+        else:
+            if cache_hits:
+                cache_hits.labels(entity_type='terminology').inc()
 
         all_mappings = self._cache['active_mappings']
         

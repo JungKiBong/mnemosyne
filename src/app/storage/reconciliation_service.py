@@ -232,7 +232,7 @@ class ReconciliationService:
                   AND n.last_accessed IS NOT NULL
                   AND toString(n.last_accessed) =~ '\\d{4}-\\d{2}-\\d{2}.*'
                 WITH n
-                WHERE datetime(n.last_accessed) < datetime() - duration('P30D')
+                WHERE toString(n.last_accessed) < toString(datetime() - duration('P30D'))
                 RETURN count(n) AS cnt
             """).single()["cnt"]
 
@@ -357,10 +357,10 @@ class ReconciliationService:
                   AND n.last_accessed IS NOT NULL
                   AND toString(n.last_accessed) =~ '\\d{4}-\\d{2}-\\d{2}.*'
                 WITH n
-                WHERE datetime(n.last_accessed) < datetime() - duration('P30D')
+                WHERE toString(n.last_accessed) < toString(datetime() - duration('P30D'))
                 RETURN n.uuid AS uuid, n.name AS name,
                        n.salience AS salience, n.last_accessed AS last_accessed
-                ORDER BY n.last_accessed ASC
+                ORDER BY toString(n.last_accessed) ASC
                 LIMIT 50
             """).data()
 

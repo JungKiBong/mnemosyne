@@ -6,7 +6,8 @@
     <title>Mories — Cognitive Memory Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-      <link rel="stylesheet" href="/dashboard/assets/css/tokens.css">
+      <link rel="stylesheet" href="/assets/css/tokens.css">
+  <script src="/i18n.js"></script>
   <style>
         
 
@@ -125,7 +126,7 @@
         /* Full width panel */
         .full-width { grid-column: 1 / -1; }
     </style>
-<link rel="stylesheet" href="/dashboard/nav-component.css">
+<link rel="stylesheet" href="/nav-component.css">
 </head>
 <body>
     <!-- UNIFIED NAV -->
@@ -134,13 +135,13 @@
     <!-- Page-specific toolbar -->
     <div class="header" style="border-top:none;">
         <div class="header-left">
-            <h1>🧠 <span>Cognitive Memory</span> Manager</h1>
+            <h1 data-i18n-html="memory.cogTitle">🧠 <span>Cognitive Memory</span> Manager</h1>
             <span class="header-badge">Phase 7</span>
         </div>
         <div class="header-actions">
-            <button class="btn btn-outline" onclick="refreshAll()">🔄 새로고침</button>
-            <button class="btn btn-danger" onclick="runDecay(false)">⏳ 망각 실행</button>
-            <button class="btn btn-primary" onclick="runDecay(true)">🔍 망각 시뮬레이션</button>
+            <button class="btn btn-outline" onclick="refreshAll()" data-i18n-html="memory.refresh">🔄 새로고침</button>
+            <button class="btn btn-danger" onclick="runDecay(false)" data-i18n-html="memory.runDecay">⏳ 망각 실행</button>
+            <button class="btn btn-primary" onclick="runDecay(true)" data-i18n-html="memory.simDecay">🔍 망각 시뮬레이션</button>
         </div>
     </div>
 
@@ -148,39 +149,39 @@
         <!-- Stat Cards -->
         <section class="stats-grid fade-in" id="statsGrid">
             <div class="stat-card blue">
-                <div class="stat-label">단기 기억 (STM)</div>
+                <div class="stat-label" data-i18n="memory.stm">단기 기억 (STM)</div>
                 <div class="stat-value" id="stmCount">–</div>
-                <div class="stat-sub" id="stmSub">버퍼 대기 중</div>
+                <div class="stat-sub" id="stmSub" data-i18n="memory.stmSub">버퍼 대기 중</div>
             </div>
             <div class="stat-card green">
-                <div class="stat-label">장기 기억 (LTM)</div>
+                <div class="stat-label" data-i18n="memory.ltm">장기 기억 (LTM)</div>
                 <div class="stat-value" id="ltmCount">–</div>
-                <div class="stat-sub" id="ltmSub">엔티티 + 관계</div>
+                <div class="stat-sub" id="ltmSub" data-i18n="memory.ltmSub">엔티티 + 관계</div>
             </div>
             <div class="stat-card amber">
-                <div class="stat-label">평균 Salience</div>
+                <div class="stat-label" data-i18n="memory.avgSalience">평균 Salience</div>
                 <div class="stat-value" id="avgSalience">–</div>
-                <div class="stat-sub" id="avgSub">기억 건강도</div>
+                <div class="stat-sub" id="avgSub" data-i18n="memory.avgSalienceSub">기억 건강도</div>
             </div>
             <div class="stat-card purple">
-                <div class="stat-label">아카이브 (망각됨)</div>
+                <div class="stat-label" data-i18n="memory.archived">아카이브 (망각됨)</div>
                 <div class="stat-value" id="archivedCount">–</div>
-                <div class="stat-sub">임계치 이하로 소멸</div>
+                <div class="stat-sub" data-i18n="memory.archivedSub">임계치 이하로 소멸</div>
             </div>
             <div class="stat-card cyan">
-                <div class="stat-label">총 인출 횟수</div>
+                <div class="stat-label" data-i18n="memory.totalAccess">총 인출 횟수</div>
                 <div class="stat-value" id="totalAccesses">–</div>
-                <div class="stat-sub">강화 기여</div>
+                <div class="stat-sub" data-i18n="memory.totalAccessSub">강화 기여</div>
             </div>
         </section>
 
         <!-- Tabs -->
         <div class="tabs">
-            <button class="tab active" data-tab="overview">📊 메모리 분포</button>
-            <button class="tab" data-tab="stm">📋 단기 기억(STM)</button>
-            <button class="tab" data-tab="memories">🧠 기억 목록</button>
-            <button class="tab" data-tab="pm">💎 영구 기억(PM)</button>
-            <button class="tab" data-tab="config">⚙️ 파라미터 설정</button>
+            <button class="tab active" data-tab="overview" data-i18n-html="memory.tabOverview">📊 메모리 분포</button>
+            <button class="tab" data-tab="stm" data-i18n-html="memory.tabSTM">📋 단기 기억(STM)</button>
+            <button class="tab" data-tab="memories" data-i18n-html="memory.tabList">🧠 기억 목록</button>
+            <button class="tab" data-tab="pm" data-i18n-html="memory.tabPM">💎 영구 기억(PM)</button>
+            <button class="tab" data-tab="config" data-i18n-html="memory.tabConfig">⚙️ 파라미터 설정</button>
         </div>
 
         <!-- Tab: Overview -->
@@ -189,8 +190,8 @@
                 <!-- Salience Distribution -->
                 <div class="panel">
                     <div class="panel-header">
-                        <h2>📊 Salience 분포도</h2>
-                        <span style="color:var(--text-muted);font-size:12px">기억 강도 분포</span>
+                        <h2 data-i18n-html="memory.salienceDist">📊 Salience 분포도</h2>
+                        <span style="color:var(--text-muted);font-size:12px" data-i18n="memory.salienceDistSub">기억 강도 분포</span>
                     </div>
                     <div class="panel-body">
                         <div class="chart-container">
@@ -202,7 +203,7 @@
                 <!-- At-Risk Memories -->
                 <div class="panel">
                     <div class="panel-header">
-                        <h2>⚠️ 위험 기억 (곧 망각)</h2>
+                        <h2 data-i18n-html="memory.atRisk">⚠️ 위험 기억 (곧 망각)</h2>
                     </div>
                     <div class="panel-body" id="atRiskList">
                         <p style="color:var(--text-muted);font-size:13px" class="pulse">로딩 중...</p>
@@ -212,7 +213,7 @@
                 <!-- Decay Curve Visualization -->
                 <div class="panel full-width">
                     <div class="panel-header">
-                        <h2>📉 Ebbinghaus 망각 곡선 시뮬레이션</h2>
+                        <h2 data-i18n-html="memory.ebbinghaus">📉 Ebbinghaus 망각 곡선 시뮬레이션</h2>
                         <span style="color:var(--text-muted);font-size:12px">현재 decay_rate: <strong id="currentDecayRate">0.95</strong></span>
                     </div>
                     <div class="panel-body">
@@ -229,29 +230,29 @@
             <div class="main-grid">
                 <div class="panel">
                     <div class="panel-header">
-                        <h2>📋 단기 기억 버퍼</h2>
-                        <button class="btn btn-primary btn-sm" onclick="showAddSTMModal()">+ 새 기억 추가</button>
+                        <h2 data-i18n-html="memory.stmBuffer">📋 단기 기억 버퍼</h2>
+                        <button class="btn btn-primary btn-sm" onclick="showAddSTMModal()" data-i18n="memory.addSTM">+ 새 기억 추가</button>
                     </div>
                     <div class="panel-body" id="stmList">
-                        <p style="color:var(--text-muted);font-size:13px">비어 있음</p>
+                        <p style="color:var(--text-muted);font-size:13px" data-i18n="memory.empty">비어 있음</p>
                     </div>
                 </div>
                 <div class="panel">
-                    <div class="panel-header"><h2>단기 기억 추가</h2></div>
+                    <div class="panel-header"><h2 data-i18n="memory.addSTMPanel">단기 기억 추가</h2></div>
                     <div class="panel-body">
                         <div style="margin-bottom:12px">
-                            <label style="display:block;font-size:11px;color:var(--text-muted);margin-bottom:4px">내용</label>
-                            <textarea id="stmContentInput" rows="3" style="width:100%;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);padding:10px;font-family:'Inter',sans-serif;font-size:13px;resize:vertical" placeholder="기억할 내용을 입력하세요..."></textarea>
+                            <label style="display:block;font-size:11px;color:var(--text-muted);margin-bottom:4px" data-i18n="memory.content">내용</label>
+                            <textarea id="stmContentInput" rows="3" style="width:100%;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);padding:10px;font-family:'Inter',sans-serif;font-size:13px;resize:vertical" data-i18n-placeholder="memory.contentPH" placeholder="기억할 내용을 입력하세요..."></textarea>
                         </div>
                         <div style="margin-bottom:12px">
-                            <label style="display:block;font-size:11px;color:var(--text-muted);margin-bottom:4px">출처</label>
+                            <label style="display:block;font-size:11px;color:var(--text-muted);margin-bottom:4px" data-i18n="memory.sourceLbl">출처</label>
                             <input type="text" id="stmSourceInput" value="manual" style="width:100%;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);padding:8px 10px;font-size:13px">
                         </div>
                         <div style="margin-bottom:12px">
-                            <label style="display:block;font-size:11px;color:var(--text-muted);margin-bottom:4px">TTL (초)</label>
+                            <label style="display:block;font-size:11px;color:var(--text-muted);margin-bottom:4px" data-i18n="memory.ttl">TTL (초)</label>
                             <input type="number" id="stmTTLInput" value="86400" style="width:100%;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);padding:8px 10px;font-size:13px">
                         </div>
-                        <button class="btn btn-primary" onclick="addToSTM()" style="width:100%">단기 기억에 추가</button>
+                        <button class="btn btn-primary" onclick="addToSTM()" style="width:100%" data-i18n="memory.addToSTM">단기 기억에 추가</button>
                     </div>
                 </div>
             </div>
@@ -773,6 +774,6 @@
         loadMemories();
         loadPMDashboard();
     </script>
-<script src="/dashboard/nav-component.js"></script>
+<script src="/nav-component.js?v=2"></script>
 </body>
 </html>

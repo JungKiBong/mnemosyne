@@ -65,6 +65,11 @@ def serve_synaptic_alias():
 def serve_terminology():
     return send_from_directory(get_dashboard_dir(), 'terminology.html')
 
+@core_bp.route('/harness')
+@core_bp.route('/harness.html')
+def serve_harness():
+    return send_from_directory(get_dashboard_dir(), 'harness.html')
+
 
 # --- n8n Workflow Catalog API ---
 def _detect_trigger(wf):

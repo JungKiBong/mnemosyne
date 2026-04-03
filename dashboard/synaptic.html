@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mories — Synaptic Network & Data Products</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-  <link rel="stylesheet" href="/dashboard/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <script src="/i18n.js"></script>
   <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family:'Inter',system-ui,sans-serif; background:var(--bg-0); color:var(--text-0); min-height:100vh; }
@@ -97,16 +98,16 @@ a:hover { text-decoration:underline; }
 .loading .spinner { display:inline-block; width:24px; height:24px; border:3px solid var(--bg-3); border-top-color:var(--accent-purple); border-radius:50%; animation:spin 1s linear infinite; }
 @keyframes spin { to { transform:rotate(360deg); } }
 </style>
-<link rel="stylesheet" href="/dashboard/nav-component.css">
+<link rel="stylesheet" href="/nav-component.css">
 </head>
 <body>
 
 <div id="mories-nav" data-active="synaptic"></div>
 
 <div class="tabs">
-  <div class="tab active" data-tab="network">🌐 Synaptic Network</div>
-  <div class="tab" data-tab="scopes">🏗️ Memory Scopes</div>
-  <div class="tab" data-tab="data">📦 Data Products</div>
+  <div class="tab active" data-tab="network" data-i18n-html="syn.network">🌐 Synaptic Network</div>
+  <div class="tab" data-tab="scopes" data-i18n-html="syn.scopes">🏗️ Memory Scopes</div>
+  <div class="tab" data-tab="data" data-i18n-html="syn.data">📦 Data Products</div>
 </div>
 
 <!-- ═══════════════════════════════════════ -->
@@ -115,16 +116,16 @@ a:hover { text-decoration:underline; }
 <div id="tab-network" class="tab-content active">
 <div class="panel">
   <div class="stat-grid" id="network-stats">
-    <div class="stat-card"><div class="label">🤖 전체 에이전트</div><div class="value" id="ns-agents">-</div></div>
-    <div class="stat-card"><div class="label">📡 전체 이벤트</div><div class="value" id="ns-events">-</div></div>
-    <div class="stat-card"><div class="label">🔗 공유 횟수</div><div class="value" id="ns-shares">-</div></div>
-    <div class="stat-card"><div class="label">💚 공감 강화</div><div class="value" id="ns-boosts">-</div></div>
+    <div class="stat-card"><div class="label" data-i18n-html="syn.totalAgents">🤖 전체 에이전트</div><div class="value" id="ns-agents">-</div></div>
+    <div class="stat-card"><div class="label" data-i18n-html="syn.totalEvents">📡 전체 이벤트</div><div class="value" id="ns-events">-</div></div>
+    <div class="stat-card"><div class="label" data-i18n-html="syn.shareCount">🔗 공유 횟수</div><div class="value" id="ns-shares">-</div></div>
+    <div class="stat-card"><div class="label" data-i18n-html="syn.empathyBoost">💚 공감 강화</div><div class="value" id="ns-boosts">-</div></div>
   </div>
 
-  <h3 style="margin-bottom:14px;">🤖 등록된 에이전트</h3>
+  <h3 style="margin-bottom:14px;" data-i18n-html="syn.registeredAgents">🤖 등록된 에이전트</h3>
   <div class="agent-list" id="agent-list"></div>
 
-  <h3 style="margin:20px 0 14px;">📡 이벤트 피드</h3>
+  <h3 style="margin:20px 0 14px;" data-i18n-html="syn.eventFeed">📡 이벤트 피드</h3>
   <div class="event-feed" id="event-feed">
     <div class="loading"><span class="spinner"></span> 로딩 중...</div>
   </div>
@@ -136,21 +137,21 @@ a:hover { text-decoration:underline; }
 <!-- ═══════════════════════════════════════ -->
 <div id="tab-scopes" class="tab-content">
 <div class="panel">
-  <h3 style="margin-bottom:14px;">🏗️ 4-Tier 기억 계층</h3>
+  <h3 style="margin-bottom:14px;" data-i18n-html="syn.scopeHierarchy">🏗️ 4-Tier 기억 계층</h3>
   <div class="scope-ladder" id="scope-ladder"></div>
 
   <div class="chart-row">
     <div class="chart-container">
-      <h4 style="margin-bottom:12px;font-size:.9rem;">스코프 분포</h4>
+      <h4 style="margin-bottom:12px;font-size:.9rem;" data-i18n="syn.scopeDistrib">스코프 분포</h4>
       <canvas id="scope-chart" height="200"></canvas>
     </div>
     <div class="chart-container">
-      <h4 style="margin-bottom:12px;font-size:.9rem;">소스 타입 분포</h4>
+      <h4 style="margin-bottom:12px;font-size:.9rem;" data-i18n="syn.sourceDistrib">소스 타입 분포</h4>
       <canvas id="source-chart" height="200"></canvas>
     </div>
   </div>
 
-  <h3 style="margin:20px 0 14px;">⬆️ 승격 후보 <span style="font-size:.75rem;color:var(--text-2);">(salience ≥ 0.8)</span></h3>
+  <h3 style="margin:20px 0 14px;" data-i18n-html="syn.promotionCandidates">⬆️ 승격 후보 <span style="font-size:.75rem;color:var(--text-2);">(salience ≥ 0.8)</span></h3>
   <div id="candidates-list"></div>
 </div>
 </div>
@@ -160,10 +161,10 @@ a:hover { text-decoration:underline; }
 <!-- ═══════════════════════════════════════ -->
 <div id="tab-data" class="tab-content">
 <div class="panel">
-  <h3 style="margin-bottom:14px;">📦 AI-Ready Data Products</h3>
+  <h3 style="margin-bottom:14px;" data-i18n-html="syn.dataProducts">📦 AI-Ready Data Products</h3>
   <div class="product-grid" id="product-grid"></div>
 
-  <h3 style="margin:24px 0 14px;">📋 생성된 Manifests</h3>
+  <h3 style="margin:24px 0 14px;" data-i18n-html="syn.manifests">📋 생성된 Manifests</h3>
   <div class="manifest-list" id="manifest-list">
     <div class="loading"><span class="spinner"></span> 로딩 중...</div>
   </div>
@@ -199,7 +200,7 @@ async function loadNetworkStats() {
 async function loadAgents() {
   const agents = await fetch(API + '/api/memory/synaptic/agents').then(r => r.json());
   const el = document.getElementById('agent-list');
-  if (!agents.length) { el.innerHTML = '<p style="color:var(--text-2);font-size:.85rem;">등록된 에이전트 없음</p>'; return; }
+  if (!agents.length) { el.innerHTML = `<p style="color:var(--text-2);font-size:.85rem;">${window.t('syn.noAgents')}</p>`; return; }
   el.innerHTML = agents.map(a => `
     <div class="agent-card">
       <div class="agent-name">
@@ -207,9 +208,9 @@ async function loadAgents() {
         <span class="agent-role">${a.role}</span>
       </div>
       <div class="agent-stats">
-        <span>📤 공유: ${a.shared_count || 0}</span>
-        <span>📥 수신: ${a.received_count || 0}</span>
-        <span>🔖 구독: ${(a.subscribed_scopes || []).join(', ')}</span>
+        <span>📤 ${window.t('syn.shared')}: ${a.shared_count || 0}</span>
+        <span>📥 ${window.t('syn.received')}: ${a.received_count || 0}</span>
+        <span>🔖 ${window.t('syn.subscribed')}: ${(a.subscribed_scopes || []).join(', ')}</span>
       </div>
     </div>
   `).join('');
@@ -218,7 +219,7 @@ async function loadAgents() {
 async function loadEvents() {
   const events = await fetch(API + '/api/memory/synaptic/events?limit=30').then(r => r.json());
   const el = document.getElementById('event-feed');
-  if (!events.length) { el.innerHTML = '<p style="color:var(--text-2);font-size:.85rem;">이벤트 없음</p>'; return; }
+  if (!events.length) { el.innerHTML = `<p style="color:var(--text-2);font-size:.85rem;">${window.t('syn.noEvents')}</p>`; return; }
   el.innerHTML = events.map(e => {
     const icon = e.event_type === 'share' ? '🔗' : '💚';
     const ago = timeAgo(e.created_at);
@@ -292,12 +293,12 @@ async function loadScopes() {
   // Candidates
   const candidates = await fetch(API + '/api/memory/scopes/candidates?scope=personal').then(r => r.json());
   const cEl = document.getElementById('candidates-list');
-  if (!candidates.length) { cEl.innerHTML = '<p style="color:var(--text-2);font-size:.85rem;">현재 승격 후보 없음</p>'; return; }
+  if (!candidates.length) { cEl.innerHTML = `<p style="color:var(--text-2);font-size:.85rem;">${window.t('syn.noCandidates')}</p>`; return; }
   cEl.innerHTML = candidates.map(c => `
     <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg-2);border-radius:8px;margin-bottom:6px;">
       <span style="font-weight:600;flex:1;">${c.name}</span>
       <span style="font-size:.8rem;color:var(--accent-green);">salience: ${c.salience?.toFixed(3)}</span>
-      <button class="btn btn-primary btn-small" onclick="promoteMemory('${c.uuid}','tribal')">→ Tribal 승격</button>
+      <button class="btn btn-primary btn-small" onclick="promoteMemory('${c.uuid}','tribal')">→ ${window.t('syn.promoteTribal')}</button>
     </div>
   `).join('');
 }
@@ -324,8 +325,8 @@ async function loadDataProducts() {
       <h3>${icons[p.id]||'📦'} ${p.name}</h3>
       <p>${p.description}</p>
       <div class="product-actions">
-        ${p.download ? `<a href="${p.download}" class="btn btn-primary btn-small" download>⬇️ 다운로드</a>` : ''}
-        <button class="btn btn-secondary btn-small" onclick="previewProduct('${p.endpoint}','${p.method||'GET'}')">👁️ 미리보기</button>
+        ${p.download ? `<a href="${p.download}" class="btn btn-primary btn-small" download>⬇️ ${window.t('download')}</a>` : ''}
+        <button class="btn btn-secondary btn-small" onclick="previewProduct('${p.endpoint}','${p.method||'GET'}')">👁️ ${window.t('view')}</button>
       </div>
     </div>
   `).join('');
@@ -333,7 +334,7 @@ async function loadDataProducts() {
   // Manifests
   const manifests = await fetch(API + '/api/memory/data/manifest/list').then(r => r.json());
   const ml = document.getElementById('manifest-list');
-  if (!manifests.length) { ml.innerHTML = '<p style="color:var(--text-2);font-size:.85rem;">아직 생성된 Manifest 없음</p>'; return; }
+  if (!manifests.length) { ml.innerHTML = `<p style="color:var(--text-2);font-size:.85rem;">${window.t('syn.noManifests')}</p>`; return; }
   ml.innerHTML = manifests.map(m => `
     <div class="manifest-item">
       <div>
@@ -347,10 +348,10 @@ async function loadDataProducts() {
 
 function previewProduct(endpoint, method) {
   if (method === 'POST') {
-    const name = prompt('Manifest 이름을 입력하세요:');
+    const name = prompt(window.t('syn.enterManifestName'));
     if (!name) return;
     fetch(endpoint, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, description:'Created from dashboard'})})
-      .then(r=>r.json()).then(d => { alert(`✅ Manifest 생성: ${d.manifest_id?.slice(0,8)}`); loadDataProducts(); });
+      .then(r=>r.json()).then(d => { alert(`✅ Manifest: ${d.manifest_id?.slice(0,8)}`); loadDataProducts(); });
   } else {
     window.open(endpoint, '_blank');
   }
@@ -360,12 +361,13 @@ function previewProduct(endpoint, method) {
 // Utils
 // ═══════════════════════════════════════
 function timeAgo(ts) {
+  if (window.formatTimeAgo) return window.formatTimeAgo(ts);
   if (!ts) return '';
   const diff = (Date.now() - new Date(ts).getTime()) / 1000;
-  if (diff < 60) return Math.floor(diff) + '초 전';
-  if (diff < 3600) return Math.floor(diff/60) + '분 전';
-  if (diff < 86400) return Math.floor(diff/3600) + '시간 전';
-  return Math.floor(diff/86400) + '일 전';
+  if (diff < 60) return Math.floor(diff) + 's ago';
+  if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+  return Math.floor(diff/86400) + 'd ago';
 }
 
 // ═══════════════════════════════════════
@@ -378,6 +380,6 @@ async function init() {
 }
 init();
 </script>
-<script src="/dashboard/nav-component.js"></script>
+<script src="/nav-component.js?v=2"></script>
 </body>
 </html>

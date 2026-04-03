@@ -8,6 +8,16 @@ import sys
 import logging
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
+from pythonjsonlogger import jsonlogger
+from flask import has_request_context, request
+
+class CorrelationFilter(logging.Filter):
+    def filter(self, record):
+        if has_request_context() and hasattr(request, 'correlation_id'):
+            record.correlation_id = request.correlation_id
+        else:
+            record.correlation_id = "N/A"
+        return True
 
 
 def _ensure_utf8_stdout():
@@ -52,15 +62,9 @@ def setup_logger(name: str = 'mirofish', level: int = logging.DEBUG) -> logging.
     if logger.handlers:
         return logger
 
-    # Log formats
-    detailed_formatter = logging.Formatter(
-        '[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-
-    simple_formatter = logging.Formatter(
-        '[%(asctime)s] %(levelname)s: %(message)s',
-        datefmt='%H:%M:%S'
+    # Log formats - Use JSON formatter for structured logging
+    json_formatter = jsonlogger.JsonFormatter(
+        '%(asctime)s %(levelname)s %(correlation_id)s %(name)s %(message)s'
     )
 
     # 1. File handler - detailed logs (named by date, with rotation)
@@ -72,14 +76,16 @@ def setup_logger(name: str = 'mirofish', level: int = logging.DEBUG) -> logging.
         encoding='utf-8'
     )
     file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(detailed_formatter)
+    file_handler.setFormatter(json_formatter)
+    file_handler.addFilter(CorrelationFilter())
 
     # 2. Console handler - concise logs (INFO and above)
     # Ensure UTF-8 encoding on Windows to avoid Chinese character issues
     _ensure_utf8_stdout()
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(simple_formatter)
+    console_handler.setFormatter(json_formatter)
+    console_handler.addFilter(CorrelationFilter())
 
     # Add handlers
     logger.addHandler(file_handler)

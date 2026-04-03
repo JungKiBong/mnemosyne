@@ -15,6 +15,27 @@ from flask_cors import CORS
 from .config import Config
 from .utils.logger import setup_logger, get_logger
 
+import uuid
+import time
+from prometheus_client import make_wsgi_app, Counter, Histogram
+from werkzeug.middleware.dispatcher import DispatcherMiddleware
+
+from prometheus_client import REGISTRY
+
+def _get_or_create_metric(MetricClass, name, desc, labels):
+    try:
+        return MetricClass(name, desc, labels)
+    except ValueError:
+        # Metric already exists (e.g. during pytest collection)
+        return REGISTRY._names_to_collectors[name.replace('_total', '') if '_total' in name and MetricClass == Counter else name]
+
+# Metrics definitions
+request_count = _get_or_create_metric(Counter, 'http_requests_total', 'Total HTTP Requests', ['method', 'endpoint', 'http_status'])
+request_latency = _get_or_create_metric(Histogram, 'http_request_duration_seconds', 'HTTP Request Duration', ['endpoint'])
+neo4j_query_latency = _get_or_create_metric(Histogram, 'neo4j_query_duration_seconds', 'Neo4j Query Duration', ['operation', 'status'])
+cache_hits = _get_or_create_metric(Counter, 'memory_cache_hits_total', 'Memory Cache Hits', ['entity_type'])
+cache_misses = _get_or_create_metric(Counter, 'memory_cache_misses_total', 'Memory Cache Misses', ['entity_type'])
+
 
 def create_app(config_class=Config):
     """Flask application factory function"""
@@ -25,6 +46,35 @@ def create_app(config_class=Config):
     # Flask >= 2.3 uses app.json.ensure_ascii, older versions use JSON_AS_ASCII config
     if hasattr(app, 'json') and hasattr(app.json, 'ensure_ascii'):
         app.json.ensure_ascii = False
+
+    # Custom JSON provider: handle Neo4j DateTime and Python datetime objects
+    from flask.json.provider import DefaultJSONProvider
+    import json
+    from datetime import datetime as _dt, date as _date
+
+    class MirofishJSONProvider(DefaultJSONProvider):
+        ensure_ascii = False
+
+        @staticmethod
+        def default(o):
+            # Neo4j DateTime / Date / Time / Duration
+            try:
+                import neo4j.time
+                if isinstance(o, (neo4j.time.DateTime, neo4j.time.Date, neo4j.time.Time)):
+                    return o.iso_format()
+                if isinstance(o, neo4j.time.Duration):
+                    return str(o)
+            except ImportError:
+                pass
+            # Standard Python datetime / date
+            if isinstance(o, _dt):
+                return o.isoformat()
+            if isinstance(o, _date):
+                return o.isoformat()
+            return super().default(o)
+
+    app.json_provider_class = MirofishJSONProvider
+    app.json = MirofishJSONProvider(app)
 
     # Setup logging
     logger = setup_logger('mirofish')
@@ -40,7 +90,8 @@ def create_app(config_class=Config):
         logger.info("=" * 50)
 
     # Enable CORS
-    CORS(app, resources={r"/api/*": {"origins": "*"}})
+    cors_origins = app.config.get('CORS_ORIGINS', ['*'])
+    CORS(app, resources={r"/api/*": {"origins": cors_origins}})
 
     # Initialize Rate Limiter
     from .utils.limiter import limiter
@@ -109,7 +160,12 @@ def create_app(config_class=Config):
     if should_log_startup:
         logger.info("Simulation process cleanup function registered")
 
-    # Request logging middleware
+    # Request tracking middleware
+    @app.before_request
+    def set_request_tracking():
+        request.correlation_id = request.headers.get('X-Correlation-ID', str(uuid.uuid4()))
+        request.start_time = time.time()
+
     @app.before_request
     def log_request():
         logger = get_logger('mirofish.request')
@@ -118,9 +174,24 @@ def create_app(config_class=Config):
             logger.debug(f"Request body: {request.get_json(silent=True)}")
 
     @app.after_request
-    def log_response(response):
+    def log_response_and_metrics(response):
+        # Set correlation ID
+        if hasattr(request, 'correlation_id'):
+            response.headers['X-Correlation-ID'] = request.correlation_id
+            
         logger = get_logger('mirofish.request')
         logger.debug(f"Response: {response.status_code}")
+        
+        # Record metrics (except for /metrics endpoint itself to avoid noise)
+        if request.path != '/metrics':
+            latency = time.time() - getattr(request, 'start_time', time.time())
+            request_latency.labels(endpoint=request.path).observe(latency)
+            request_count.labels(
+                method=request.method,
+                endpoint=request.path,
+                http_status=response.status_code
+            ).inc()
+            
         return response
 
     # Register blueprints
@@ -163,6 +234,12 @@ def create_app(config_class=Config):
         logger.info("Dashboard: http://localhost:5001/")
         logger.info("Health API: http://localhost:5001/api/health")
         logger.info("MCP Endpoint: http://localhost:5001/api/mcp")
+        logger.info("Metrics: http://localhost:5001/metrics")
+
+    # Mount prometheus WSGI app on /metrics
+    app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {
+        '/metrics': make_wsgi_app()
+    })
 
     return app
 

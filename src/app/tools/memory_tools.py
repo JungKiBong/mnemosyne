@@ -438,6 +438,105 @@ class MoriesToolkit:
             ],
         )
 
+        # ── Harness Memory Tools (Evolutionary Process Patterns) ──
+
+        # 27. memory_harness_record
+        self._tools["memory_harness_record"] = ToolDefinition(
+            name="memory_harness_record",
+            description="프로세스 패턴(harness)을 수동 등록. 도메인·트리거·도구 체인·데이터 흐름을 구조화하여 저장.",
+            category="harness",
+            parameters=[
+                ToolParameter("domain", "string", "도메인 분류 (e.g., development, devops, research)"),
+                ToolParameter("trigger", "string", "프로세스 시작 조건 (e.g., 'PR이 올라왔을 때')"),
+                ToolParameter("tool_chain", "array", "도구 체인 [{tool, type, order, role}]"),
+                ToolParameter("description", "string", "프로세스 설명", required=False),
+                ToolParameter("process_type", "string", "아키텍처 패턴 (pipeline|fan_out|expert_pool|supervisor)", required=False, default="pipeline"),
+                ToolParameter("data_flow", "object", "데이터 흐름 {input, intermediate, output}", required=False),
+                ToolParameter("tags", "array", "분류 태그", required=False),
+                ToolParameter("agent_id", "string", "등록 에이전트 ID", required=False, default="system"),
+                ToolParameter("scope", "string", "공유 범위 (personal|tribal|global)", required=False, default="tribal"),
+            ],
+        )
+
+        # 28. memory_harness_extract
+        self._tools["memory_harness_extract"] = ToolDefinition(
+            name="memory_harness_extract",
+            description="실행 로그에서 프로세스 패턴을 자동 추출. 유사 패턴 존재 시 기존 harness에 병합.",
+            category="harness",
+            parameters=[
+                ToolParameter("execution_log", "object", "실행 로그 {steps, trigger, overall_success, execution_time_ms}"),
+                ToolParameter("domain", "string", "도메인 분류", required=False, default="general"),
+                ToolParameter("agent_id", "string", "추출 에이전트 ID", required=False, default="system"),
+                ToolParameter("min_tools", "number", "최소 도구 수 (이 미만이면 스킵)", required=False, default=2),
+            ],
+        )
+
+        # 29. memory_harness_recall
+        self._tools["memory_harness_recall"] = ToolDefinition(
+            name="memory_harness_recall",
+            description="도메인/트리거/태그 기반으로 적합한 프로세스 패턴(harness) 조회. 성공률 필터 지원.",
+            category="harness",
+            parameters=[
+                ToolParameter("domain", "string", "도메인 필터", required=False),
+                ToolParameter("trigger", "string", "트리거 텍스트 검색", required=False),
+                ToolParameter("tags", "array", "태그 필터 (OR 검색)", required=False),
+                ToolParameter("agent_id", "string", "RBAC 에이전트 ID", required=False, default="system"),
+                ToolParameter("min_success_rate", "number", "최소 성공률 필터 (0.0~1.0)", required=False, default=0.0),
+                ToolParameter("limit", "number", "최대 결과 수", required=False, default=10),
+            ],
+        )
+
+        # 30. memory_harness_execute
+        self._tools["memory_harness_execute"] = ToolDefinition(
+            name="memory_harness_execute",
+            description="프로세스 실행 결과 기록. 성공률·실행시간 자동 집계, 도구 체인 변경 시 자동 진화.",
+            category="harness",
+            parameters=[
+                ToolParameter("harness_uuid", "string", "harness 메모리 UUID"),
+                ToolParameter("success", "boolean", "실행 성공 여부"),
+                ToolParameter("execution_time_ms", "number", "실행 시간(ms)", required=False, default=0),
+                ToolParameter("result_summary", "string", "실행 결과 요약", required=False),
+                ToolParameter("new_tool_chain", "array", "변경된 도구 체인 (자동 진화 트리거)", required=False),
+            ],
+        )
+
+        # 31. memory_harness_evolve
+        self._tools["memory_harness_evolve"] = ToolDefinition(
+            name="memory_harness_evolve",
+            description="프로세스 패턴을 수동 진화 (새 버전 생성). 변경 이유와 새 도구 체인 필수.",
+            category="harness",
+            parameters=[
+                ToolParameter("harness_uuid", "string", "harness 메모리 UUID"),
+                ToolParameter("new_tool_chain", "array", "새로운 도구 체인"),
+                ToolParameter("change_reason", "string", "변경 이유"),
+                ToolParameter("new_data_flow", "object", "변경된 데이터 흐름", required=False),
+            ],
+        )
+
+        # 32. memory_harness_list
+        self._tools["memory_harness_list"] = ToolDefinition(
+            name="memory_harness_list",
+            description="도메인별 harness 프로세스 패턴 카탈로그 조회.",
+            category="harness",
+            parameters=[
+                ToolParameter("domain", "string", "도메인 필터", required=False),
+                ToolParameter("agent_id", "string", "RBAC 에이전트 ID (all=모두)", required=False, default="system"),
+                ToolParameter("include_low_success", "boolean", "성공률 낮은 harness 포함 여부", required=False, default=False),
+            ],
+        )
+
+        # 33. memory_harness_compare
+        self._tools["memory_harness_compare"] = ToolDefinition(
+            name="memory_harness_compare",
+            description="harness의 두 버전 간 변경 이력과 성공률 차이 비교.",
+            category="harness",
+            parameters=[
+                ToolParameter("harness_uuid", "string", "harness 메모리 UUID"),
+                ToolParameter("version_a", "number", "비교 대상 버전 A (기본값: 직전 버전)", required=False),
+                ToolParameter("version_b", "number", "비교 대상 버전 B (기본값: 최신 버전)", required=False),
+            ],
+        )
+
     # ──────────────────────────────────────────
     # Tool Execution
     # ──────────────────────────────────────────
@@ -794,6 +893,75 @@ class MoriesToolkit:
     def _exec_memory_active_tasks(self, agent_id: str = None) -> dict:
         mgr = self._get_category_manager()
         return {"tasks": mgr.get_active_tasks(agent_id=agent_id)}
+
+    # ── Harness Memory Handlers ──
+
+    def _exec_memory_harness_record(self, domain: str, trigger: str,
+                                     tool_chain: list, description: str = "",
+                                     process_type: str = "pipeline",
+                                     data_flow: dict = None, tags: list = None,
+                                     agent_id: str = "system",
+                                     scope: str = "tribal") -> dict:
+        mgr = self._get_category_manager()
+        return mgr.record_harness(
+            domain=domain, trigger=trigger, tool_chain=tool_chain,
+            description=description, process_type=process_type,
+            data_flow=data_flow, tags=tags, agent_id=agent_id, scope=scope)
+
+    def _exec_memory_harness_extract(self, execution_log: dict,
+                                      domain: str = "general",
+                                      agent_id: str = "system",
+                                      min_tools: int = 2) -> dict:
+        mgr = self._get_category_manager()
+        return mgr.extract_harness_from_log(
+            execution_log=execution_log, domain=domain,
+            agent_id=agent_id, min_tools=min_tools)
+
+    def _exec_memory_harness_recall(self, domain: str = None,
+                                     trigger: str = None, tags: list = None,
+                                     agent_id: str = "system",
+                                     min_success_rate: float = 0.0,
+                                     limit: int = 10) -> dict:
+        mgr = self._get_category_manager()
+        return {"harnesses": mgr.recall_harness(
+            domain=domain, trigger=trigger, tags=tags,
+            agent_id=agent_id, min_success_rate=min_success_rate, limit=limit)}
+
+    def _exec_memory_harness_execute(self, harness_uuid: str, success: bool,
+                                      execution_time_ms: int = 0,
+                                      result_summary: str = "",
+                                      new_tool_chain: list = None) -> dict:
+        mgr = self._get_category_manager()
+        return mgr.record_harness_execution(
+            harness_uuid=harness_uuid, success=success,
+            execution_time_ms=execution_time_ms,
+            result_summary=result_summary,
+            new_tool_chain=new_tool_chain)
+
+    def _exec_memory_harness_evolve(self, harness_uuid: str,
+                                     new_tool_chain: list,
+                                     change_reason: str,
+                                     new_data_flow: dict = None) -> dict:
+        mgr = self._get_category_manager()
+        return mgr.evolve_harness(
+            harness_uuid=harness_uuid, new_tool_chain=new_tool_chain,
+            change_reason=change_reason, new_data_flow=new_data_flow)
+
+    def _exec_memory_harness_list(self, domain: str = None,
+                                   agent_id: str = "system",
+                                   include_low_success: bool = False) -> dict:
+        mgr = self._get_category_manager()
+        return {"harnesses": mgr.list_harnesses(
+            domain=domain, agent_id=agent_id,
+            include_low_success=include_low_success)}
+
+    def _exec_memory_harness_compare(self, harness_uuid: str,
+                                      version_a: int = None,
+                                      version_b: int = None) -> dict:
+        mgr = self._get_category_manager()
+        return mgr.compare_harness_versions(
+            harness_uuid=harness_uuid,
+            version_a=version_a, version_b=version_b)
 
     # ── Helpers ──
 

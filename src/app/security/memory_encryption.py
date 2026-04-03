@@ -370,23 +370,88 @@ class MemoryEncryption:
         summary["total"] = summary["encrypted"] + summary["cleartext"]
         return summary
 
-    def rotate_keys(self, scope: str = None) -> Dict[str, Any]:
+    def rotate_keys(self, scope: str = None, execute: bool = False, requesting_principal: str = "admin") -> Dict[str, Any]:
         """
-        Key rotation: decrypt all → regenerate keys → re-encrypt.
+        Key rotation: decrypt all target memories → generate new master key → re-encrypt.
 
         Warning: This is a heavy operation. Run during maintenance windows.
         """
-        # For now, return info about what would happen
-        status = self.get_encryption_status()
-        target_count = status["encrypted"]
+        status_info = self.get_encryption_status()
+        
+        target_count = status_info["encrypted"]
         if scope:
-            target_count = status["by_scope"].get(scope, {}).get("encrypted", 0)
+            target_count = status_info.get("by_scope", {}).get(scope, {}).get("encrypted", 0)
 
+        if not execute:
+            return {
+                "status": "key_rotation_planned",
+                "target_scope": scope or "all",
+                "memories_to_rotate": target_count,
+                "warning": "Key rotation requires maintenance window. Pass execute=true to proceed.",
+            }
+            
+        if target_count == 0:
+            return {"status": "no_memories_to_rotate", "target_scope": scope or "all"}
+            
+        logger.info(f"Starting key rotation by {requesting_principal} for scope: {scope or 'all'}")
+        
+        # We must rotate EVERYTHING if we change the master key.
+        if scope:
+            logger.warning("Scope-specific rotation is not fully isolated from master key; assuming all-scope rotation for master key refresh.")
+
+        # Step 1: Backup & Decrypt all globally
+        with self._driver.session() as session:
+            records = session.run("MATCH (e:Entity) WHERE e.encrypted = true RETURN e.uuid AS uuid").data()
+
+        results = {"scope": "all", "total": len(records), "rotated": 0, "errors": 0}
+        
+        decrypted_cache = {}
+        for rec in records:
+            memory_uuid = rec["uuid"]
+            decrypt_result = self.decrypt_memory(memory_uuid, requesting_principal)
+            if decrypt_result.get("error"):
+                logger.error(f"Failed to decrypt {memory_uuid}: {decrypt_result['error']}")
+                results["errors"] += 1
+                continue
+            decrypted_cache[memory_uuid] = decrypt_result.get("decrypted_fields", {})
+
+            # Remove encryption
+            self.remove_encryption(memory_uuid, removed_by=requesting_principal)
+
+        # Step 2: Regenerate Master Key
+        env_key = os.environ.get('MORIES_MASTER_KEY')
+        if env_key:
+            return {
+                "error": "Cannot auto-rotate master key when MORIES_MASTER_KEY is in environment. Update env manually after decryption.",
+                "status": "decrypted_only",
+                "decrypted_count": len(decrypted_cache)
+            }
+            
+        from cryptography.fernet import Fernet
+        new_key = Fernet.generate_key()
+        key_path = os.path.join(os.path.dirname(__file__), '../../.encryption_key')
+        try:
+            os.makedirs(os.path.dirname(key_path), exist_ok=True)
+            with open(key_path, 'wb') as f:
+                f.write(new_key)
+            self._master_key = new_key
+            logger.info("New master encryption key generated successfully.")
+        except Exception as e:
+            logger.error(f"Failed to persist new key: {e}")
+            return {"error": f"Failed to write new key: {e}", "status": "decrypted_only"}
+
+        # Step 3: Re-encrypt
+        for memory_uuid, fields_dict in decrypted_cache.items():
+            enc_res = self.encrypt_memory(memory_uuid, fields=list(fields_dict.keys()), encrypted_by=requesting_principal)
+            if enc_res.get("status") == "encrypted":
+                results["rotated"] += 1
+            else:
+                results["errors"] += 1
+                
+        logger.info(f"🔑 Key rotation completed: {results['rotated']} rotated, {results['errors']} errors")
         return {
-            "status": "key_rotation_planned",
-            "target_scope": scope or "all",
-            "memories_to_rotate": target_count,
-            "warning": "Key rotation requires maintenance window. Use /api/security/rotate with confirm=true",
+            "status": "key_rotation_completed",
+            "results": results
         }
 
 

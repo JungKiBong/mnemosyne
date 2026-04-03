@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mories — Terminology Management</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/dashboard/assets/css/tokens.css">
-    <link rel="stylesheet" href="/dashboard/nav-component.css">
+    <link rel="stylesheet" href="/assets/css/tokens.css">
+    <script src="/i18n.js"></script>
+    <link rel="stylesheet" href="/nav-component.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; }
@@ -74,9 +75,9 @@
         <div class="main-grid">
             <div class="panel">
                 <div class="panel-header">
-                    <h2>Active Mappings</h2>
+                    <h2 data-i18n="term.activeMappings">Active Mappings</h2>
                     <select id="scopeFilter" class="form-control" style="width:auto;padding:4px 8px;font-size:12px" onchange="loadMappings()">
-                        <option value="">All Scopes</option>
+                        <option value="" data-i18n="term.allScopes">All Scopes</option>
                         <option value="Personal">Personal</option>
                         <option value="Tribal">Tribal</option>
                         <option value="Global">Global</option>
@@ -87,11 +88,11 @@
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th>Source Term</th>
-                                    <th>Standard Term</th>
-                                    <th>Scope</th>
-                                    <th>Created At</th>
-                                    <th>Actions</th>
+                                    <th data-i18n="term.sourceTerm">Source Term</th>
+                                    <th data-i18n="term.standardTerm">Standard Term</th>
+                                    <th data-i18n="term.scope">Scope</th>
+                                    <th data-i18n="term.createdAt">Created At</th>
+                                    <th data-i18n="actions">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="mappingsTableBody">
@@ -103,7 +104,7 @@
                     </div>
 
                     <div id="migrationPreview">
-                        <h3 style="font-size:14px;color:var(--accent-amber);margin-bottom:8px">Migration Preview</h3>
+                        <h3 style="font-size:14px;color:var(--accent-amber);margin-bottom:8px" data-i18n="term.migrationPreview">Migration Preview</h3>
                         <p style="font-size:12px" id="previewMsg"></p>
                         <div class="preview-list" id="previewList"></div>
                         <div style="margin-top:12px;display:flex;gap:8px">
@@ -156,7 +157,7 @@
     </div>
 
     <!-- Include Nav Script -->
-    <script src="/dashboard/nav-component.js"></script>
+    <script src="/nav-component.js?v=2"></script>
     <script>
         let currentPreviewUuid = null;
 

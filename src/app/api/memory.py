@@ -327,6 +327,7 @@ logger = logging.getLogger('mirofish.api.synaptic')
 
 
 def _get_bridge():
+    from flask import current_app
     from ..storage.synaptic_bridge import SynapticBridge
     driver = current_app.extensions.get('neo4j_driver')
     return SynapticBridge(driver=driver)
@@ -433,6 +434,7 @@ logger = logging.getLogger('mirofish.api.audit')
 
 def _get_audit():
     """Get MemoryAudit instance with shared Neo4j driver."""
+    from flask import current_app
     from ..storage.memory_audit import MemoryAudit
     driver = current_app.extensions.get('neo4j_driver')
     return MemoryAudit(driver=driver)
@@ -602,6 +604,7 @@ _cat_manager = None
 def _get_pm():
     global _pm_manager
     if _pm_manager is None:
+        from flask import current_app
         from ..storage.permanent_memory import PermanentMemoryManager
         driver = current_app.extensions.get('neo4j_driver')
         _pm_manager = PermanentMemoryManager(driver=driver)
@@ -611,6 +614,7 @@ def _get_pm():
 def _get_cat():
     global _cat_manager
     if _cat_manager is None:
+        from flask import current_app
         from ..storage.memory_categories import MemoryCategoryManager
         driver = current_app.extensions.get('neo4j_driver')
         _cat_manager = MemoryCategoryManager(driver=driver)
