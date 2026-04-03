@@ -1100,48 +1100,54 @@ def update_task_status():
 def record_harness():
     """Record the registration of a new computational harness."""
     data = request.get_json(silent=True) or {}
-    name = data.get('name')
-    tools = data.get('tools')
-    process = data.get('process')
-    if not all([name, tools, process]):
-        return jsonify({"error": "name, tools, and process are required for harness"}), 400
+    domain = data.get('domain')
+    trigger = data.get('trigger')
+    tool_chain = data.get('tool_chain')
+    if not all([domain, trigger, tool_chain]):
+        return jsonify({"error": "domain, trigger, and tool_chain are required for harness"}), 400
 
     result = _get_cat().record_harness(
-        name=name,
+        domain=domain,
+        trigger=trigger,
+        tool_chain=tool_chain,
         description=data.get('description', ''),
-        version=data.get('version', '1.0.0'),
-        tools=tools,
-        process=process,
-        success_criteria=data.get('success_criteria'),
+        process_type=data.get('process_type', 'pipeline'),
+        data_flow=data.get('data_flow'),
+        tags=data.get('tags'),
         agent_id=data.get('agent_id', 'system'),
+        scope=data.get('scope', 'tribal'),
     )
     return jsonify(result), 201
 
-@memory_bp.route('/category/harness/<name>', methods=['GET'])
-def recall_harness(name):
-    """Recall a specific computational harness by name."""
+@memory_bp.route('/category/harness/search', methods=['GET'])
+def recall_harness():
+    """Recall a specific computational harness by domain and trigger."""
+    domain = request.args.get('domain')
+    trigger = request.args.get('trigger')
     agent_id = request.args.get('agent_id', 'system')
-    return jsonify(_get_cat().recall_harness(name=name, agent_id=agent_id))
+    return jsonify(_get_cat().recall_harness(domain=domain, trigger=trigger, agent_id=agent_id))
 
 @memory_bp.route('/category/harness/list', methods=['GET'])
 def list_harnesses():
     """List all available computational harnesses."""
+    domain = request.args.get('domain')
     agent_id = request.args.get('agent_id', 'system')
-    return jsonify(_get_cat().list_harnesses(agent_id=agent_id))
+    return jsonify(_get_cat().list_harnesses(domain=domain, agent_id=agent_id))
 
 @memory_bp.route('/category/harness/extract', methods=['POST'])
 def extract_harness():
     """Extract a structural harness definition from unstructured project logs/events."""
     data = request.get_json(silent=True) or {}
-    events = data.get('events')
-    prompt = data.get('prompt')
-    if not events:
-        return jsonify({"error": "events payload required for harness extraction"}), 400
+    execution_log = data.get('execution_log')
+    domain = data.get('domain', 'general')
+    if not execution_log:
+        return jsonify({"error": "execution_log payload required for harness extraction"}), 400
     
     result = _get_cat().extract_harness_from_log(
-        events=events,
-        prompt=prompt,
-        agent_id=data.get('agent_id', 'system')
+        execution_log=execution_log,
+        domain=domain,
+        agent_id=data.get('agent_id', 'system'),
+        min_tools=data.get('min_tools', 2)
     )
     return jsonify(result), 200
 

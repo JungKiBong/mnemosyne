@@ -27,16 +27,12 @@
 ## 2. 미완료 P0 버그 (즉시 수정 필요)
 
 ### [BUG-1] `memory.py` current_app 미임포트
-- **파일:** `src/app/api/memory.py`, `_get_audit()` 함수
-- **오류:** `NameError: name 'current_app' is not defined`
-- **수정:** 파일 상단에 `from flask import current_app` 추가
-- **영향:** TestAuditAPI 2건 실패
+- **상태:** **✅ 코드 수정 완료** (`from flask import current_app` 반영 확인)
+- **추가조치:** `pytest` 환경에서 application context fixture 연결 확인 필요
 
 ### [BUG-2] reconciliation_service.py Neo4j datetime() 호환성
-- **파일:** `src/app/storage/reconciliation_service.py`, Line 233, 356
-- **오류:** Neo4j datetime() 파싱 실패 (Long 입력)
-- **수정:** Cypher 쿼리에 정규식 검증 선행 추가
-- **영향:** TestReconciliationAPI 3건 실패
+- **상태:** **✅ 코드 수정 완료** (`toString(n.last_accessed) =~ '\\d{4}-\\d{2}-\\d{2}.*'` 반영 확인)
+- **추가조치:** `tests/integration/test_reconciliation.py` 파일 내 Pytest fixture(`recon_service`, `test_entity`) 바인딩 오류 수정 필요
 
 ---
 
@@ -44,8 +40,8 @@
 
 ### P0 — 즉시 실행
 ```
-1. [ ] 미커밋 변경사항 검토 & 커밋/Push
-2. [ ] BUG-1, BUG-2 수정 후 테스트 재실행
+1. [ ] 미커밋 변경사항(Phase 16 Cognitive Memory + MCP 포함) 검토 및 커밋/Push
+2. [ ] BUG-2 테스트코드 픽스처(Pytest class scope) 바인딩 오류 수정 및 테스트 100% 통과 확보
 3. [ ] git push origin main
 ```
 
@@ -56,6 +52,7 @@
 | TASK-4 | 멀티테넌트 지원 | 4h+ | 대기 |
 | UI-4 | tokens.css 라이트모드 대비 정비 | 2h | 대기 |
 | UI-5 | 인라인 CSS → CSS 변수 치환 | 3h | 대기 |
+| **UI-6** | **Harness 오케스트레이션 및 인지 기억 지식(조건부 등) 시각화 UI** | **3h** | **최우선 대기(추천)** |
 
 ### P2 — 중기 로드맵
 | Phase | 이름 | 설명 |

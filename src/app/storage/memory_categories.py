@@ -1477,13 +1477,14 @@ class MemoryCategoryManager:
         agent_id: str = "system",
         min_tools: int = 2,
     ) -> Dict[str, Any]:
-        """Auto-extract a harness pattern from an execution log.
+        """Auto-extract a harness pattern from an execution log with loop compression and conditional extraction.
 
         Expected log format:
         {
             "steps": [
                 {"tool": "git_diff", "type": "shell", "input": "...", "output": "...", "success": true},
-                {"tool": "llm_call", "type": "api", "input": "...", "output": "...", "success": true}
+                {"tool": "llm_call", "type": "api", "input": "...", "output": "...", "success": false, "error": "timeout"},
+                {"tool": "llm_call_fallback", "type": "api", "input": "...", "output": "...", "success": true}
             ],
             "trigger": "PR review request",
             "overall_success": true,
@@ -1494,41 +1495,78 @@ class MemoryCategoryManager:
         if len(steps) < min_tools:
             return {"status": "skipped", "reason": f"Only {len(steps)} tools < min {min_tools}"}
 
-        # Build tool chain from log steps
+        # Build tool chain with loop compression (consecutive identical tools become 1 step with iteration_count)
         tool_chain = []
-        for i, step in enumerate(steps, 1):
-            tool_chain.append({
-                "tool": step.get("tool", "unknown"),
-                "type": step.get("type", "unknown"),
-                "order": i,
-                "role": step.get("role", "processing"),
-            })
+        last_tool = None
+        for step in steps:
+            tool_name = step.get("tool", "unknown")
+            if tool_name == last_tool:
+                tool_chain[-1]["iteration_count"] = tool_chain[-1].get("iteration_count", 1) + 1
+            else:
+                tool_chain.append({
+                    "tool": tool_name,
+                    "type": step.get("type", "unknown"),
+                    "order": len(tool_chain) + 1,
+                    "role": step.get("role", "processing"),
+                    "iteration_count": 1
+                })
+            last_tool = tool_name
+
+        # Extract potential conditional knowledge (fallback patterns from failures)
+        extracted_conditionals = []
+        for i in range(len(steps) - 1):
+            if not steps[i].get("success", True):
+                failed_tool = steps[i].get("tool", "unknown")
+                error_msg = steps[i].get("error", "Unknown error")
+                next_tool = steps[i+1].get("tool", "unknown")
+                extracted_conditionals.append({
+                    "condition": f"If tool '{failed_tool}' fails with '{error_msg}'",
+                    "then_action": f"Fallback to using tool '{next_tool}'"
+                })
 
         trigger = execution_log.get("trigger", "unknown")
         log_id = execution_log.get("log_id", str(uuid.uuid4())[:8])
 
-        # Check for existing similar harness (same domain + similar tool chain)
+        # Automatically record extracted conditionals
+        for cond in extracted_conditionals:
+            try:
+                self.record_conditional(
+                    condition=cond["condition"],
+                    then_action=cond["then_action"],
+                    description=f"Auto-extracted fallback from harness execution log {log_id}",
+                    subcategory="contextual",
+                    confidence=0.7,
+                    agent_id=agent_id
+                )
+            except Exception as e:
+                logger.warning(f"Failed to record conditional logic from log {log_id}: {e}")
+
+        # Check for existing similar harness (same domain + similar compressed tool chain)
         existing = self._find_similar_harness(domain, tool_chain)
         if existing:
             # Merge: record as additional execution of existing harness
-            return self.record_harness_execution(
+            merge_res = self.record_harness_execution(
                 harness_uuid=existing["uuid"],
                 success=execution_log.get("overall_success", True),
                 execution_time_ms=execution_log.get("execution_time_ms", 0),
-                result_summary=f"Auto-merged from log {log_id}",
+                result_summary=f"Auto-merged from log {log_id}. Detected conditionals: {len(extracted_conditionals)}",
             )
+            # Annotate with conditionals extracted
+            merge_res["extracted_conditionals"] = len(extracted_conditionals)
+            return merge_res
 
-        # Build data flow from input/output
+        # Build richer data flow mapping from inputs and outputs
         data_flow = {
-            "input": steps[0].get("input", "")[:200] if steps else "",
-            "intermediate": [s.get("output", "")[:100] for s in steps[1:-1]] if len(steps) > 2 else [],
-            "output": steps[-1].get("output", "")[:200] if steps else "",
+            "input": str(steps[0].get("input", ""))[:500] if steps else "",
+            "intermediate": [str(s.get("output", ""))[:200] for s in steps[1:-1] if s.get("output")] if len(steps) > 2 else [],
+            "output": str(steps[-1].get("output", ""))[:500] if steps else "",
+            "error_paths_detected": len(extracted_conditionals) > 0
         }
 
         meta = create_harness_metadata(
             domain=domain, trigger=trigger, tool_chain=tool_chain,
             data_flow=data_flow, source_agent=agent_id,
-            auto_extracted=True, extraction_confidence=0.7,
+            auto_extracted=True, extraction_confidence=0.75,
             source_log_ids=[log_id])
 
         # Record initial execution stats
@@ -1539,6 +1577,8 @@ class MemoryCategoryManager:
         meta["stats"]["success_rate"] = 1.0 if overall_success else 0.0
         meta["stats"]["avg_execution_time_ms"] = execution_log.get("execution_time_ms", 0)
         meta["stats"]["last_executed"] = datetime.now(timezone.utc).isoformat()
+        if len(extracted_conditionals) > 0:
+            meta["stats"]["resilience_score"] = 0.5  # Recovered from failure
 
         node_uuid = str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat()
