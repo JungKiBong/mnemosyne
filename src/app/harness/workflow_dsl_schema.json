@@ -1,0 +1,198 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Mories Harness v2 Workflow DSL",
+  "description": "분기/반복/조건/코드실행/API호출을 자연어에서 자동 생성 가능한 범용 워크플로우 정의 형식",
+  "type": "object",
+  "required": ["harness_id", "version", "domain", "steps"],
+  "properties": {
+    "harness_id": {
+      "type": "string",
+      "description": "Mories 하네스 UUID 또는 사용자 지정 ID"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "domain": {
+      "type": "string",
+      "description": "시나리오 도메인 (engineering, marketing, data_science 등)"
+    },
+    "description": {
+      "type": "string"
+    },
+    "env": {
+      "type": "object",
+      "description": "워크플로우 전역 환경변수 (DIFY_BASE_URL, N8N_BASE_URL 등)",
+      "additionalProperties": {"type": "string"}
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "type"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "스텝 고유 ID (goto 참조용)"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["code", "api_call", "webhook", "branch", "loop", "parallel", "wait", "end"],
+            "description": "스텝 실행 방식"
+          },
+          "description": {
+            "type": "string",
+            "description": "이 스텝이 하는 일에 대한 자연어 설명"
+          },
+
+          "action": {
+            "type": "string",
+            "description": "[code] 실행할 Python 함수 경로 (module.function)"
+          },
+          "params": {
+            "type": "object",
+            "description": "[code] 함수 매개변수. ${prev_step.output_key} 형태로 변수 참조 가능"
+          },
+          "output_key": {
+            "type": "string",
+            "description": "이 스텝의 실행 결과를 저장할 변수명"
+          },
+
+          "method": {
+            "type": "string",
+            "enum": ["GET", "POST", "PUT", "DELETE"],
+            "description": "[api_call/webhook] HTTP 메서드"
+          },
+          "url": {
+            "type": "string",
+            "description": "[api_call/webhook] 호출할 URL. 환경변수 참조 가능"
+          },
+          "headers": {
+            "type": "object",
+            "description": "[api_call] 요청 헤더",
+            "additionalProperties": {"type": "string"}
+          },
+          "body": {
+            "type": "object",
+            "description": "[api_call/webhook] 요청 바디"
+          },
+
+          "condition": {
+            "type": "string",
+            "description": "[branch] 평가할 조건식: ${step_id.output_key} op value"
+          },
+          "then": {
+            "type": "string",
+            "description": "[branch] 조건이 참일 때 이동할 step id"
+          },
+          "else": {
+            "type": "string",
+            "description": "[branch] 조건이 거짓일 때 이동할 step id"
+          },
+
+          "max_iterations": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "[loop] 최대 반복 횟수"
+          },
+          "goto": {
+            "type": "string",
+            "description": "[loop] 반복 시 되돌아갈 step id"
+          },
+
+          "branches": {
+            "type": "array",
+            "description": "[parallel] 동시에 실행할 step id 목록",
+            "items": {"type": "string"}
+          },
+
+          "timeout_seconds": {
+            "type": "integer",
+            "description": "[wait/api_call] 타임아웃(초)"
+          },
+
+          "on_error": {
+            "type": "string",
+            "enum": ["skip", "retry", "abort", "fallback"],
+            "description": "에러 발생 시 행동"
+          },
+          "fallback_step": {
+            "type": "string",
+            "description": "[on_error=fallback] 이동할 step id"
+          },
+          "retry_count": {
+            "type": "integer",
+            "description": "[on_error=retry] 최대 재시도 횟수",
+            "default": 3
+          }
+        }
+      }
+    },
+    "state_storage": {
+      "type": "object",
+      "description": "실행 상태 저장 설정",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["json_file", "sqlite", "memory"],
+          "default": "json_file"
+        },
+        "path": {
+          "type": "string",
+          "description": "JSON/SQLite 파일 경로"
+        }
+      }
+    },
+    "monitoring": {
+      "type": "object",
+      "description": "모니터링/알림 설정",
+      "properties": {
+        "webhook_on_complete": {"type": "string"},
+        "webhook_on_failure": {"type": "string"},
+        "log_level": {
+          "type": "string",
+          "enum": ["DEBUG", "INFO", "WARNING", "ERROR"],
+          "default": "INFO"
+        }
+      }
+    },
+    "cost_tracking": {
+      "type": "object",
+      "description": "v3: 비용/토큰 추적 설정",
+      "properties": {
+        "enabled": {"type": "boolean", "default": true},
+        "token_price_input": {
+          "type": "number",
+          "description": "입력 토큰당 USD (예: 0.000003)"
+        },
+        "token_price_output": {
+          "type": "number",
+          "description": "출력 토큰당 USD (예: 0.000015)"
+        }
+      }
+    },
+    "evolution": {
+      "type": "object",
+      "description": "v3: 자기 진화 설정",
+      "properties": {
+        "auto_fix": {
+          "type": "boolean",
+          "default": false,
+          "description": "실패 시 자동 FIX 진화 시도"
+        },
+        "cascade_threshold": {
+          "type": "number",
+          "default": 0.5,
+          "description": "cascade 트리거 성공률 임계값"
+        },
+        "capture_new_patterns": {
+          "type": "boolean",
+          "default": true,
+          "description": "새 패턴 자동 포착 여부"
+        }
+      }
+    }
+  }
+}
