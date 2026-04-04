@@ -1,0 +1,112 @@
+{
+  "harness_id": "cicd_auto_recovery_live",
+  "version": 1,
+  "domain": "devops_automation",
+  "description": "CI/CD 라이브 파이프라인: 시뮬레이션 함수 + 실제 Dify LLM 에러 분석 + 실제 n8n 웹훅 알림",
+  "env": {
+    "DIFY_BASE_URL": "http://100.75.95.45:5001/v1",
+    "DIFY_API_KEY": "app-4ElPP6OBpbEdCINmPDBrSnxq",
+    "N8N_WEBHOOK_URL": "http://100.75.95.45:5678/webhook/harness-deploy-success"
+  },
+  "steps": [
+    {
+      "id": "pr_event",
+      "type": "code",
+      "description": "GitHub PR merge 이벤트 수신 (시뮬레이션)",
+      "action": "src.app.harness.scenario_helpers.receive_pr_event",
+      "params": {"repo": "mirofish/supermemory"},
+      "output_key": "event"
+    },
+    {
+      "id": "build",
+      "type": "code",
+      "description": "빌드 실행 (시뮬레이션)",
+      "action": "src.app.harness.scenario_helpers.run_build",
+      "params": {"commit_sha": "${pr_event.event}"},
+      "output_key": "build_result",
+      "on_error": "skip"
+    },
+    {
+      "id": "check_build",
+      "type": "branch",
+      "description": "빌드 성공 여부 판단",
+      "condition": "${build.build_result} != null",
+      "then": "run_tests",
+      "else": "analyze_error_live"
+    },
+    {
+      "id": "run_tests",
+      "type": "code",
+      "description": "테스트 실행 (시뮬레이션)",
+      "action": "src.app.harness.scenario_helpers.run_tests",
+      "params": {"build_success": true},
+      "output_key": "test_result"
+    },
+    {
+      "id": "check_tests",
+      "type": "branch",
+      "description": "테스트 성공 시 배포, 실패 시 LLM 분석",
+      "condition": "${run_tests.test_result} != null",
+      "then": "deploy",
+      "else": "analyze_error_live"
+    },
+    {
+      "id": "analyze_error_live",
+      "type": "api_call",
+      "description": "Dify LLM으로 에러 로그 실제 분석 (LIVE)",
+      "url": "${env.DIFY_BASE_URL}/chat-messages",
+      "method": "POST",
+      "headers": {
+        "Authorization": "Bearer ${env.DIFY_API_KEY}",
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "inputs": {},
+        "query": "다음 빌드 에러를 분석하고 원인과 수정 방법을 JSON으로 반환해줘: TypeError: Cannot read properties of undefined (reading 'map')",
+        "response_mode": "streaming",
+        "user": "harness-cicd"
+      },
+      "timeout_seconds": 30,
+      "output_key": "llm_analysis"
+    },
+    {
+      "id": "rebuild_loop",
+      "type": "loop",
+      "description": "패치 적용 후 재빌드 (최대 2회)",
+      "max_iterations": 2,
+      "goto": "build"
+    },
+    {
+      "id": "deploy",
+      "type": "code",
+      "description": "스테이징 배포 (시뮬레이션)",
+      "action": "src.app.harness.scenario_helpers.deploy_to_staging",
+      "params": {"commit_sha": "${pr_event.event}"},
+      "output_key": "deploy_result"
+    },
+    {
+      "id": "notify_live",
+      "type": "webhook",
+      "description": "n8n 웹훅으로 배포 알림 (LIVE)",
+      "url": "${env.N8N_WEBHOOK_URL}",
+      "body": {
+        "event": "deploy_success",
+        "source": "mories-harness",
+        "harness_id": "cicd_auto_recovery_live",
+        "deploy_result": "${deploy.deploy_result}",
+        "timestamp": "auto"
+      },
+      "timeout_seconds": 10
+    },
+    {
+      "id": "complete",
+      "type": "end",
+      "description": "CI/CD 라이브 파이프라인 완료"
+    }
+  ],
+  "state_storage": {"type": "json_file", "path": "./harness_state"},
+  "monitoring": {
+    "webhook_on_failure": "http://100.75.95.45:5678/webhook/harness-fail",
+    "log_level": "INFO"
+  }
+}
