@@ -204,15 +204,16 @@ class StateManager:
 # ─────────────────────────────────────────────
 class HarnessRuntime:
     """
-    JSON DSL 워크플로우를 실제로 실행하는 범용 런타임 엔진.
+    JSON DSL 워크플로우를 실제로 실행하는 범용 런타임 엔진 (v4).
 
     지원 스텝 타입:
     - code: Python 함수 호출
     - api_call: 외부 REST API 호출
     - webhook: n8n/Zapier 등 이벤트 발사
+    - container_exec: Docker 컨테이너 내 실행 (v4)
     - branch: 조건 분기 (then/else)
     - loop: 반복 (max_iterations + goto)
-    - parallel: 병렬 스텝 실행 (순차 에뮬레이션)
+    - parallel: 실제 병렬 스텝 실행 (v4 ThreadPoolExecutor)
     - wait: 비동기 대기
     - end: 종료 + 결과 기록
     """
@@ -259,6 +260,47 @@ class HarnessRuntime:
         self._metrics = MetricsStore(db_path=metrics_db)
         self._evolution = EvolutionEngine(metrics_store=self._metrics)
         self._exec_tree = ExecutionTree()
+
+        # ── v4: Executor Registry + Tool Memory ──
+        from src.app.harness.executors import create_default_registry
+        from src.app.harness.executors.parallel_executor import ParallelExecutor
+        from src.app.harness.executors.container_executor import ContainerExecutor
+        from src.app.harness.memory.tool_memory_index import ToolMemoryIndex
+
+        self._executor_registry = create_default_registry()
+
+        # Register container executor
+        self._executor_registry.register("container_exec", ContainerExecutor())
+
+        # Parallel executor with callback to our _execute_step_fn
+        self._parallel_executor = ParallelExecutor(
+            step_executor_fn=self._execute_step_fn,
+            max_workers=workflow.get("parallel_workers", 4),
+        )
+        self._executor_registry.register("parallel", self._parallel_executor)
+
+        # Tool Memory Index
+        tool_memory_db = os.path.join(
+            storage_cfg.get("path", "./harness_state"), "tool_memory.db"
+        )
+        self._tool_memory = ToolMemoryIndex(db_path=tool_memory_db)
+
+    def _execute_step_fn(self, step: dict, context: Dict[str, Any]) -> Any:
+        """Callback for ParallelExecutor — execute a single sub-step and return result."""
+        step_type = step["type"]
+        if self._executor_registry.has(step_type):
+            er = self._executor_registry.execute(step_type, step, context)
+            if not er.success:
+                raise RuntimeError(er.error or "Unknown error")
+            return er.output
+        # Fallback for non-registry types
+        if step_type == "code":
+            return _exec_code(step, context)
+        elif step_type == "api_call":
+            return _exec_api_call(step, context)
+        elif step_type == "webhook":
+            return _exec_webhook(step, context)
+        raise ValueError(f"Unknown step_type for parallel branch: {step_type}")
 
     def run(self, resume: bool = False) -> dict:
         """
@@ -394,22 +436,8 @@ class HarnessRuntime:
         start = time.time()
 
         try:
-            if step_type == "code":
-                result = _exec_code(step, self.context)
-                if step.get("output_key"):
-                    self.context.setdefault(step_id, {})[step.get("output_key")] = result
-
-            elif step_type == "api_call":
-                result = _exec_api_call(step, self.context)
-                if step.get("output_key"):
-                    self.context.setdefault(step_id, {})[step.get("output_key")] = result
-
-            elif step_type == "webhook":
-                result = _exec_webhook(step, self.context)
-                if step.get("output_key"):
-                    self.context.setdefault(step_id, {})[step.get("output_key")] = result
-
-            elif step_type == "branch":
+            # ── v4: Native handlers (control flow) ──
+            if step_type == "branch":
                 return self._handle_branch(step, current_idx)
 
             elif step_type == "loop":
@@ -427,6 +455,19 @@ class HarnessRuntime:
                 logger.info(f"  [end] 워크플로우 종료")
                 self._log_step(step_id, step_type, time.time() - start, True)
                 return -1
+
+            # ── v4: Delegate to ExecutorRegistry ──
+            elif self._executor_registry.has(step_type):
+                exec_result = self._executor_registry.execute(step_type, step, self.context)
+                if step.get("output_key"):
+                    self.context.setdefault(step_id, {})[step.get("output_key")] = exec_result.output
+                if not exec_result.success:
+                    raise RuntimeError(exec_result.error or f"Executor failed for {step_type}")
+                # Record tool memory
+                self._record_tool_memory(step_id, step_type, exec_result)
+
+            else:
+                logger.warning(f"  [unknown] Unregistered step_type: {step_type}")
 
             self._log_step(step_id, step_type, time.time() - start, True)
             return current_idx + 1
@@ -496,16 +537,40 @@ class HarnessRuntime:
             return current_idx + 1
 
     def _handle_parallel(self, step: dict):
-        """병렬 실행 (현재는 순차 에뮬레이션, 향후 threading/asyncio 확장 가능)."""
+        """v4: 실제 병렬 실행 (ThreadPoolExecutor)"""
         branch_ids = step.get("branches", [])
-        logger.info(f"  [parallel] {len(branch_ids)}개 브랜치 실행 (순차 에뮬레이션)")
-        for bid in branch_ids:
-            if bid in self.steps:
-                sub_step = self.steps[bid]
-                try:
-                    self._execute_step(sub_step, 0)
-                except Exception as e:
-                    logger.warning(f"  [parallel] 브랜치 '{bid}' 실패: {e}")
+        resolved = [self.steps[bid] for bid in branch_ids if bid in self.steps]
+
+        if not resolved:
+            logger.warning("  [parallel] No valid branches found")
+            return
+
+        # Inject resolved branches for ParallelExecutor
+        step_copy = {**step, "_resolved_branches": resolved}
+        exec_result = self._parallel_executor.execute(step_copy, self.context)
+
+        # Merge branch outputs into context
+        if exec_result.output:
+            for bid, output in exec_result.output.items():
+                self.context.setdefault(bid, {})["_parallel_result"] = output
+
+        if not exec_result.success:
+            logger.warning(f"  [parallel] Some branches failed: {exec_result.error}")
+
+    def _record_tool_memory(self, step_id: str, step_type: str, exec_result):
+        """Record executor result into Tool Memory Index."""
+        try:
+            from src.app.harness.memory.tool_memory_index import ToolExecution
+            self._tool_memory.record(ToolExecution(
+                tool_name=step_id,
+                tool_type=step_type,
+                success=exec_result.success,
+                elapsed_ms=exec_result.elapsed_ms,
+                domain=self.workflow.get("domain", "unknown"),
+                error=exec_result.error,
+            ))
+        except Exception as e:
+            logger.debug(f"Tool memory record failed (non-critical): {e}")
 
     def _log_step(self, step_id: str, step_type: str, elapsed: float, success: bool, error: str = None):
         """실행 로그에 스텝 결과를 추가한다."""
