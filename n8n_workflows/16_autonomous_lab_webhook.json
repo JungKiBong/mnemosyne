@@ -1,0 +1,105 @@
+{
+  "name": "Autonomous Laboratory: LTM Promotion Handler",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mories-events",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "e6f49f50-32b5-4b07-aaac-077fffc8cba9",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ],
+      "webhookId": "mories-events"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f516a22b-ec1d-4074-b77d-78408f655106",
+              "name": "Action",
+              "value": "={{ $json.body.action }}",
+              "type": "string"
+            },
+            {
+              "id": "4b6ec528-912f-413e-a898-1e42ba9e52d6",
+              "name": "Message",
+              "value": "={{ $json.body.message }}",
+              "type": "string"
+            },
+            {
+              "id": "97b5eebd-cb62-4aa3-bc4e-cd57662c19e5",
+              "name": "MemoryID",
+              "value": "={{ $json.body.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8c4ff4d4-51e0-4a81-9f93-01d7e2319082",
+      "name": "Extract Event Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "console.log('Received Mories Event:', $input.first().json);\nreturn $input.all();"
+      },
+      "id": "f57732a8-0f0e-43f6-bdcd-087ce12fc8ce",
+      "name": "Log to Console",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract Event Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Event Data": {
+      "main": [
+        [
+          {
+            "node": "Log to Console",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "f781df57-ff47-4cf3-a759-9f7bbffdf4e5",
+  "id": "auto_lab_event_handler",
+  "meta": {
+    "instanceId": "f0ad0d3a77d5448cd4d538e1a1412ea7a6c518018bba0b0ecb3f0cc6b567b4da"
+  },
+  "tags": []
+}

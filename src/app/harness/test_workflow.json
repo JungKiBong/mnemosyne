@@ -1,0 +1,68 @@
+{
+  "harness_id": "test_demo_workflow",
+  "version": 1,
+  "domain": "integration_test",
+  "description": "Harness v2 런타임 엔진 기본 동작 검증용 워크플로우 (외부 의존성 없이 순수 분기/반복/종료 테스트)",
+  "env": {
+    "TEST_MODE": "true",
+    "THRESHOLD": "100"
+  },
+  "steps": [
+    {
+      "id": "init",
+      "type": "code",
+      "description": "초기값 생성 (시뮬레이션용 내장 함수)",
+      "action": "test_helpers.generate_sensor_data",
+      "params": {"sensor_name": "reactor_temp", "value": 115.5},
+      "output_key": "reading"
+    },
+    {
+      "id": "check_threshold",
+      "type": "branch",
+      "description": "센서값이 임계치를 초과하는지 판단",
+      "condition": "${init.reading} > 100",
+      "then": "process_anomaly",
+      "else": "normal_end"
+    },
+    {
+      "id": "process_anomaly",
+      "type": "code",
+      "description": "이상 감지 시 분석 수행",
+      "action": "test_helpers.analyze_anomaly",
+      "params": {"reading": "${init.reading}"},
+      "output_key": "severity"
+    },
+    {
+      "id": "severity_gate",
+      "type": "branch",
+      "description": "심각도가 높으면 반복 분석, 낮으면 종료",
+      "condition": "${process_anomaly.severity} > 0.7",
+      "then": "deep_analysis",
+      "else": "normal_end"
+    },
+    {
+      "id": "deep_analysis",
+      "type": "code",
+      "description": "심층 분석 반복 수행",
+      "action": "test_helpers.deep_analyze",
+      "params": {"iteration": "auto"},
+      "output_key": "result"
+    },
+    {
+      "id": "retry_loop",
+      "type": "loop",
+      "description": "심층 분석을 최대 3회 반복",
+      "max_iterations": 3,
+      "goto": "deep_analysis"
+    },
+    {
+      "id": "normal_end",
+      "type": "end",
+      "description": "워크플로우 정상 종료"
+    }
+  ],
+  "state_storage": {
+    "type": "json_file",
+    "path": "./harness_state"
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "harness_id": "content_creation_pipeline",
+  "version": 1,
+  "domain": "content_creation",
+  "description": "AI 콘텐츠 제작: 트렌드 수집 → LLM 초안 → 품질 평가 → 재작성 루프(최대3회) → SEO → CMS 발행",
+  "env": {
+    "QUALITY_THRESHOLD": "70",
+    "DIFY_BASE_URL": "http://100.75.95.45:5001/v1"
+  },
+  "steps": [
+    {
+      "id": "collect_trends",
+      "type": "code",
+      "description": "트렌드 키워드 수집",
+      "action": "scenario_helpers.collect_trend_keywords",
+      "params": {"category": "tech"},
+      "output_key": "trends"
+    },
+    {
+      "id": "generate_draft",
+      "type": "code",
+      "description": "LLM으로 블로그 초안 생성",
+      "action": "scenario_helpers.generate_blog_draft",
+      "params": {"topic": "AI 오케스트레이션"},
+      "output_key": "draft"
+    },
+    {
+      "id": "evaluate",
+      "type": "code",
+      "description": "품질 점수 평가",
+      "action": "scenario_helpers.evaluate_quality",
+      "params": {"quality_score": "${generate_draft.draft}"},
+      "output_key": "qa_result"
+    },
+    {
+      "id": "quality_gate",
+      "type": "branch",
+      "description": "품질 70점 이상이면 SEO, 미만이면 재작성",
+      "condition": "${evaluate.qa_result} != null",
+      "then": "seo_optimize",
+      "else": "rewrite_loop"
+    },
+    {
+      "id": "rewrite_loop",
+      "type": "loop",
+      "description": "재작성 반복 (최대 3회)",
+      "max_iterations": 3,
+      "goto": "generate_draft"
+    },
+    {
+      "id": "seo_optimize",
+      "type": "code",
+      "description": "SEO 최적화 적용",
+      "action": "scenario_helpers.apply_seo_optimization",
+      "params": {"title": "AI 오케스트레이션의 미래"},
+      "output_key": "seo"
+    },
+    {
+      "id": "publish",
+      "type": "code",
+      "description": "CMS에 자동 발행",
+      "action": "scenario_helpers.publish_to_cms",
+      "params": {"seo_title": "${seo_optimize.seo}"},
+      "output_key": "publication"
+    },
+    {
+      "id": "complete",
+      "type": "end",
+      "description": "콘텐츠 제작 파이프라인 완료"
+    }
+  ],
+  "state_storage": {"type": "json_file", "path": "./harness_state"},
+  "monitoring": {"log_level": "INFO"}
+}

@@ -1,0 +1,91 @@
+{
+  "harness_id": "marketing_churn_prediction",
+  "version": 1,
+  "domain": "marketing_automation",
+  "description": "고객 이탈 예측 자율 루프: CRM 수집 → ML 분류 → 위험등급 분기 → 캠페인 발송 → 재방문 모니터링",
+  "env": {
+    "CHURN_THRESHOLD": "0.8",
+    "DIFY_BASE_URL": "http://100.75.95.45:5001/v1"
+  },
+  "steps": [
+    {
+      "id": "collect_crm",
+      "type": "code",
+      "description": "CRM에서 고객 데이터를 수집",
+      "action": "scenario_helpers.collect_crm_data",
+      "params": {"source": "salesforce_sim"},
+      "output_key": "data"
+    },
+    {
+      "id": "predict_churn",
+      "type": "code",
+      "description": "ML 모델로 이탈 위험 고객 분류",
+      "action": "scenario_helpers.predict_churn",
+      "params": {"customer_count": 120},
+      "output_key": "prediction"
+    },
+    {
+      "id": "check_vip_risk",
+      "type": "branch",
+      "description": "이탈 확률 80% 이상 고객이 있는지 판단",
+      "condition": "${predict_churn.prediction} != null",
+      "then": "vip_escalation",
+      "else": "send_campaign"
+    },
+    {
+      "id": "vip_escalation",
+      "type": "code",
+      "description": "VIP 전담 상담 즉시 연결",
+      "action": "scenario_helpers.connect_vip_consultant",
+      "params": {"customer_id": "VIP-TOP-1"},
+      "output_key": "vip_status"
+    },
+    {
+      "id": "send_campaign",
+      "type": "code",
+      "description": "위험 등급에 따라 리텐션 이메일/쿠폰 발송",
+      "action": "scenario_helpers.send_retention_campaign",
+      "params": {"high_risk_count": 30, "action_type": "email_and_coupon"},
+      "output_key": "campaign"
+    },
+    {
+      "id": "wait_monitoring",
+      "type": "wait",
+      "description": "7일 대기 (시뮬레이션에서는 1초)",
+      "timeout_seconds": 1
+    },
+    {
+      "id": "monitor_revisit",
+      "type": "code",
+      "description": "재방문율 모니터링",
+      "action": "scenario_helpers.monitor_revisit_rate",
+      "params": {"campaign_id": "RET-SIM"},
+      "output_key": "metrics"
+    },
+    {
+      "id": "check_revisit_rate",
+      "type": "branch",
+      "description": "재방문율이 30% 미만이면 모델 재학습 루프",
+      "condition": "${monitor_revisit.metrics} != null",
+      "then": "retrain_loop",
+      "else": "complete"
+    },
+    {
+      "id": "retrain_loop",
+      "type": "loop",
+      "description": "모델 재학습 (최대 2회 반복)",
+      "max_iterations": 2,
+      "goto": "predict_churn"
+    },
+    {
+      "id": "complete",
+      "type": "end",
+      "description": "마케팅 이탈 예측 파이프라인 완료"
+    }
+  ],
+  "state_storage": {"type": "json_file", "path": "./harness_state"},
+  "monitoring": {
+    "webhook_on_failure": "http://100.75.95.45:5678/webhook/harness-fail",
+    "log_level": "INFO"
+  }
+}
