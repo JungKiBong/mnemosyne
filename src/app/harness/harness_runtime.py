@@ -276,7 +276,7 @@ class HarnessRuntime:
                     requests.post(fail_hook, json={
                         "run_id": run_id,
                         "error": error_msg,
-                        "step": step_id if 'step_id' in dir() else "unknown"
+                        "step": locals().get('step_id', 'unknown')
                     }, timeout=5)
                 except Exception:
                     pass

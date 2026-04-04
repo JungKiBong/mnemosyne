@@ -151,6 +151,15 @@ class MetricsStore:
             ).fetchone()
             return dict(row) if row else None
 
+    def get_runs_by_harness(self, harness_id: str) -> List[Dict[str, Any]]:
+        """특정 하네스의 모든 런 요약을 최신순으로 조회한다."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM run_summaries WHERE harness_id = ? ORDER BY timestamp DESC",
+                (harness_id,),
+            ).fetchall()
+            return [dict(r) for r in rows]
+
     def get_harness_stats(self, harness_id: str) -> Dict[str, Any]:
         """하네스별 통합 통계를 반환한다."""
         with self._conn() as conn:

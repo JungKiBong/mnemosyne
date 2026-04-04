@@ -68,15 +68,25 @@
 
 ---
 
-## 4. 다음 세션에서 할 작업 (Phase 3)
+## 4. 다음 세션에서 할 작업 (Phase 3 → v4 Autonomous Orchestration)
 
 | 우선순위 | 항목 | 설명 |
 |----------|------|------|
-| **Done** | Dashboard UI 연동 | Dashboard 내 metrics.db (Cost, 평균 시간 등) 연동 및 수동 Edit 인터페이스 구축 완료 |
+| **Done** | Dashboard UI 연동 | Execution Tree + AI Evolution Suggestion UI 완성 |
 | **Done** | 외부 API Step (api_call) | Dify Agent App 호환 검증 완료 (Thin Bridge) |
 | **Done** | 웹훅 Step (webhook) | n8n 이벤트 핸들링 검증 완료 (Thin Bridge) |
-| **Canceled**| 병렬 처리 (parallel) | Mories 내부의 복잡한 실행(Bloatware) 방지를 위해 외부(n8n 등) 위임 |
-| **Canceled**| Harness 스킬 자동화 고도화 | 복잡도 증가 방지를 위해 우선순위 하향 및 폐기 |
+| **Done** | Operations Guide 업데이트 | v3 아키텍처/DSL/대시보드/메모리 연동 전면 재작성 |
+| **Done** | API Docs 업데이트 | /tree, /execute, /compare, /generate, PUT update 5개 엔드포인트 추가 |
+| **Done** | DSL Schema v3 | title v2→v3 수정, cost_tracking + evolution 필드 반영 |
+| **Planned** | True Parallel Executor | asyncio.gather + ThreadPoolExecutor 실제 병렬 실행 |
+| **Planned** | Container Executor | Docker SDK 기반 컨테이너 내 코드 실행 |
+| **Planned** | Ray/Nomad Executor | 원격 인프라 작업 디스패치 |
+| **Planned** | Agent Registry | 에이전트 등록/역할/능력 관리 |
+| **Planned** | Autonomous Planner | LLM 기반 OODA 자율 다음 작업 선택 |
+| **Planned** | HITL Gate | 사람 승인/피드백 대기 + 피드백 기억 저장 |
+| **Planned** | Tool Memory Index | 도구별 성공률/비용/속도 통계 연동 |
+
+> 상세 계획: `docs/10_autonomous_orchestration_plan.md`
 
 ---
 

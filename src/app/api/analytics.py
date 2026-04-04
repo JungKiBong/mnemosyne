@@ -1018,6 +1018,32 @@ def get_harness_detail(uuid):
         logger.error(f"Harness detail failed: {e}")
         return jsonify({"error": str(e)}), 500
 
+@analytics_bp.route('/harness/<uuid>/tree', methods=['GET'])
+def get_harness_tree(uuid):
+    """Retrieve the hierarchical execution tree for a specific harness."""
+    try:
+        from ..harness.metrics_store import MetricsStore
+        from ..harness.execution_tree import ExecutionTree
+        
+        metrics_store = MetricsStore()
+        runs = metrics_store.get_runs_by_harness(uuid)
+        
+        tree = ExecutionTree()
+        # Populate runs into the tree (Top 20 recent runs for brevity)
+        for run in runs[:20]:
+            steps = metrics_store.get_steps_by_run(run["run_id"])
+            tree.add_run(
+                domain=run.get("domain", "default"),
+                workflow=uuid,
+                run_id=run["run_id"],
+                steps=steps
+            )
+            
+        return jsonify({"status": "success", "tree": tree.root.to_dict()})
+    except Exception as e:
+        logger.error(f"Harness execution tree retrieval failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
 @analytics_bp.route('/harness/<uuid>', methods=['PUT'])
 def update_harness_detail(uuid):
     """Update direct harness configuration metadata."""

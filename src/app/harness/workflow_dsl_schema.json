@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Mories Harness v2 Workflow DSL",
+  "title": "Mories Harness v3 Workflow DSL",
   "description": "분기/반복/조건/코드실행/API호출을 자연어에서 자동 생성 가능한 범용 워크플로우 정의 형식",
   "type": "object",
   "required": ["harness_id", "version", "domain", "steps"],
