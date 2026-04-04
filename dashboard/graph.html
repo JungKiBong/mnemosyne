@@ -124,6 +124,17 @@ select.select-modern option { background:var(--bg-1); }
       <h3 style="margin-top:20px;" data-i18n-html="graph.agents">🤖 Agents</h3>
       <button class="btn btn-primary" style="background:#22c55e; margin-bottom:10px;" onclick="loadAgents()" data-i18n-html="graph.overlayAgents">🧬 Overlay Agents Network</button>
       <p style="font-size:0.75rem; color:var(--text-2); line-height:1.4;" data-i18n="graph.overlayDesc">Active agents and their shared memories via Synaptic Bridge will be highlighted.</p>
+
+      <h3 style="margin-top:20px;">⚙️ Harness Patterns</h3>
+      <div style="display:flex; flex-direction:column; gap:6px; margin-top:8px;">
+        <label style="font-size:0.8rem; color:var(--text-1); display:flex; align-items:center; gap:8px; cursor:pointer;">
+          <input type="checkbox" id="filterHarnessExp" onchange="applyHarnessFilter()" checked> HarnessExperience
+        </label>
+        <label style="font-size:0.8rem; color:var(--text-1); display:flex; align-items:center; gap:8px; cursor:pointer;">
+          <input type="checkbox" id="filterHarnessPattern" onchange="applyHarnessFilter()" checked> HarnessPattern
+        </label>
+      </div>
+      <button class="btn btn-primary" style="background:linear-gradient(135deg,#f59e0b,#ef4444); margin-top:10px; font-size:0.8rem;" onclick="loadHarnessGraph()">🔥 Load Harness Graph</button>
     </div>
 
     <div id="node-details">
@@ -145,6 +156,8 @@ select.select-modern option { background:var(--bg-1); }
       <div class="legend-item"><div class="legend-dot" style="background:rgba(34,197,94,0.2); border-color:#22c55e;"></div> <span data-i18n="graph.legendSocial">Memory (Social/Tribal)</span></div>
       <div class="legend-item"><div class="legend-dot" style="background:rgba(249,115,22,0.2); border-color:#f97316;"></div> <span data-i18n="graph.legendRevision">Revision / Metadata</span></div>
       <div class="legend-item"><div class="legend-dot" style="background:rgba(139,92,246,0.3); border-color:#8b5cf6;"></div> <span data-i18n="graph.legendAgent">Synaptic Agent</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(245,158,11,0.3); border-color:#f59e0b;"></div> <span>Harness Pattern</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(239,68,68,0.3); border-color:#ef4444;"></div> <span>Harness Experience</span></div>
     </div>
   </div>
 </div>
@@ -609,6 +622,103 @@ async function runQuery() {
   } finally {
     toggleLoader(false);
   }
+}
+
+// Harness Domain Color Map
+const HARNESS_DOMAIN_COLORS = {
+  engineering: '#3b82f6', devops: '#06b6d4', marketing: '#22c55e',
+  content: '#a855f7', sales: '#f59e0b', platform: '#ef4444', default: '#6b7280'
+};
+
+function getHarnessDomainColor(domain) {
+  return HARNESS_DOMAIN_COLORS[(domain || '').toLowerCase()] || HARNESS_DOMAIN_COLORS.default;
+}
+
+async function loadHarnessGraph() {
+  toggleLoader(true);
+  try {
+    const showExp = document.getElementById('filterHarnessExp').checked;
+    const showPat = document.getElementById('filterHarnessPattern').checked;
+    const labels = [];
+    if (showExp) labels.push('HarnessExperience');
+    if (showPat) labels.push('HarnessPattern');
+    if (labels.length === 0) { toggleLoader(false); return; }
+
+    const labelFilter = labels.map(l => `n:\`${l}\``).join(' OR ');
+    const query = `MATCH (n) WHERE ${labelFilter} OPTIONAL MATCH (n)-[r]-(m) RETURN n, type(r) as type, m LIMIT 200`;
+    const resp = await fetch('/api/memory/graph/query', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({query})
+    });
+    const data = await resp.json();
+    if (!data.results) { toggleLoader(false); return; }
+
+    const nodeSet = new Set(); const edgeSet = new Set();
+    const newNodes = []; const newEdges = [];
+
+    data.results.forEach(rec => {
+      if (rec.n && !nodeSet.has(rec.n.id)) {
+        nodeSet.add(rec.n.id);
+        const labels = rec.n.labels || [];
+        const isPattern = labels.includes('HarnessPattern');
+        const domain = rec.n.properties?.domain || 'default';
+        const domainColor = getHarnessDomainColor(domain);
+        newNodes.push({
+          id: rec.n.id,
+          label: rec.n.properties?.trigger?.substring(0, 30) || rec.n.properties?.name?.substring(0, 30) || `Harness-${rec.n.id}`,
+          color: { background: domainColor + '30', border: domainColor },
+          shape: isPattern ? 'diamond' : 'triangle',
+          size: isPattern ? 20 : 14,
+          font: { color: '#e0e0e0', size: 10 },
+          title: `[${labels.join(',')}] ${domain}`,
+          _harnessUuid: rec.n.properties?.uuid || null,
+        });
+      }
+      if (rec.m && !nodeSet.has(rec.m.id)) {
+        nodeSet.add(rec.m.id);
+        newNodes.push({
+          id: rec.m.id,
+          label: rec.m.properties?.name?.substring(0, 25) || `Node-${rec.m.id}`,
+          color: { background: 'rgba(100,100,120,0.3)', border: '#64748b' },
+          shape: 'dot', size: 10,
+          font: { color: '#94a3b8', size: 9 },
+        });
+      }
+      if (rec.n && rec.m && rec.type) {
+        const edgeId = `${rec.n.id}-${rec.type}-${rec.m.id}`;
+        if (!edgeSet.has(edgeId)) {
+          edgeSet.add(edgeId);
+          newEdges.push({ from: rec.n.id, to: rec.m.id, label: rec.type, font: { size: 8, color: '#64748b' }, arrows: 'to', color: '#475569' });
+        }
+      }
+    });
+
+    if (nodes) {
+      newNodes.forEach(n => { try { nodes.update(n); } catch(_) { nodes.add(n); }});
+      newEdges.forEach(e => { try { edges.add(e); } catch(_) {} });
+    }
+
+    // Harness node click → open detail page
+    if (network) {
+      network.on('doubleClick', (params) => {
+        if (params.nodes.length === 1) {
+          const nodeData = nodes.get(params.nodes[0]);
+          if (nodeData && nodeData._harnessUuid) {
+            window.open(`/harness.html?uuid=${nodeData._harnessUuid}`, '_blank');
+          }
+        }
+      });
+    }
+  } catch(e) {
+    console.error('Harness graph load failed:', e);
+  } finally {
+    toggleLoader(false);
+  }
+}
+
+function applyHarnessFilter() {
+  // Re-trigger harness graph load with updated filter
+  loadHarnessGraph();
 }
 
 // 2. Add Agents to the Network

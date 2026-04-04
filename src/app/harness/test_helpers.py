@@ -1,7 +1,7 @@
 """
-test_helpers.py — Harness v2 런타임 테스트용 헬퍼 함수 모듈
-
-외부 의존성 없이 분기/반복/변수 치환 동작을 검증하기 위한 순수 Python 함수들.
+DEPRECATED: Use tests.harness.helpers.scenario_helpers instead.
+This file remains for backward-compatible dynamic import from workflow JSON files
+that reference 'src.app.harness.test_helpers'.
 """
 
 _deep_analysis_counter = 0

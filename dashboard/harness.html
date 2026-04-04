@@ -249,6 +249,11 @@ a:hover{text-decoration:underline}
       <h3 data-i18n="harness.recentExec">📈 최근 실행 현황</h3>
       <div id="recentExecTable"></div>
     </div>
+
+    <div class="chart-box">
+      <h3>📉 실행 성공률 트렌드 (최근 20회)</h3>
+      <div id="trendChartContainer" style="height:120px; display:flex; align-items:flex-end; gap:2px; padding:12px 0;"></div>
+    </div>
   </div>
 
   <!-- ═══ Tab: Pattern List ═══ -->
@@ -413,10 +418,44 @@ async function loadData() {
     renderPatternGrid();
     buildDomainFilter();
     renderRecentTable();
+    loadTrendChart();
   } catch (e) {
     console.error('Harness load error:', e);
     toast(window.t('harness.loadError'), 'error');
   }
+}
+
+async function loadTrendChart() {
+  try {
+    const resp = await fetch(BASE + '/metrics/trend?limit=20');
+    const data = await resp.json();
+    if (data.status === 'success' && data.trend) {
+      renderTrendChart(data.trend);
+    }
+  } catch (e) {
+    console.warn('Trend chart load failed:', e);
+  }
+}
+
+function renderTrendChart(runs) {
+  const container = document.getElementById('trendChartContainer');
+  if (!container || runs.length === 0) {
+    if (container) container.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;width:100%">No execution data</div>';
+    return;
+  }
+  const reversed = [...runs].reverse(); // oldest first
+  const maxMs = Math.max(...reversed.map(r => r.elapsed_ms || 1), 1);
+  
+  container.innerHTML = reversed.map((r, i) => {
+    const h = Math.max(8, ((r.elapsed_ms || 0) / maxMs) * 90);
+    const color = r.success ? '#22c55e' : '#ef4444';
+    const bg = r.success ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)';
+    const ts = r.timestamp ? new Date(r.timestamp).toLocaleString() : '';
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;" title="${ts}\n${r.success?'✅ Success':'❌ Failed'}\n${(r.elapsed_ms||0).toLocaleString()}ms">
+      <div style="font-size:9px;color:${color};margin-bottom:2px;">${r.success?'✓':'✗'}</div>
+      <div style="width:100%;height:${h}%;background:${bg};border:1px solid ${color};border-radius:3px;min-height:4px;transition:height 0.3s;"></div>
+    </div>`;
+  }).join('');
 }
 
 // ── Stats cards ──

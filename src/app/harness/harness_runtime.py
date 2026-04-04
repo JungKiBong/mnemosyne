@@ -62,7 +62,49 @@ def _resolve_vars(value: Any, context: Dict[str, Any]) -> Any:
 
 
 # ─────────────────────────────────────────────
-# 2. 개별 스텝 실행기 (Step Executors)
+# 2. 조건 파서 (Condition Parser)
+# ─────────────────────────────────────────────
+
+def _parse_condition(resolved: str) -> bool:
+    """
+    Parse a simple condition string safely.
+    Supports: ==, !=, <, >, <=, >=, null checks, truthy evaluation.
+    """
+    s = str(resolved).strip()
+
+    # Null/None checks
+    for op, expected in [("!=", False), ("==", True)]:
+        for null_word in ("null", "None"):
+            pattern = f"{op} {null_word}"
+            if pattern in s or f"{op}{null_word}" in s:
+                val = s.split(op)[0].strip()
+                is_null = val in ("None", "null", "", "<UNRESOLVED")
+                return is_null if expected else not is_null
+
+    # Comparison operators (order matters: >= before >, <= before <)
+    for op, fn in [
+        (">=", lambda a, b: a >= b),
+        ("<=", lambda a, b: a <= b),
+        ("!=", lambda a, b: a != b),
+        ("==", lambda a, b: a == b),
+        (">",  lambda a, b: a > b),
+        ("<",  lambda a, b: a < b),
+    ]:
+        if op in s:
+            parts = s.split(op, 1)
+            if len(parts) == 2:
+                try:
+                    return fn(float(parts[0].strip()), float(parts[1].strip()))
+                except ValueError:
+                    # String comparison fallback
+                    return fn(parts[0].strip(), parts[1].strip())
+
+    # Truthy evaluation
+    return bool(s) and s.lower() not in ("false", "0", "none", "null")
+
+
+# ─────────────────────────────────────────────
+# 3. 개별 스텝 실행기 (Step Executors)
 # ─────────────────────────────────────────────
 def _exec_code(step: dict, context: dict) -> Any:
     """Python 함수를 동적으로 import하여 실행한다."""
@@ -421,31 +463,12 @@ class HarnessRuntime:
             raise
 
     def _handle_branch(self, step: dict, current_idx: int) -> int:
-        """
-        조건 분기를 처리한다.
-        condition 문자열을 변수 치환 후 간단히 평가한다.
-        """
+        """조건 분기를 처리한다. condition 문자열을 변수 치환 후 평가한다."""
         raw_cond = step.get("condition", "true")
         resolved = _resolve_vars(raw_cond, self.context)
 
-        # 안전한 조건 평가 (== , !=, >, <, is not None 등)
         try:
-            # None 체크
-            if "!= null" in str(resolved) or "!= None" in str(resolved):
-                val = str(resolved).split("!=")[0].strip()
-                cond_result = val not in ("None", "null", "", "<UNRESOLVED")
-            elif "== null" in str(resolved) or "== None" in str(resolved):
-                val = str(resolved).split("==")[0].strip()
-                cond_result = val in ("None", "null", "")
-            elif "<" in str(resolved) and "=" not in str(resolved).split("<")[1]:
-                parts = str(resolved).split("<")
-                cond_result = float(parts[0].strip()) < float(parts[1].strip())
-            elif ">" in str(resolved) and "=" not in str(resolved).split(">")[1]:
-                parts = str(resolved).split(">")
-                cond_result = float(parts[0].strip()) > float(parts[1].strip())
-            else:
-                # 기본: truthy 평가
-                cond_result = bool(resolved) and str(resolved).lower() not in ("false", "0", "none", "null")
+            cond_result = _parse_condition(resolved)
         except Exception:
             cond_result = False
 
@@ -454,7 +477,6 @@ class HarnessRuntime:
 
         if target and target in self.steps:
             return self.step_order.index(target)
-        # then/else가 없으면 다음 스텝으로
         return current_idx + 1
 
     def _handle_loop(self, step: dict, current_idx: int) -> int:

@@ -923,6 +923,7 @@ Endpoints:
   GET  /api/analytics/harness/overview     — Dashboard overview stats
   GET  /api/analytics/harness/recommend    — AI-powered pattern recommendation
   GET  /api/analytics/harness/<uuid>       — Get harness detail
+  GET  /api/analytics/harness/metrics/trend — Success/failure trend data
   POST /api/analytics/harness/record       — Record a new harness pattern
   POST /api/analytics/harness/<uuid>/execute — Record an execution
   POST /api/analytics/harness/<uuid>/evolve  — Evolve a harness pattern
@@ -935,6 +936,21 @@ def _get_category_mgr():
     """Lazy-load MemoryCategoryManager."""
     from ..storage.memory_categories import MemoryCategoryManager
     return MemoryCategoryManager()
+
+
+@analytics_bp.route('/harness/metrics/trend', methods=['GET'])
+def harness_metrics_trend():
+    """Get success/failure trend data for chart visualization."""
+    from ..harness.metrics_store import MetricsStore
+    harness_id = request.args.get('harness_id')
+    limit = int(request.args.get('limit', '20'))
+    try:
+        ms = MetricsStore()
+        trend = ms.get_success_trend(harness_id=harness_id, limit=limit)
+        return jsonify({"status": "success", "trend": trend})
+    except Exception as e:
+        logger.error(f"Harness metrics trend failed: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @analytics_bp.route('/harness/list', methods=['GET'])
@@ -1048,13 +1064,34 @@ def get_harness_tree(uuid):
 def update_harness_detail(uuid):
     """Update direct harness configuration metadata."""
     try:
-        req = request.json or {}
-        mgr = _get_category_mgr()
-        
+        req = request.json
+        if not req or not isinstance(req, dict):
+            return jsonify({"error": "Request body must be a JSON object"}), 400
+
+        # Allowed fields for update
+        ALLOWED_FIELDS = {"domain", "trigger", "tags", "description", "scope",
+                          "tool_chain", "conditionals", "data_flow"}
+        unknown_fields = set(req.keys()) - ALLOWED_FIELDS
+        if unknown_fields:
+            return jsonify({"error": f"Unknown fields: {', '.join(sorted(unknown_fields))}"}), 400
+
+        # Type validation
+        _str_fields = {"domain", "trigger", "description", "scope"}
+        _list_fields = {"tags", "tool_chain", "conditionals"}
+        for field in _str_fields:
+            if field in req and not isinstance(req[field], str):
+                return jsonify({"error": f"{field} must be a string"}), 400
+        for field in _list_fields:
+            if field in req and not isinstance(req[field], list):
+                return jsonify({"error": f"{field} must be a list"}), 400
+        if "data_flow" in req and not isinstance(req["data_flow"], dict):
+            return jsonify({"error": "data_flow must be an object"}), 400
+
         # normalize toolchain if it exists
         if "tool_chain" in req:
             req["tool_chain"] = _normalize_tool_chain(req["tool_chain"])
-            
+
+        mgr = _get_category_mgr()
         result = mgr.update_harness(uuid, req)
         if "error" in result:
             return jsonify(result), 404

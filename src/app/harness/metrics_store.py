@@ -189,3 +189,25 @@ class MetricsStore:
             "avg_elapsed_ms": int(avg_ms),
             "total_cost_usd": round(total_cost, 6),
         }
+
+    def get_success_trend(
+        self, harness_id: str = None, limit: int = 20
+    ) -> List[Dict[str, Any]]:
+        """Get recent run success/failure trend for chart visualization."""
+        with self._conn() as conn:
+            if harness_id:
+                rows = conn.execute(
+                    "SELECT run_id, harness_id, success, elapsed_ms, "
+                    "total_cost_usd, timestamp "
+                    "FROM run_summaries WHERE harness_id = ? "
+                    "ORDER BY timestamp DESC LIMIT ?",
+                    (harness_id, limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT run_id, harness_id, success, elapsed_ms, "
+                    "total_cost_usd, timestamp "
+                    "FROM run_summaries ORDER BY timestamp DESC LIMIT ?",
+                    (limit,),
+                ).fetchall()
+            return [dict(r) for r in rows]

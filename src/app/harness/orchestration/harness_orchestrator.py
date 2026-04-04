@@ -11,6 +11,7 @@ Mories 인지 메모리 파이프라인으로 자동 퍼블리싱한다.
 작성: 2026-04-04
 """
 import logging
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional, Protocol
 
 from src.app.harness.harness_runtime import HarnessRuntime
@@ -175,9 +176,38 @@ class HarnessOrchestrator:
         if self.memory_bridge.backend is not None:
             self.memory_bridge.publish(experience)
 
+        # Failure webhook notification
+        self._notify_failure_webhook(
+            harness_id=current_workflow.get("harness_id", "unknown"),
+            error=runtime_result.get("error", ""),
+            run_id=runtime_result.get("run_id", ""),
+        )
+
         runtime_result.setdefault("metadata", {})
         runtime_result["metadata"]["auto_healed"] = False
         return runtime_result
+
+    def _notify_failure_webhook(
+        self, harness_id: str, error: str, run_id: str
+    ) -> None:
+        """Send failure alert to configured webhook endpoint."""
+        webhook_url = self.config.get("monitoring", {}).get(
+            "webhook_on_failure"
+        )
+        if not webhook_url:
+            return
+        try:
+            import requests as _requests
+            _requests.post(webhook_url, json={
+                "event": "harness_failure",
+                "harness_id": harness_id,
+                "run_id": run_id,
+                "error": error[:500],
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }, timeout=5)
+            logger.info(f"Failure webhook sent to {webhook_url}")
+        except Exception as e:
+            logger.warning(f"Failure webhook failed: {e}")
 
     # Legacy alias
     def _sync_to_mories_ltm(self, pattern_data: dict):
