@@ -544,6 +544,7 @@ function renderPatternGrid(filter) {
           <span class="tag tag-scope">${p.scope}</span>
           ${tags}
         </div>
+        ${p.success_rate < 0.8 && p.execution_count > 0 ? `<div style="margin: 8px 0; color: #f44336; font-size: 12px; font-weight: bold; background: rgba(244, 67, 54, 0.1); padding: 4px 8px; border-radius: 4px; display: inline-block;">⚠️ Failure Alert: Attention Needed</div>` : ''}
         <div class="p-stats">
           <span>🔧 ${p.tool_count} tools</span>
           <span>▶ ${p.execution_count}x</span>
@@ -573,6 +574,123 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ── Detail modal ──
+function renderTree(node, isRoot = false) {
+    if (!node) return '';
+    let html = '';
+    
+    let icon = '📂';
+    if (node.level === 'run') icon = node.metadata?.success ? '✅' : '❌';
+    if (node.level === 'step') icon = node.metadata?.success ? '🔸' : '🔻';
+    
+    let metaHtml = '';
+    if (node.metadata) {
+      if (node.metadata.elapsed_ms) metaHtml += `<span style="font-size: 11px; color: var(--muted); margin-left: 8px">${node.metadata.elapsed_ms}ms</span>`;
+      if (node.metadata.total_ms) metaHtml += `<span style="font-size: 11px; color: var(--muted); margin-left: 8px">${node.metadata.total_ms}ms</span>`;
+    }
+
+    const hasChildren = node.children && Object.keys(node.children).length > 0;
+    
+    if (hasChildren) {
+        html += `<details ${isRoot || node.level === 'domain' || node.level === 'workflow' ? 'open' : ''} style="margin-left: ${isRoot ? '0' : '16px'}; border-left: 1px dashed var(--border); padding-left: 8px; margin-bottom: 4px;">`;
+        html += `<summary style="cursor: pointer; padding: 4px 0; outline: none; user-select: none;">
+          <span style="font-size: 12px; margin-right: 4px">${icon}</span>
+          <span style="font-size: 13px; font-weight: 600;">${escHtml(node.name)}</span>
+          <span style="font-size: 11px; color: var(--muted); margin-left: 8px">[${node.level}]</span>
+          ${metaHtml}
+        </summary>`;
+        html += `<div style="margin-top: 4px;">`;
+        for (const [key, childNode] of Object.entries(node.children)) {
+            html += renderTree(childNode, false);
+        }
+        html += `</div></details>`;
+    } else {
+        html += `<div style="margin-left: ${isRoot ? '0' : '16px'}; border-left: 1px dashed var(--border); padding: 4px 0 4px 8px; margin-bottom: 4px;">
+          <span style="font-size: 12px; margin-right: 4px">${icon}</span>
+          <span style="font-size: 13px; font-weight: 600;">${escHtml(node.name)}</span>
+          <span style="font-size: 11px; color: var(--muted); margin-left: 8px">[${node.level}]</span>
+          ${metaHtml}
+        </div>`;
+    }
+    return html;
+}
+
+async function fetchAndRenderTree(uuid) {
+    try {
+        const res = await fetch(`${BASE}/${uuid}/tree`);
+        const data = await res.json();
+        if (data && data.tree && Object.keys(data.tree.children || {}).length > 0) {
+            return `
+              <h4 style="margin:20px 0 8px;font-size:14px">🌴 Execution Tree</h4>
+              <div style="background:var(--bg); border-radius: 8px; padding: 12px; max-height: 300px; overflow-y: auto;">
+                  ${renderTree(data.tree, true)}
+              </div>
+            `;
+        }
+    } catch (e) {
+        console.error("ExecutionTree fetch failed", e);
+    }
+    return '';
+}
+
+window.suggestEvolve = async function(uuid) {
+    const btn = document.querySelector(`button[onclick="suggestEvolve('${uuid}')"]`);
+    const resultDiv = document.getElementById('aiEvolveResult');
+    
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = '제안 생성 중...';
+    }
+    
+    resultDiv.style.display = 'block';
+    resultDiv.innerHTML = '<div style="color:var(--muted); font-size:12px;">LLM이 과거 실행 트리를 분석하여 개선안을 도출하고 있습니다 (수십초 소요)...</div>';
+    
+    try {
+        const res = await fetch(`/api/analytics/harness/${uuid}/suggest_evolution`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ context: "Please analyze the tree to provide failure suggestions." })
+        });
+        const data = await res.json();
+        
+        if (data.error) {
+            resultDiv.innerHTML = `<div style="color:red; font-size:12px;">오류: ${escHtml(data.error)}</div>`;
+            return;
+        }
+        
+        const suggestion = data.suggested_evolution;
+        
+        let html = `<div style="background: rgba(139, 92, 246, 0.1); border: 1px solid var(--accent); padding: 12px; border-radius: 8px;">`;
+        html += `<h5 style="margin:0 0 8px 0; color:var(--text);">💡 진화 아이디어</h5>`;
+        
+        if (suggestion.new_tool_chain && suggestion.new_tool_chain.length > 0) {
+            html += `<div style="font-size:13px; font-weight:bold; margin-bottom:4px;">새로운 Tool Chain:</div>`;
+            html += `<ul style="margin:0 0 8px 24px; font-size:12px;">`;
+            suggestion.new_tool_chain.forEach(t => html += `<li>${escHtml(t)}</li>`);
+            html += `</ul>`;
+        }
+        
+        if (suggestion.conditionals && suggestion.conditionals.length > 0) {
+            html += `<div style="font-size:13px; font-weight:bold; margin-bottom:4px;">제안된 Conditionals:</div>`;
+            html += `<ul style="margin:0 0 8px 24px; font-size:12px;">`;
+            suggestion.conditionals.forEach(c => html += `<li>[${c.type}] ${escHtml(c.condition)} → ${escHtml(c.then_action)}</li>`);
+            html += `</ul>`;
+        }
+        
+        html += `<div style="font-size:12px; color:var(--text); margin-top: 8px;"><strong>사유:</strong> ${escHtml(suggestion.reason)}</div>`;
+        html += `</div>`;
+        
+        resultDiv.innerHTML = html;
+        
+    } catch (e) {
+        resultDiv.innerHTML = `<div style="color:red; font-size:12px;">요청 실패: ${escHtml(e.message)}</div>`;
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = '제안 받기';
+        }
+    }
+}
+
 window.openDetail = async function(uuid) {
   try {
     const res = await fetch(`${BASE}/${uuid}`);
@@ -727,6 +845,9 @@ window.openDetail = async function(uuid) {
         </div>`;
       }
     }
+
+    // Fetch and render Execution Tree
+    body += await fetchAndRenderTree(uuid);
 
     // Extraction info
     if (extraction.auto_extracted) {
