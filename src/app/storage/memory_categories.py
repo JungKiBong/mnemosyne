@@ -1929,6 +1929,42 @@ class MemoryCategoryManager:
             "new_version": meta.get("evolution", {}).get("current_version", 1) if evolved else None,
         }
 
+    def update_harness(
+        self,
+        harness_uuid: str,
+        updates: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Update specific harness metadata directly (e.g. for user edits)."""
+        now = datetime.now(timezone.utc).isoformat()
+        with self._driver.session() as session:
+            existing = session.run("""
+                MATCH (e:Entity {uuid: $uuid, memory_category: 'harness'})
+                RETURN e.uuid AS uuid, e.attributes_json AS meta_json
+            """, uuid=harness_uuid).single()
+
+            if not existing:
+                return {"error": f"Harness {harness_uuid} not found"}
+                
+            meta = self._safe_json_load(existing["meta_json"])
+            
+            # Apply updates mapping
+            for key in ["description", "domain", "trigger", "process_type", "tags", "scope", "tool_chain", "data_flow", "conditionals"]:
+                if key in updates:
+                    meta["harness"][key] = updates[key]
+                
+            session.run("""
+                MATCH (e:Entity {uuid: $uuid})
+                SET e.attributes_json = $meta_json,
+                    e.description = $desc,
+                    e.last_accessed = $now
+            """, uuid=harness_uuid,
+                meta_json=json.dumps(meta, ensure_ascii=False),
+                desc=updates.get("description", meta["harness"].get("description", "")),
+                now=now)
+                
+        logger.info(f"Harness {harness_uuid} manually updated")
+        return {"status": "updated", "uuid": harness_uuid}
+
     def evolve_harness(
         self,
         harness_uuid: str,

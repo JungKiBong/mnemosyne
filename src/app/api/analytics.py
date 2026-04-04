@@ -1018,6 +1018,25 @@ def get_harness_detail(uuid):
         logger.error(f"Harness detail failed: {e}")
         return jsonify({"error": str(e)}), 500
 
+@analytics_bp.route('/harness/<uuid>', methods=['PUT'])
+def update_harness_detail(uuid):
+    """Update direct harness configuration metadata."""
+    try:
+        req = request.json or {}
+        mgr = _get_category_mgr()
+        
+        # normalize toolchain if it exists
+        if "tool_chain" in req:
+            req["tool_chain"] = _normalize_tool_chain(req["tool_chain"])
+            
+        result = mgr.update_harness(uuid, req)
+        if "error" in result:
+            return jsonify(result), 404
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Harness update failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
 
 def _normalize_tool_chain(raw_chain: list) -> list:
     """Normalize tool chain: accept both string list and dict list."""
@@ -1115,17 +1134,23 @@ def suggest_harness_evolution(uuid):
         
         mgr = _get_category_mgr()
         # Get existing harness
-        harness = mgr.get_harness(uuid)
-        if not harness:
+        results = mgr.recall_harness(harness_uuid=uuid)
+        if not results:
             return jsonify({"error": "Harness not found"}), 404
+        
+        harness = results[0]
             
         current_chain = harness.get('tool_chain', [])
         current_conds = harness.get('conditionals', [])
         trigger = harness.get('trigger', '')
-        desc = harness.get('description', '')
-        stats = harness.get('stats', {})
+        desc = harness.get('description', harness.get('summary', ''))
         
-        from app.utils.llm_client import LLMClient
+        # Integrate granular metrics
+        from ..harness.metrics_store import MetricsStore
+        metrics_store = MetricsStore()
+        historical_stats = metrics_store.get_harness_stats(uuid)
+
+        from ..utils.llm_client import LLMClient
         llm = LLMClient()
         
         prompt = f"""
@@ -1135,8 +1160,10 @@ def suggest_harness_evolution(uuid):
         ## Current Pattern Context
         - Trigger/Objective: {trigger}
         - Description: {desc}
-        - Success Rate: {stats.get('success_rate', 0) * 100}%
-        - Execution Count: {stats.get('execution_count', 0)}
+        - Success Rate: {historical_stats.get('success_rate', 0) * 100}%
+        - Total Runs: {historical_stats.get('total_runs', 0)}
+        - Avg Execution Time: {historical_stats.get('avg_elapsed_ms', 0)} ms
+        - Total Cost (USD): ${historical_stats.get('total_cost_usd', 0.0)}
         
         ## Current Tool Chain
         {current_chain}

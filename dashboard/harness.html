@@ -357,7 +357,8 @@ a:hover{text-decoration:underline}
     <div class="modal-body" id="modalBody">
       <!-- populated dynamically -->
     </div>
-    <div class="modal-footer">
+    <div class="modal-footer" id="modalFooter">
+      <button class="btn btn-primary" onclick="openEditMode()">Edit</button>
       <button class="btn btn-outline" onclick="closeModal()" data-i18n="close">닫기</button>
     </div>
   </div>
@@ -583,6 +584,9 @@ window.openDetail = async function(uuid) {
     const evolution = h.evolution || {};
     const extraction = h.extraction || {};
     const dataFlow = h.data_flow || {};
+    
+    window.currentHarnessDetail = h;
+    window.currentHarnessUuid = uuid;
 
     document.getElementById('modalTitle').textContent = h.name || h.trigger || uuid;
 
@@ -671,19 +675,23 @@ window.openDetail = async function(uuid) {
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px">
       <div style="background:var(--bg);padding:10px;border-radius:8px;text-align:center">
         <div style="font-size:20px;font-weight:800">${stats.execution_count || 0}</div>
-        <div style="font-size:11px;color:var(--muted)">${window.t('harness.execCount')}</div>
+        <div style="font-size:11px;color:var(--muted)">${window.t('harness.execCount') || 'Exec Count'}</div>
       </div>
       <div style="background:var(--bg);padding:10px;border-radius:8px;text-align:center">
         <div style="font-size:20px;font-weight:800;color:var(--green)">${((stats.success_rate || 0)*100).toFixed(1)}%</div>
-        <div style="font-size:11px;color:var(--muted)">${window.t('harness.successRate')}</div>
+        <div style="font-size:11px;color:var(--muted)">${window.t('harness.successRate') || 'Success Rate'}</div>
       </div>
       <div style="background:var(--bg);padding:10px;border-radius:8px;text-align:center">
         <div style="font-size:20px;font-weight:800">${stats.avg_execution_time_ms || 0}ms</div>
         <div style="font-size:11px;color:var(--muted)">Avg Time</div>
       </div>
       <div style="background:var(--bg);padding:10px;border-radius:8px;text-align:center">
+        <div style="font-size:20px;font-weight:800">$${(stats.total_cost_usd || 0).toFixed(4)}</div>
+        <div style="font-size:11px;color:var(--muted)">Total Cost</div>
+      </div>
+      <div style="background:var(--bg);padding:10px;border-radius:8px;text-align:center">
         <div style="font-size:20px;font-weight:800">${evolution.current_version || 1}</div>
-        <div style="font-size:11px;color:var(--muted)">${window.t('harness.version')}</div>
+        <div style="font-size:11px;color:var(--muted)">${window.t('harness.version') || 'Version'}</div>
       </div>
     </div>`;
 
@@ -741,11 +749,68 @@ window.openDetail = async function(uuid) {
       <div id="aiEvolveResult" style="margin-top: 12px; display: none;"></div>
     </div>`;
 
+    document.getElementById('modalFooter').innerHTML = `
+      <button class="btn btn-primary" onclick="openEditMode()">Edit</button>
+      <button class="btn btn-outline" onclick="closeModal()" data-i18n="close">닫기</button>
+    `;
+
     document.getElementById('modalBody').innerHTML = body;
     document.getElementById('detailModal').classList.add('show');
   } catch (e) {
     toast('Failed to load detail', 'error');
     console.error(e);
+  }
+};
+
+window.openEditMode = function() {
+  const h = window.currentHarnessDetail;
+  const uuid = window.currentHarnessUuid;
+  
+  let html = `<div style="margin-bottom: 12px;">
+    <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Domain</label>
+    <input type="text" id="editDomain" class="harness-input" value="${escHtml(h.domain || '')}" style="width:100%; padding:8px; border-radius:6px; border:1px solid var(--border); background:var(--card); color:var(--text);"/>
+  </div>
+  <div style="margin-bottom: 12px;">
+    <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Description</label>
+    <textarea id="editDescription" style="width:100%; padding:8px; border-radius:6px; border:1px solid var(--border); background:var(--card); color:var(--text); min-height:60px;">${escHtml(h.description || '')}</textarea>
+  </div>
+  <div style="margin-bottom: 12px;">
+    <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Trigger</label>
+    <input type="text" id="editTrigger" class="harness-input" value="${escHtml(h.trigger || '')}" style="width:100%; padding:8px; border-radius:6px; border:1px solid var(--border); background:var(--card); color:var(--text);"/>
+  </div>
+  <div style="margin-bottom: 12px;">
+    <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Tags (comma separated)</label>
+    <input type="text" id="editTags" class="harness-input" value="${escHtml((h.tags || []).join(', '))}" style="width:100%; padding:8px; border-radius:6px; border:1px solid var(--border); background:var(--card); color:var(--text);"/>
+  </div>`;
+  
+  document.getElementById('modalBody').innerHTML = html;
+  document.getElementById('modalFooter').innerHTML = `
+    <button class="btn btn-primary" onclick="submitEditHarness()">Save</button>
+    <button class="btn btn-outline" onclick="openDetail(window.currentHarnessUuid)">Cancel</button>
+  `;
+};
+
+window.submitEditHarness = async function() {
+  const uuid = window.currentHarnessUuid;
+  const updates = {
+    domain: document.getElementById('editDomain').value,
+    description: document.getElementById('editDescription').value,
+    trigger: document.getElementById('editTrigger').value,
+    tags: document.getElementById('editTags').value.split(',').map(s => s.trim()).filter(s => s)
+  };
+  
+  try {
+    const res = await fetch(`${BASE}/${uuid}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    toast('Harness updated successfully', 'success');
+    openDetail(uuid); // refresh
+  } catch (e) {
+    toast(e.message || 'Update failed', 'error');
   }
 };
 
