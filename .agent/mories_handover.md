@@ -72,11 +72,11 @@
 
 | 우선순위 | 항목 | 설명 |
 |----------|------|------|
-| **High** | Dashboard UI 연동 | Vue.js에 metrics.db + Neo4j 시각화 패널 추가 |
-| **Medium** | 외부 API Step (api_call) | Dify Agent App과 연동하는 하네스 스텝 구현 |
-| **Medium** | 웹훅 Step (webhook) | n8n 이벤트 버스 연동 |
-| **Low** | 병렬 실행 (parallel) | threading 기반 병렬 스텝 실행 |
-| **Low** | Harness 스킬 고도화 | 스킬 파라미터 자동 추천/검증 |
+| **Done** | Dashboard UI 연동 | Dashboard 내 metrics.db (Cost, 평균 시간 등) 연동 및 수동 Edit 인터페이스 구축 완료 |
+| **Done** | 외부 API Step (api_call) | Dify Agent App 호환 검증 완료 (Thin Bridge) |
+| **Done** | 웹훅 Step (webhook) | n8n 이벤트 핸들링 검증 완료 (Thin Bridge) |
+| **Canceled**| 병렬 처리 (parallel) | Mories 내부의 복잡한 실행(Bloatware) 방지를 위해 외부(n8n 등) 위임 |
+| **Canceled**| Harness 스킬 자동화 고도화 | 복잡도 증가 방지를 위해 우선순위 하향 및 폐기 |
 
 ---
 
