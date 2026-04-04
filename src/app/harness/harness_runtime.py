@@ -98,7 +98,8 @@ def _exec_api_call(step: dict, context: dict) -> Any:
         resp = requests.request(method, url, json=body, headers=headers, timeout=timeout)
         if resp.status_code >= 400:
             logger.warning(f"  [api_call] HTTP {resp.status_code}: {resp.text[:200]}")
-        result = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else resp.text
+        ct = (resp.headers.get("content-type") or "").lower()
+        result = resp.json() if "application/json" in ct else resp.text
         return result
     except Exception as e:
         logger.error(f"  [api_call] 요청 실패: {e}")

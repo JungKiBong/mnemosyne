@@ -110,6 +110,19 @@ class Neo4jMemoryBackend:
         if self._owns_driver and self._driver:
             self._driver.close()
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+        return False
+
+    def __del__(self):
+        try:
+            self.close()
+        except Exception:
+            pass
+
     def _ensure_schema(self):
         """하네스 전용 인덱스/제약 조건 생성."""
         queries = [
