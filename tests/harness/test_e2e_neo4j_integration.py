@@ -199,3 +199,22 @@ class TestE2ENeo4jIntegration:
                 hid=workflow["harness_id"],
             ).single()["cnt"]
             assert count >= 1
+
+    def test_07_record_instruction_to_neo4j(self):
+        """사람의 지침(Human Feedback)이 Instruction 노드로 기록되고 검색된다."""
+        result = self.backend.record_instruction(
+            category="human_feedback",
+            rule="Never deploy without manual approval in e2e domain.",
+            description="HITL feedback received during run e2e_123",
+            strictness="must"
+        )
+        assert result["status"] == "recorded"
+        assert result["id"]  # UUID 반환
+
+        # 검색 
+        instructions = self.backend.find_instructions(category="human_feedback")
+        assert len(instructions) >= 1
+        
+        # 자신이 넣은 rule이 포함되어 있는지 확인
+        found = any(inst["rule"] == "Never deploy without manual approval in e2e domain." for inst in instructions)
+        assert found is True

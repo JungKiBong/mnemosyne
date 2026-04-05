@@ -71,6 +71,17 @@ MERGE (d:Domain {name: $domain})
 MERGE (h)-[:BELONGS_TO]->(d)
 """
 
+CREATE_INSTRUCTION_NODE = """
+CREATE (i:Instruction {
+    uuid: $uuid,
+    category: $category,
+    rule: $rule,
+    description: $description,
+    strictness: $strictness,
+    created_at: $now
+})
+"""
+
 LINK_PATTERN_TO_DOMAIN = """
 MATCH (p:HarnessPattern {uuid: $pat_uuid})
 MERGE (d:Domain {name: $domain})
@@ -132,6 +143,8 @@ class Neo4jMemoryBackend:
             "FOR (p:HarnessPattern) REQUIRE p.uuid IS UNIQUE",
             "CREATE CONSTRAINT reflection_uuid IF NOT EXISTS "
             "FOR (r:Reflection) REQUIRE r.uuid IS UNIQUE",
+            "CREATE CONSTRAINT instruction_uuid IF NOT EXISTS "
+            "FOR (i:Instruction) REQUIRE i.uuid IS UNIQUE",
         ]
         try:
             with self._driver.session() as session:
@@ -143,6 +156,23 @@ class Neo4jMemoryBackend:
     # ─────────────────────────────────────────
     # MemoryBridge Backend Protocol
     # ─────────────────────────────────────────
+
+    def record_instruction(self, category: str, rule: str, description: str = "", strictness: str = "must") -> dict:
+        """사람의 피드백 등 영구적 규칙을 저장."""
+        node_uuid = str(_uuid.uuid4())
+        now = datetime.now(timezone.utc).isoformat()
+        with self._driver.session() as session:
+            session.run(
+                CREATE_INSTRUCTION_NODE,
+                uuid=node_uuid,
+                category=category,
+                rule=rule[:2000],
+                description=description[:2000],
+                strictness=strictness,
+                now=now,
+            )
+        logger.info(f"Neo4j: Recorded Instruction ({category})")
+        return {"status": "recorded", "id": node_uuid}
 
     def ingest(
         self,
@@ -314,6 +344,31 @@ class Neo4jMemoryBackend:
         with self._driver.session() as session:
             records = session.run(query, **params).data()
             return [dict(r["r"]) for r in records]
+
+    def find_instructions(
+        self,
+        category: Optional[str] = None,
+        limit: int = 10,
+    ) -> List[dict]:
+        """지침(Instruction) 검색."""
+        conditions = []
+        params: dict = {"limit": limit}
+
+        if category:
+            conditions.append("i.category = $category")
+            params["category"] = category
+
+        where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+
+        query = f"""
+            MATCH (i:Instruction) {where}
+            RETURN i ORDER BY i.created_at DESC
+            LIMIT $limit
+        """
+
+        with self._driver.session() as session:
+            records = session.run(query, **params).data()
+            return [dict(r["i"]) for r in records]
 
     def get_domain_stats(self) -> List[dict]:
         """도메인별 실행 통계 요약."""

@@ -1,7 +1,7 @@
-# Harness Operations Guide v3
+# Harness Operations Guide v4
 
 > **Updated:** 2026-04-05  
-> **Covers:** Harness v3 (Evolution Engine + Memory Bridge + Execution Tree)
+> **Covers:** Harness v4 (Autonomous Orchestrator + Knowledge Recall + Executor Registry)
 
 ---
 
@@ -55,6 +55,10 @@ Workflows are defined as JSON objects following the schema in `harness/workflow_
 | `loop` | Iteration with max limit | `max_iterations`, `goto` |
 | `parallel` | Concurrent step execution | `branches[]` |
 | `wait` | Pause for timeout | `timeout_seconds` |
+| `container_exec` | Run inside Docker | `image`, `command`, `env` |
+| `ray` | Distributed execution via Ray | `script`, `cluster_config` |
+| `nomad` | Remote execution via HashiCorp Nomad | `job_spec` |
+| `hitl_gate` | Pause for human-in-the-loop feedback | `prompt`, `required_role` |
 | `end` | Terminate workflow | — |
 
 ### Error Handling

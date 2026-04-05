@@ -240,6 +240,83 @@ def health():
     return jsonify(body), http_status
 
 
+# --- Harness Actions ---
+@core_bp.route('/api/harness/hitl/pending', methods=['GET'])
+def get_pending_hitl():
+    """
+    Returns a list of all currently suspended state files that await HITL resolution.
+    """
+    state_dir = "./harness_state"
+    pending = []
+    if os.path.exists(state_dir):
+        for fname in os.listdir(state_dir):
+            if fname.endswith(".json"):
+                fpath = os.path.join(state_dir, fname)
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        state = _json.load(f)
+                        if state.get("run_status") == "suspended":
+                            suspension_point = state.get("run_suspension_point")
+                            run_id = state.get("id", state.get("run_id", fname.replace(".json", "")))
+                            step_id = suspension_point.get("step_id") if suspension_point else None
+                            if step_id:
+                                pending.append({
+                                    "run_id": run_id,
+                                    "step_id": step_id,
+                                    "harness_uuid": state.get("harness_uuid", ""),
+                                    "suspended_at": state.get("updated_at", ""),
+                                    "context_preview": state.get("context", {}).get("trigger", "N/A")
+                                })
+                except Exception:
+                    pass
+    return jsonify({"status": "success", "pending": pending}), 200
+
+
+@core_bp.route('/api/harness/hitl/resolve', methods=['POST'])
+def resolve_hitl():
+    """
+    Resolve a Human-In-The-Loop gate by providing an answer (approved/rejected).
+    Body: {"run_id": "...", "step_id": "...", "approved": true, "feedback": "looks good"}
+    """
+    data = request.get_json(silent=True) or {}
+    run_id = data.get('run_id')
+    step_id = data.get('step_id')
+    
+    if not run_id or not step_id:
+        return jsonify({"error": "run_id and step_id are required"}), 400
+        
+    state_file = os.path.join("./harness_state", f"{run_id}.json")
+    if not os.path.exists(state_file):
+        return jsonify({"error": f"Target state file not found for run_id {run_id}"}), 404
+        
+    try:
+        with open(state_file, 'r', encoding='utf-8') as f:
+            state = _json.load(f)
+            
+        context = state.get('context', {})
+        hitl_responses = context.get('_hitl_responses', {})
+        
+        hitl_responses[step_id] = {
+            "approved": data.get("approved", True),
+            "feedback": data.get("feedback", ""),
+            "metadata": data.get("metadata", {})
+        }
+        
+        context['_hitl_responses'] = hitl_responses
+        state['context'] = context
+        
+        with open(state_file, 'w', encoding='utf-8') as f:
+            _json.dump(state, f, ensure_ascii=False, indent=2)
+            
+        # Optional: auto-resume the workflow process here by submitting to a background worker
+        # Currently, just updates the state file.
+        return jsonify({"status": "ok", "message": f"HITL for {step_id} resolved."})
+        
+    except Exception as e:
+        logger.error(f"Error resolving HITL: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 # --- MCP Tools via REST (for n8n / external agents) ---
 @core_bp.route('/api/mcp', methods=['POST'])
 def mcp_proxy():

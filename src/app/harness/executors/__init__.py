@@ -27,6 +27,7 @@ class ExecutorResult:
     output: Any = None
     error: Optional[str] = None
     elapsed_ms: int = 0
+    status: str = "completed"  # Can be "completed", "failed", "suspended"
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -139,6 +140,8 @@ class WebhookExecutor(BaseExecutor):
 # ──────────────────────────────────────────────
 # 4. Executor Registry
 # ──────────────────────────────────────────────
+from .hitl_executor import HitlGateExecutor
+
 class ExecutorRegistry:
     """
     Pluggable registry that maps `step_type` → `BaseExecutor` instance.
@@ -192,4 +195,12 @@ def create_default_registry() -> ExecutorRegistry:
     registry.register("code", LocalCodeExecutor())
     registry.register("api_call", ApiCallExecutor())
     registry.register("webhook", WebhookExecutor())
+    registry.register("hitl_gate", HitlGateExecutor())
+    
+    from .ray_executor import RayExecutor
+    from .nomad_executor import NomadExecutor
+    registry.register("ray", RayExecutor())
+    registry.register("nomad", NomadExecutor())
+    
     return registry
+

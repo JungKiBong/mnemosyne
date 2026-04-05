@@ -25,6 +25,10 @@ import requests
 
 logger = logging.getLogger("harness_runtime")
 
+class HitlSuspendException(Exception):
+    """Raised when the workflow needs to suspend for HITL gate approval."""
+    pass
+
 
 # ─────────────────────────────────────────────
 # 1. 변수 치환 엔진 (${step_id.output_key} 등)
@@ -341,7 +345,22 @@ class HarnessRuntime:
                 })
 
                 # 스텝 타입별 실행 분기
-                next_idx = self._execute_step(step, current_idx)
+                try:
+                    next_idx = self._execute_step(step, current_idx)
+                except HitlSuspendException as e:
+                    logger.info(f"  [hitl] Workflow suspended at step '{step_id}': {e}")
+                    # Save checkpoint for suspension
+                    self.state_mgr.save({
+                        "current_step_idx": current_idx,
+                        "context": {k: v for k, v in self.context.items() if k != "env"}
+                    })
+                    return {
+                        "success": True,
+                        "status": "suspended",
+                        "suspended_at": step_id,
+                        "prompt": self.context.get("_suspension_prompt"),
+                        "run_id": run_id
+                    }
 
                 if next_idx == -1:
                     # end 스텝에 의한 종료
@@ -461,6 +480,11 @@ class HarnessRuntime:
                 exec_result = self._executor_registry.execute(step_type, step, self.context)
                 if step.get("output_key"):
                     self.context.setdefault(step_id, {})[step.get("output_key")] = exec_result.output
+                
+                if exec_result.status == "suspended":
+                    self.context["_suspension_prompt"] = exec_result.output
+                    raise HitlSuspendException("Awaiting human input.")
+                    
                 if not exec_result.success:
                     raise RuntimeError(exec_result.error or f"Executor failed for {step_type}")
                 # Record tool memory

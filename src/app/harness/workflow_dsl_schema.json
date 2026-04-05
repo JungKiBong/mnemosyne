@@ -38,7 +38,7 @@
           },
           "type": {
             "type": "string",
-            "enum": ["code", "api_call", "webhook", "branch", "loop", "parallel", "wait", "end", "container_exec"],
+            "enum": ["code", "api_call", "webhook", "branch", "loop", "parallel", "wait", "end", "container_exec", "hitl_gate"],
             "description": "스텝 실행 방식"
           },
           "description": {

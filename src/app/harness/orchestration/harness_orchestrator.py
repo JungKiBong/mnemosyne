@@ -191,7 +191,7 @@ class HarnessOrchestrator:
         self, harness_id: str, error: str, run_id: str
     ) -> None:
         """Send failure alert to configured webhook endpoint."""
-        webhook_url = self.config.get("monitoring", {}).get(
+        webhook_url = self.workflow.get("config", {}).get("monitoring", {}).get(
             "webhook_on_failure"
         )
         if not webhook_url:

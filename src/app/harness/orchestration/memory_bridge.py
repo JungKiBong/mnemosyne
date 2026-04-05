@@ -28,6 +28,7 @@ class ExperienceType(Enum):
     CAPTURED = "CAPTURED"     # 새 패턴 포착
     HEALED = "HEALED"         # 자기수복 후 성공
     DERIVED = "DERIVED"       # 도메인 포크
+    HUMAN_CORRECTED = "HUMAN_CORRECTED" # HITL 피드백에 의한 교정/규칙 추가
 
 
 @dataclass
@@ -138,6 +139,9 @@ class MemoryBridge:
         elif experience.experience_type == ExperienceType.DERIVED:
             actions.append(self._publish_captured(experience, scope))
 
+        elif experience.experience_type == ExperienceType.HUMAN_CORRECTED:
+            actions.append(self._publish_human_feedback(experience, scope))
+
         logger.info(
             f"[MemoryBridge] Published {experience.experience_type.value} "
             f"for {experience.harness_id}: {len(actions)} actions"
@@ -210,6 +214,22 @@ class MemoryBridge:
         )
         return {"action": "pattern", "result": result}
 
+    def _publish_human_feedback(
+        self, exp: HarnessExperience, scope: str
+    ) -> dict:
+        """HITL 사람의 피드백을 영구적인 규칙(Instruction)으로 기억."""
+        if hasattr(self.backend, "record_instruction"):
+            result = self.backend.record_instruction(
+                category="human_feedback",
+                rule=exp.summary,
+                description=f"Human feedback received during '{exp.harness_id}'. Original tool_chain: {' → '.join(exp.tool_chain)}",
+                strictness="must"
+            )
+        else:
+            # Fallback if record_instruction isn't strictly available (e.g., in some mock backends)
+            result = {"status": "saved_as_mock_feedback", "rule": exp.summary}
+        return {"action": "human_feedback", "result": result}
+
     def _calculate_salience(self, exp: HarnessExperience) -> float:
         """경험 유형과 실행 결과로부터 salience를 산출한다."""
         base = 0.5
@@ -220,6 +240,7 @@ class MemoryBridge:
             ExperienceType.CAPTURED: 0.3,
             ExperienceType.HEALED: 0.25,
             ExperienceType.DERIVED: 0.15,
+            ExperienceType.HUMAN_CORRECTED: 0.4,
             ExperienceType.FAILURE: 0.0,
         }
         base += type_boost.get(exp.experience_type, 0)

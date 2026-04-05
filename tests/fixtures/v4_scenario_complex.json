@@ -1,0 +1,67 @@
+{
+  "scenario_id": "v4_complex_orchestration_demo",
+  "domain": "engineering",
+  "trigger": "Run AI model training with parallel data processing on distributed infrastructure",
+  "data_flow": {
+    "input_data": "s3://bucket/raw_data"
+  },
+  "tool_chain": [
+    "data_preprocessing",
+    "parallel_training",
+    "model_evaluation",
+    "hitl_approval"
+  ],
+  "steps": [
+    {
+      "id": "data_preprocessing",
+      "type": "ray",
+      "action": "distribute_data",
+      "task": "Clean and tokenize massive datasets using Ray cluster",
+      "parameters": {
+        "num_cpus": 8,
+        "memory": "16G"
+      }
+    },
+    {
+      "id": "parallel_training",
+      "type": "parallel",
+      "branches": ["model_a_container", "model_b_nomad"]
+    },
+    {
+      "id": "model_a_container",
+      "type": "container_exec",
+      "action": "train_model_a",
+      "image": "pytorch/pytorch:latest",
+      "command": "python train_a.py",
+      "environment": {
+        "EPOCHS": "10"
+      }
+    },
+    {
+      "id": "model_b_nomad",
+      "type": "nomad",
+      "action": "train_model_b",
+      "task": "Train Model B on GPU instances via Nomad",
+      "parameters": {
+        "datacenter": "dc1",
+        "job_type": "batch"
+      }
+    },
+    {
+      "id": "model_evaluation",
+      "type": "branch",
+      "condition": "results.branch_a.score > results.branch_b.score",
+      "then": "hitl_approval",
+      "else": "hitl_approval"
+    },
+    {
+      "id": "hitl_approval",
+      "type": "hitl_gate",
+      "action": "request_deploy_approval",
+      "task": "Review model metrics and approve for production deployment",
+      "parameters": {
+        "timeout_seconds": 3600
+      }
+    }
+  ]
+}

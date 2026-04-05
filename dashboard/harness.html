@@ -230,6 +230,7 @@ a:hover{text-decoration:underline}
     <div class="tab" data-tab="patterns" data-i18n="harness.tabPatterns">♞ 패턴 목록</div>
     <div class="tab" data-tab="recommend" data-i18n="harness.tabRecommend">🔮 AI 추천</div>
     <div class="tab" data-tab="record" data-i18n="harness.tabRecord">➕ 패턴 등록</div>
+    <div class="tab" data-tab="hitl" data-i18n="harness.tabHitl">👨‍💻 사람 피드백 대기</div>
   </div>
 
   <!-- ═══ Tab: Overview ═══ -->
@@ -347,6 +348,20 @@ a:hover{text-decoration:underline}
       </div>
 
       <button class="btn btn-primary" onclick="submitRecord()" data-i18n="harness.recordBtn">패턴 등록</button>
+    </div>
+  </div>
+
+  <!-- ═══ Tab: HITL Resolution ═══ -->
+  <div class="tab-content" id="tab-hitl">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
+      <h3 style="margin: 0;">👨‍💻 피드백 대기 중인 워크플로우</h3>
+      <button class="btn btn-outline btn-sm" onclick="loadPendingHitl()">🔄 새로고침</button>
+    </div>
+    <div id="hitlContainer">
+      <div class="empty-state">
+        <div class="icon">✨</div>
+        <p>현재 피드백을 기다리는 항목이 없습니다.</p>
+      </div>
     </div>
   </div>
 
@@ -625,25 +640,44 @@ function renderTree(node, isRoot = false) {
     if (node.metadata) {
       if (node.metadata.elapsed_ms) metaHtml += `<span style="font-size: 11px; color: var(--muted); margin-left: 8px">${node.metadata.elapsed_ms}ms</span>`;
       if (node.metadata.total_ms) metaHtml += `<span style="font-size: 11px; color: var(--muted); margin-left: 8px">${node.metadata.total_ms}ms</span>`;
+      
+      // v4 Badges
+      const st = node.metadata.step_type;
+      if (st) {
+        if (st === 'branch') metaHtml += `<span class="v-badge" style="background:#3b82f6; margin-left:8px">🔀 Branch</span>`;
+        else if (st === 'loop') metaHtml += `<span class="v-badge" style="background:#8b5cf6; margin-left:8px">🔁 Loop</span>`;
+        else if (st === 'parallel') metaHtml += `<span class="v-badge" style="background:#f59e0b; margin-left:8px">⏸ Parallel</span>`;
+        else if (st === 'container_exec') metaHtml += `<span class="v-badge" style="background:#0ea5e9; margin-left:8px">🐳 Docker</span>`;
+        else if (st === 'ray') metaHtml += `<span class="v-badge" style="background:#14b8a6; margin-left:8px">☀️ Ray</span>`;
+        else if (st === 'nomad') metaHtml += `<span class="v-badge" style="background:#ec4899; margin-left:8px">⬡ Nomad</span>`;
+        else if (st === 'hitl_gate') {
+           const isSus = node.metadata.status === 'suspended';
+           metaHtml += `<span class="v-badge" style="background:${isSus ? '#f59e0b' : '#10b981'}; margin-left:8px">👨‍💻 HITL ${isSus?'(Wait)':'(Done)'}</span>`;
+        }
+      }
+      if (node.metadata.status === 'healed') {
+        metaHtml += `<span class="v-badge" style="background:#10b981; margin-left:8px">✨ Healed</span>`;
+      }
     }
 
     const hasChildren = node.children && Object.keys(node.children).length > 0;
     
     if (hasChildren) {
-        html += `<details ${isRoot || node.level === 'domain' || node.level === 'workflow' ? 'open' : ''} style="margin-left: ${isRoot ? '0' : '16px'}; border-left: 1px dashed var(--border); padding-left: 8px; margin-bottom: 4px;">`;
+        // v4: indent logic is slightly larger for visual grouping
+        html += `<details ${isRoot || node.level === 'domain' || node.level === 'workflow' ? 'open' : ''} style="margin-left: ${isRoot ? '0' : '20px'}; border-left: 2px dashed rgba(255,255,255,0.1); padding-left: 8px; margin-bottom: 6px;">`;
         html += `<summary style="cursor: pointer; padding: 4px 0; outline: none; user-select: none;">
           <span style="font-size: 12px; margin-right: 4px">${icon}</span>
           <span style="font-size: 13px; font-weight: 600;">${escHtml(node.name)}</span>
           <span style="font-size: 11px; color: var(--muted); margin-left: 8px">[${node.level}]</span>
           ${metaHtml}
         </summary>`;
-        html += `<div style="margin-top: 4px;">`;
+        html += `<div style="margin-top: 4px; padding-bottom: 4px;">`;
         for (const [key, childNode] of Object.entries(node.children)) {
             html += renderTree(childNode, false);
         }
         html += `</div></details>`;
     } else {
-        html += `<div style="margin-left: ${isRoot ? '0' : '16px'}; border-left: 1px dashed var(--border); padding: 4px 0 4px 8px; margin-bottom: 4px;">
+        html += `<div style="margin-left: ${isRoot ? '0' : '20px'}; border-left: 2px dashed rgba(255,255,255,0.1); padding: 4px 0 4px 8px; margin-bottom: 4px;">
           <span style="font-size: 12px; margin-right: 4px">${icon}</span>
           <span style="font-size: 13px; font-weight: 600;">${escHtml(node.name)}</span>
           <span style="font-size: 11px; color: var(--muted); margin-left: 8px">[${node.level}]</span>
@@ -1224,6 +1258,81 @@ async function doRollback(uuid) {
   }
 }
 window.doRollback = doRollback;
+// ── HITL Resolution ──
+window.loadPendingHitl = async function() {
+  const container = document.getElementById('hitlContainer');
+  if (!container) return;
+  container.innerHTML = '<div class="empty-state"><p>로딩 중...</p></div>';
+  try {
+    const res = await fetch('/api/harness/hitl/pending');
+    const data = await res.json();
+    if (data.status !== 'success') throw new Error(data.error || 'Failed to fetch pending HITL');
+    const pending = data.pending || [];
+    if (pending.length === 0) {
+      container.innerHTML = '<div class="empty-state"><div class="icon">✨</div><p>현재 피드백을 기다리는 항목이 없습니다.</p></div>';
+      return;
+    }
+    
+    container.innerHTML = pending.map(task => `
+      <div style="border: 1px solid var(--orange); margin-bottom: 12px; padding: 16px; border-radius: 12px; background: var(--card);">
+        <div style="display:flex; justify-content:space-between; margin-bottom: 8px;">
+          <div>
+            <span style="font-weight: 600; font-size: 14px;">Run ID: ${task.run_id}</span>
+            <span style="font-size: 12px; margin-left: 8px; color: var(--muted);">Step: ${task.step_id}</span>
+          </div>
+          <span style="font-size: 12px; color: var(--muted);">${task.suspended_at}</span>
+        </div>
+        <div style="font-size: 13px; color: var(--text); background: var(--bg); padding: 8px; border-radius: 6px; margin-bottom: 12px; border-left: 3px solid var(--accent);">
+          <strong>Trigger:</strong> ${task.context_preview || 'N/A'}
+        </div>
+        <div style="margin-bottom: 12px;">
+          <input type="text" id="feedback_${task.run_id}" placeholder="피드백 입력 (선택사항)" style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 13px; width: 100%; max-width: 400px; outline: none;">
+        </div>
+        <div style="display:flex; gap: 8px;">
+          <button class="btn btn-success btn-sm" onclick="resolveHitl('${task.run_id}', '${task.step_id}', true)">✅ 승인 (진행)</button>
+          <button class="btn btn-danger btn-sm" onclick="resolveHitl('${task.run_id}', '${task.step_id}', false)">❌ 반려 (중단/우회)</button>
+        </div>
+      </div>
+    `).join('');
+  } catch (e) {
+    container.innerHTML = `<div class="empty-state"><div class="icon">❌</div><p>오류 발생: ${e.message}</p></div>`;
+  }
+};
+
+window.resolveHitl = async function(run_id, step_id, approved) {
+  const fbInput = document.getElementById('feedback_' + run_id);
+  const feedback = fbInput ? fbInput.value : '';
+  
+  if (!confirm(`${approved ? '✅ 승인' : '❌ 반려'} 처리하시겠습니까?`)) return;
+  
+  try {
+    const res = await fetch('/api/harness/hitl/resolve', {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ run_id, step_id, approved, feedback })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    
+    // Use toast if available, else alert
+    if (typeof toast === 'function') toast('✔️ HITL 피드백이 처리되었습니다.', 'success');
+    else alert('✅ HITL 상태가 업데이트되었습니다.');
+    
+    loadPendingHitl();
+  } catch (e) {
+    if (typeof toast === 'function') toast('해결 실패: ' + e.message, 'error');
+    else alert('해결 실패: ' + e.message);
+  }
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    const hitlTab = document.querySelector('.tab[data-tab="hitl"]');
+    if (hitlTab) {
+        hitlTab.addEventListener('click', () => {
+            loadPendingHitl();
+        });
+    }
+});
 </script>
 </body>
 </html>

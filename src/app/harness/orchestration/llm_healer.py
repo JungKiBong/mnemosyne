@@ -52,11 +52,13 @@ class LLMHealerEngine:
         model: str = "qwen3:8b",
         api_key: str = "ollama",
         timeout: int = 30,
+        memory_backend: Optional[Any] = None,
     ):
         self.api_base_url = api_base_url
         self.model = model
         self.api_key = api_key
         self.timeout = timeout
+        self.memory_backend = memory_backend
 
     def heal_workflow(
         self,
@@ -70,7 +72,38 @@ class LLMHealerEngine:
         Returns:
             수정된 워크플로우 dict (수정 불가 시 원본 반환)
         """
-        user_prompt = self._build_prompt(workflow, error_msg, failed_step_id)
+        memory_context = ""
+        if self.memory_backend:
+            try:
+                # 최근 동일 도메인의 Reflection 및 Instruction 조회
+                domain = workflow.get("domain")
+                reflections = []
+                if hasattr(self.memory_backend, "find_reflections"):
+                    reflections = self.memory_backend.find_reflections(domain=domain, limit=3)
+                
+                # Instruction 조회 (human_feedback 위주)
+                instructions = []
+                if hasattr(self.memory_backend, "find_instructions"):
+                    instructions = self.memory_backend.find_instructions(category="human_feedback", limit=3)
+
+                ctx_lines = []
+                if reflections:
+                    ctx_lines.append("Previous Reflections:")
+                    for r in reflections:
+                        ctx_lines.append(f"- Event: {r.get('event')}, Lesson: {r.get('lesson')}")
+                if instructions:
+                    ctx_lines.append("Human Feedback Rules:")
+                    for idx, inst in enumerate(instructions):
+                        # dict or node object
+                        rule = inst.get("rule") if isinstance(inst, dict) else getattr(inst, "rule", "")
+                        ctx_lines.append(f"- Rule {idx+1}: {rule}")
+                
+                if ctx_lines:
+                    memory_context = "\n".join(ctx_lines)
+            except Exception as e:
+                logger.warning(f"Failed to fetch memory context for healer: {e}")
+
+        user_prompt = self._build_prompt(workflow, error_msg, failed_step_id, memory_context)
 
         try:
             import requests
@@ -113,7 +146,7 @@ class LLMHealerEngine:
             return self._apply_rule_based_fix(workflow, error_msg, failed_step_id)
 
     def _build_prompt(
-        self, workflow: dict, error_msg: str, failed_step_id: str
+        self, workflow: dict, error_msg: str, failed_step_id: str, memory_context: str = ""
     ) -> str:
         """LLM에 보낼 수리 요청 프롬프트 생성."""
         # 워크플로우를 간략화 (토큰 절약)
@@ -121,7 +154,7 @@ class LLMHealerEngine:
         # state_storage path 등 불필요한 정보 제거
         slim_wf.pop("state_storage", None)
 
-        return f"""## Failed Workflow
+        prompt = f"""## Failed Workflow
 
 ```json
 {json.dumps(slim_wf, indent=2, ensure_ascii=False)}
@@ -130,10 +163,15 @@ class LLMHealerEngine:
 ## Error Information
 - **Failed Step ID**: `{failed_step_id}`
 - **Error Message**: `{error_msg}`
+"""
+        if memory_context:
+            prompt += f"\n## Cross-Domain Memory Context\n{memory_context}\n"
 
+        prompt += """
 ## Task
 Analyze the error and return a patched version of the workflow JSON that fixes the issue.
 Remember: output ONLY the valid JSON object."""
+        return prompt
 
     def _parse_json_response(self, content: str) -> Optional[dict]:
         """LLM 응답에서 JSON을 추출한다."""
