@@ -31,7 +31,7 @@ class TestMemoryAPI:
 
     def test_stm_add_via_api(self, client):
         """POST /api/memory/stm/add adds an STM item (returns 201)."""
-        resp = client.post('/api/memory/stm/add', json={
+        resp = client.post('/api/v1/memory/stm/add', json={
             'content': 'E2E test: 중요한 기억',
             'source': 'e2e_test',
         })
@@ -42,12 +42,12 @@ class TestMemoryAPI:
     def test_stm_list_via_api(self, client):
         """GET /api/memory/stm/list returns current STM buffer."""
         # Add something first
-        client.post('/api/memory/stm/add', json={
+        client.post('/api/v1/memory/stm/add', json={
             'content': 'E2E list test memory',
             'source': 'e2e_test',
         })
 
-        resp = client.get('/api/memory/stm/list')
+        resp = client.get('/api/v1/memory/stm/list')
         assert resp.status_code == 200
         data = resp.get_json()
         assert isinstance(data, list)
@@ -56,14 +56,14 @@ class TestMemoryAPI:
     def test_stm_evaluate_via_api(self, client):
         """POST /api/memory/stm/evaluate evaluates salience."""
         # Add an item first
-        add_resp = client.post('/api/memory/stm/add', json={
+        add_resp = client.post('/api/v1/memory/stm/add', json={
             'content': 'Evaluate test',
             'source': 'e2e_test',
         })
         item_id = add_resp.get_json().get('id')
 
         if item_id:
-            resp = client.post('/api/memory/stm/evaluate', json={
+            resp = client.post('/api/v1/memory/stm/evaluate', json={
                 'id': item_id,
                 'salience': 0.75,
             })
@@ -71,14 +71,14 @@ class TestMemoryAPI:
 
     def test_memory_overview_api(self, client):
         """GET /api/memory/overview returns dashboard data."""
-        resp = client.get('/api/memory/overview')
+        resp = client.get('/api/v1/memory/overview')
         assert resp.status_code == 200
         data = resp.get_json()
         assert 'stm' in data
 
     def test_decay_manual_trigger_api(self, client):
         """POST /api/memory/decay triggers manual decay."""
-        resp = client.post('/api/memory/decay', json={
+        resp = client.post('/api/v1/memory/decay', json={
             'dry_run': True,
         })
         assert resp.status_code == 200
@@ -87,7 +87,7 @@ class TestMemoryAPI:
 
     def test_memory_config_get_api(self, client):
         """GET /api/memory/config returns current config."""
-        resp = client.get('/api/memory/config')
+        resp = client.get('/api/v1/memory/config')
         assert resp.status_code == 200
         data = resp.get_json()
         assert 'decay_rate' in data or 'config' in data
@@ -98,7 +98,7 @@ class TestSearchAPI:
 
     def test_search_api(self, client):
         """POST /api/search with a query returns results."""
-        resp = client.post('/api/search', json={
+        resp = client.post('/api/v1/search', json={
             'query': 'test memory',
             'limit': 5,
         })
@@ -113,14 +113,14 @@ class TestAuditAPI:
 
     def test_audit_recent_activity(self, client):
         """GET /api/memory/audit/activity returns recent activity."""
-        resp = client.get('/api/memory/audit/activity')
+        resp = client.get('/api/v1/memory/audit/activity')
         assert resp.status_code == 200
         data = resp.get_json()
         assert isinstance(data, (list, dict))
 
     def test_audit_stats(self, client):
         """GET /api/memory/audit/stats returns stats."""
-        resp = client.get('/api/memory/audit/stats')
+        resp = client.get('/api/v1/memory/audit/stats')
         assert resp.status_code == 200
         data = resp.get_json()
         assert 'total_revisions' in data or isinstance(data, dict)
@@ -131,7 +131,7 @@ class TestScopeAPI:
 
     def test_scope_summary(self, client):
         """GET /api/memory/scopes/summary returns scope stats."""
-        resp = client.get('/api/memory/scopes/summary')
+        resp = client.get('/api/v1/memory/scopes/summary')
         assert resp.status_code == 200
         data = resp.get_json()
         assert 'scopes' in data or isinstance(data, dict)
@@ -142,17 +142,17 @@ class TestDashboardAPI:
 
     def test_dashboard_overview(self, client):
         """GET /api/memory/overview returns full dashboard data."""
-        resp = client.get('/api/memory/overview')
+        resp = client.get('/api/v1/memory/overview')
         assert resp.status_code == 200
 
     def test_ltm_overview(self, client):
         """GET /api/memory/ltm/overview returns LTM statistics."""
-        resp = client.get('/api/memory/ltm/overview')
+        resp = client.get('/api/v1/memory/ltm/overview')
         assert resp.status_code in (200, 404)
 
     def test_memory_detail_not_found(self, client):
         """GET /api/memory/detail/<uuid> handles non-existent gracefully."""
-        resp = client.get('/api/memory/detail/00000000-0000-0000-0000-000000000000')
+        resp = client.get('/api/v1/memory/detail/00000000-0000-0000-0000-000000000000')
         # Can be 200 with error, or 404 — both are valid
         assert resp.status_code in (200, 404)
 

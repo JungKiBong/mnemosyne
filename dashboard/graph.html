@@ -335,7 +335,7 @@ async function showNodeDetails(data) {
   // Fetch true history async
   if(data.uuid) {
     try {
-      const res = await fetch('/api/memory/audit/history/' + data.uuid);
+      const res = await fetch('/api/v1/memory/audit/history/' + data.uuid);
       const history = await res.json();
       
       const tlDiv = document.getElementById('rev-timeline');
@@ -387,7 +387,7 @@ async function sendMemoryChat(uuid) {
   log.scrollTop = log.scrollHeight;
   
   try {
-      const res = await fetch('/api/memory/' + uuid + '/chat', {
+      const res = await fetch('/api/v1/memory/' + uuid + '/chat', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({message: msg})
@@ -496,7 +496,7 @@ async function openDeepDive(data) {
   
   // Fetch History
   try {
-    const res = await fetch('/api/memory/audit/history/' + uuid);
+    const res = await fetch('/api/v1/memory/audit/history/' + uuid);
     const history = await res.json();
     const tlDiv = document.getElementById('modal-timeline');
     
@@ -564,7 +564,7 @@ async function synthesizeMemory(e) {
   if(synthBtn) { synthBtn.innerText = "Saving..."; synthBtn.disabled = true; }
   
   try {
-      const res = await fetch('/api/memory/' + uuid + '/synthesize', {
+      const res = await fetch('/api/v1/memory/' + uuid + '/synthesize', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({insight: insight, created_by: 'user_synthesis'})
@@ -615,7 +615,7 @@ async function sendModalChat() {
       const payload = {message: msg};
       if(revId) payload.revision_id = revId;
       
-      const res = await fetch('/api/memory/' + uuid + '/chat', {
+      const res = await fetch('/api/v1/memory/' + uuid + '/chat', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify(payload)
@@ -652,7 +652,7 @@ async function runQuery() {
   toggleLoader(true);
   const cypher = document.getElementById('cypherInput').value;
   try {
-    const res = await fetch('/api/query', {
+    const res = await fetch('/api/v1/query', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cypher })
     });
@@ -687,7 +687,7 @@ async function loadHarnessGraph() {
 
     const labelFilter = labels.map(l => `n:\`${l}\``).join(' OR ');
     const query = `MATCH (n) WHERE ${labelFilter} OPTIONAL MATCH (n)-[r]-(m) RETURN n, type(r) as type, m LIMIT 200`;
-    const resp = await fetch('/api/memory/graph/query', {
+    const resp = await fetch('/api/v1/memory/graph/query', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({query})
     });
@@ -766,7 +766,7 @@ function applyHarnessFilter() {
 async function loadAgents() {
   toggleLoader(true);
   try {
-    const res = await fetch('/api/memory/synaptic/agents');
+    const res = await fetch('/api/v1/memory/synaptic/agents');
     const agents = await res.json();
     
     // Add central bridge node

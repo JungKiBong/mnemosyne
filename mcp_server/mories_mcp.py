@@ -526,7 +526,7 @@ async def _dispatch(name: str, args: dict) -> dict:
 
     # ── Search ──
     if name == "mories_search":
-        return await _api("POST", "/api/search", {
+        return await _api("POST", "/api/v1/search", {
             "query": args["query"],
             "limit": args.get("limit", 10),
         })
@@ -534,7 +534,7 @@ async def _dispatch(name: str, args: dict) -> dict:
     # ── Ingest (STM + promote to LTM) ──
     elif name == "mories_ingest":
         # Step 1: Add to STM
-        stm = await _api("POST", "/api/memory/stm/add", {
+        stm = await _api("POST", "/api/v1/memory/stm/add", {
             "content": args["content"],
             "source": args.get("source", AGENT_ID),
             "salience": args.get("salience", 0.7),
@@ -546,7 +546,7 @@ async def _dispatch(name: str, args: dict) -> dict:
         # Step 2: Auto-promote to LTM
         stm_id = stm.get("id")
         if stm_id:
-            ltm = await _api("POST", "/api/memory/stm/promote", {"id": stm_id})
+            ltm = await _api("POST", "/api/v1/memory/stm/promote", {"id": stm_id})
             return {
                 "status": "ingested_and_promoted",
                 "stm_id": stm_id,
@@ -557,7 +557,7 @@ async def _dispatch(name: str, args: dict) -> dict:
 
     # ── STM Add ──
     elif name == "mories_stm_add":
-        return await _api("POST", "/api/memory/stm/add", {
+        return await _api("POST", "/api/v1/memory/stm/add", {
             "content": args["content"],
             "source": args.get("source", AGENT_ID),
             "salience": args.get("salience", 0.5),
@@ -565,19 +565,19 @@ async def _dispatch(name: str, args: dict) -> dict:
 
     # ── STM Promote ──
     elif name == "mories_stm_promote":
-        return await _api("POST", "/api/memory/stm/promote", {"id": args["id"]})
+        return await _api("POST", "/api/v1/memory/stm/promote", {"id": args["id"]})
 
     # ── Memory Overview ──
     elif name == "mories_memory_overview":
-        return await _api("GET", "/api/memory/overview")
+        return await _api("GET", "/api/v1/memory/overview")
 
     # ── Memory Top ──
     elif name == "mories_memory_top":
-        return await _api("GET", "/api/memory/top", {"limit": args.get("limit", 10)})
+        return await _api("GET", "/api/v1/memory/top", {"limit": args.get("limit", 10)})
 
     # ── Graph Query ──
     elif name == "mories_graph_query":
-        return await _api("POST", "/api/query", {"cypher": args["cypher"]})
+        return await _api("POST", "/api/v1/query", {"cypher": args["cypher"]})
 
     # ── Graph List ──
     elif name == "mories_graph_list":
@@ -598,7 +598,7 @@ async def _dispatch(name: str, args: dict) -> dict:
 
     # ── Permanent Imprint ──
     elif name == "mories_permanent_imprint":
-        return await _api("POST", "/api/memory/permanent/imprint", {
+        return await _api("POST", "/api/v1/memory/permanent/imprint", {
             "content": args["content"],
             "category": args.get("category", "custom"),
             "scope": args.get("scope", "tribal"),
@@ -612,7 +612,7 @@ async def _dispatch(name: str, args: dict) -> dict:
 
     # ── Cognitive Memory Categories ──
     elif name == "mories_record_preference":
-        return await _api("POST", "/api/memory/category/preference", {
+        return await _api("POST", "/api/v1/memory/category/preference", {
             "domain": args["domain"],
             "preference_key": args["preference_key"],
             "preference_value": args["preference_value"],
@@ -622,13 +622,13 @@ async def _dispatch(name: str, args: dict) -> dict:
             "agent_id": AGENT_ID,
         })
     elif name == "mories_recall_preferences":
-        return await _api("GET", "/api/memory/category/preference", {
+        return await _api("GET", "/api/v1/memory/category/preference", {
             "domain": args.get("domain"),
             "agent_id": AGENT_ID,
         })
 
     elif name == "mories_record_instruction":
-        return await _api("POST", "/api/memory/category/instruction", {
+        return await _api("POST", "/api/v1/memory/category/instruction", {
             "rule": args["rule"],
             "category": args.get("category", "general"),
             "strictness": args.get("strictness", "should"),
@@ -636,13 +636,13 @@ async def _dispatch(name: str, args: dict) -> dict:
             "agent_id": AGENT_ID,
         })
     elif name == "mories_recall_instructions":
-        return await _api("GET", "/api/memory/category/instruction", {
+        return await _api("GET", "/api/v1/memory/category/instruction", {
             "category": args.get("category"),
             "agent_id": AGENT_ID,
         })
 
     elif name == "mories_record_reflection":
-        return await _api("POST", "/api/memory/category/reflection", {
+        return await _api("POST", "/api/v1/memory/category/reflection", {
             "event": args["event"],
             "lesson": args["lesson"],
             "domain": args.get("domain", "general"),
@@ -651,14 +651,14 @@ async def _dispatch(name: str, args: dict) -> dict:
             "agent_id": AGENT_ID,
         })
     elif name == "mories_recall_reflections":
-        return await _api("GET", "/api/memory/category/reflection", {
+        return await _api("GET", "/api/v1/memory/category/reflection", {
             "domain": args.get("domain"),
             "severity": args.get("severity"),
             "agent_id": AGENT_ID,
         })
 
     elif name == "mories_record_conditional":
-        return await _api("POST", "/api/memory/category/conditional", {
+        return await _api("POST", "/api/v1/memory/category/conditional", {
             "condition": args["condition"],
             "then_action": args["then_action"],
             "else_action": args.get("else_action"),
@@ -667,7 +667,7 @@ async def _dispatch(name: str, args: dict) -> dict:
             "agent_id": AGENT_ID,
         })
     elif name == "mories_recall_conditionals":
-        return await _api("POST", "/api/memory/category/conditional/search", {
+        return await _api("POST", "/api/v1/memory/category/conditional/search", {
             "context": args.get("context"),
             "subcategory": args.get("subcategory"),
             "agent_id": AGENT_ID,

@@ -251,7 +251,7 @@ def mories_ingest(
     }
 
     try:
-        resp = client.post("/api/ingest", json=payload)
+        resp = client.post("/api/v1/ingest", json=payload)
         return resp.json()
     except Exception as e:
         return {"error": str(e)}
@@ -470,7 +470,7 @@ def mories_stream(
 
     if action == "list":
         try:
-            resp = client.get("/api/ingest/streams")
+            resp = client.get("/api/v1/ingest/streams")
             return resp.json()
         except Exception as e:
             return {"error": str(e)}
@@ -484,7 +484,7 @@ def mories_stream(
             "config": config or {},
         }
         try:
-            resp = client.post("/api/ingest/stream", json=payload)
+            resp = client.post("/api/v1/ingest/stream", json=payload)
             return resp.json()
         except Exception as e:
             return {"error": str(e)}
@@ -494,7 +494,7 @@ def mories_stream(
             return {"error": "source_ref required for stop"}
         try:
             resp = client.delete(
-                "/api/ingest/stream", params={"source_ref": source_ref}
+                "/api/v1/ingest/stream", params={"source_ref": source_ref}
             )
             return resp.json()
         except Exception as e:

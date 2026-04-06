@@ -439,43 +439,43 @@ PYTHONPATH=src .venv/bin/python -m pytest tests/unit/test_resilience.py tests/in
 <h2 id="5-api">5. API 활용 가이드</h2>
 <h3 id="51-stm-ltm">5.1 기억 저장 (STM → LTM)</h3>
 <pre><code class="language-bash"># 1. STM에 추가
-curl -X POST http://localhost:5050/api/memory/stm/add \
+curl -X POST http://localhost:5050/api/v1/memory/stm/add \
   -H &quot;Content-Type: application/json&quot; \
   -d '{&quot;content&quot;: &quot;프로젝트 X의 아키텍처 결정&quot;, &quot;source&quot;: &quot;meeting&quot;}'
 
 # 2. 평가 (salience 부여)
-curl -X POST http://localhost:5050/api/memory/stm/evaluate \
+curl -X POST http://localhost:5050/api/v1/memory/stm/evaluate \
   -H &quot;Content-Type: application/json&quot; \
   -d '{&quot;id&quot;: &quot;&lt;stm-uuid&gt;&quot;, &quot;salience&quot;: 0.8}'
 
 # 3. LTM으로 승격
-curl -X POST http://localhost:5050/api/memory/stm/promote \
+curl -X POST http://localhost:5050/api/v1/memory/stm/promote \
   -H &quot;Content-Type: application/json&quot; \
   -d '{&quot;id&quot;: &quot;&lt;stm-uuid&gt;&quot;}'
 </code></pre>
 <h3 id="52">5.2 기억 검색</h3>
-<pre><code class="language-bash">curl -X POST http://localhost:5050/api/search \
+<pre><code class="language-bash">curl -X POST http://localhost:5050/api/v1/search \
   -H &quot;Content-Type: application/json&quot; \
   -d '{&quot;query&quot;: &quot;아키텍처 결정&quot;, &quot;limit&quot;: 10}'
 # 검색 시 자동으로 Retrieval Boost 적용
 </code></pre>
 <h3 id="53">5.3 감쇠 수동 트리거</h3>
 <pre><code class="language-bash"># Dry-run (실제 변경 없이 영향 확인)
-curl -X POST http://localhost:5050/api/memory/decay \
+curl -X POST http://localhost:5050/api/v1/memory/decay \
   -H &quot;Content-Type: application/json&quot; \
   -d '{&quot;dry_run&quot;: true}'
 
 # 실제 실행
-curl -X POST http://localhost:5050/api/memory/decay \
+curl -X POST http://localhost:5050/api/v1/memory/decay \
   -H &quot;Content-Type: application/json&quot; \
   -d '{&quot;dry_run&quot;: false}'
 </code></pre>
 <h3 id="54">5.4 감사 및 롤백</h3>
 <pre><code class="language-bash"># 특정 기억의 변경 이력
-curl http://localhost:5050/api/memory/audit/history/&lt;memory-uuid&gt;
+curl http://localhost:5050/api/v1/memory/audit/history/&lt;memory-uuid&gt;
 
 # 이전 버전으로 롤백
-curl -X POST http://localhost:5050/api/memory/audit/rollback \
+curl -X POST http://localhost:5050/api/v1/memory/audit/rollback \
   -H &quot;Content-Type: application/json&quot; \
   -d '{&quot;revision_id&quot;: &quot;&lt;revision-uuid&gt;&quot;}'
 </code></pre>
@@ -651,7 +651,7 @@ curl http://localhost:5050/api/health
 # → &quot;scheduler&quot;: &quot;running&quot; 확인
 
 # 수동 감쇠 실행
-curl -X POST http://localhost:5050/api/memory/decay -d '{&quot;dry_run&quot;: false}'
+curl -X POST http://localhost:5050/api/v1/memory/decay -d '{&quot;dry_run&quot;: false}'
 </code></pre>
 <h3 id="_3">테스트 실패 시</h3>
 <pre><code class="language-bash"># 개별 테스트 실행 (디버그)

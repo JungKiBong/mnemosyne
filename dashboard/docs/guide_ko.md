@@ -162,7 +162,7 @@ curl -X POST http://localhost:5050/api/reconciliation/run \
 
 ### 7.2 트러블슈팅 (Neo4j 및 감쇠)
 * **Neo4j 연결 실패**: `docker logs mirofish-neo4j`를 통해 컨테이너 시동 확인 및 `.env` 파일의 `NEO4J_URI` 점검.
-* **감쇠(Decay) 스케줄러 미작동**: `curl http://localhost:5050/api/health` 호출 시 `"scheduler": "running"` 확인. 작동 중지 상태라면 수동 트리거로 복구 가능: `curl -X POST http://localhost:5050/api/memory/decay -d '{"dry_run": false}'`.
+* **감쇠(Decay) 스케줄러 미작동**: `curl http://localhost:5050/api/health` 호출 시 `"scheduler": "running"` 확인. 작동 중지 상태라면 수동 트리거로 복구 가능: `curl -X POST http://localhost:5050/api/v1/memory/decay -d '{"dry_run": false}'`.
 
 ---
 *Last updated: 2026-04-01*

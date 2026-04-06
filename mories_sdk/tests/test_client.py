@@ -144,7 +144,7 @@ class TestAPIMethods:
         assert len(result["results"]) == 1
         mock_ctx.request.assert_called_once_with(
             "POST",
-            "http://test-server:5050/api/search",
+            "http://test-server:5050/api/v1/search",
             json={"query": "아키텍처 결정", "limit": 5, "graph_id": ""},
         )
 
@@ -162,7 +162,7 @@ class TestAPIMethods:
         assert result["success"] is True
         mock_ctx.request.assert_called_once_with(
             "POST",
-            "http://test-server:5050/api/ingest/text",
+            "http://test-server:5050/api/v1/ingest/pipeline/process",
             json={"content": "테스트 내용", "source": "unit-test", "salience": 0.9},
         )
 
@@ -240,12 +240,18 @@ class TestErrorHandling:
 
     @patch("mories.client.httpx.Client")
     def test_http_error_raises(self, MockClient, client):
-        """서버 에러(4xx/5xx) 시 httpx.HTTPStatusError 발생"""
+        """서버 에러(4xx/5xx) 시 MoriesError(NotFoundError) 발생"""
+        from mories.errors import NotFoundError
         mock_resp = MagicMock(spec=httpx.Response)
+        mock_resp.is_success = False
+        mock_resp.status_code = 404
+        mock_resp.json.return_value = {
+            "error": {"code": "NOT_FOUND", "message": "Item missing", "details": {}}
+        }
         mock_resp.raise_for_status.side_effect = httpx.HTTPStatusError(
             "Not Found",
             request=MagicMock(),
-            response=MagicMock(status_code=404),
+            response=mock_resp,
         )
         mock_ctx = MagicMock()
         mock_ctx.__enter__ = MagicMock(return_value=mock_ctx)
@@ -253,5 +259,7 @@ class TestErrorHandling:
         mock_ctx.request.return_value = mock_resp
         MockClient.return_value = mock_ctx
 
-        with pytest.raises(httpx.HTTPStatusError):
+        with pytest.raises(NotFoundError) as exc:
             client.health()
+        assert exc.value.status_code == 404
+        assert exc.value.code == "NOT_FOUND"

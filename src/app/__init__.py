@@ -97,6 +97,10 @@ def create_app(config_class=Config):
     from .utils.limiter import limiter
     limiter.init_app(app)
 
+    # Register Global Error Handlers
+    from .utils.error_handlers import register_error_handlers
+    register_error_handlers(app)
+
     # --- Initialize Storage singleton (DI via app.extensions) ---
     storage_backend = app.config.get('STORAGE_BACKEND', 'neo4j').lower()
     
@@ -210,15 +214,17 @@ def create_app(config_class=Config):
     except ImportError:
         logger.info("OASIS plugin not installed. Skipping simulation blueprint registration.")
 
-    # Data Ingestion API (Phase 1.5)
+    # API v1 Versioning (Phase 2.3)
+    from .api.v1 import api_v1_bp
+    app.register_blueprint(api_v1_bp, url_prefix='/api/v1')
 
     # Cognitive Memory API (Phase 7)
     from .api.memory import memory_bp
-    app.register_blueprint(memory_bp, url_prefix='/api/memory')
+    app.register_blueprint(memory_bp, url_prefix='/api/v1/memory')
 
     # Ingest API (Ingestion, Pipeline, Gateway)
     from .api.ingest import ingest_bp
-    app.register_blueprint(ingest_bp, url_prefix='/api/ingest')
+    app.register_blueprint(ingest_bp, url_prefix='/api/v1/ingest')
     # Analytics API (Maturity, Reconciliation, Reports, Data Products)
     from .api.analytics import analytics_bp
     app.register_blueprint(analytics_bp, url_prefix='/api/analytics')
@@ -242,10 +248,6 @@ def create_app(config_class=Config):
     from .api.core import core_bp
     app.register_blueprint(core_bp)
     
-    # API v1 Versioning (Phase 2.3)
-    from .api.v1 import api_v1_bp
-    app.register_blueprint(api_v1_bp, url_prefix='/api/v1')
-
     if should_log_startup:
         logger.info("MiroFish-Offline Backend startup complete")
         logger.info("Dashboard: http://localhost:5001/")

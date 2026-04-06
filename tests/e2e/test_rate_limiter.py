@@ -11,7 +11,7 @@ def test_rate_limit_on_batch_endpoint(client):
     }
     
     for _ in range(12):
-        resp = client.post("/api/ingest/batch/async", json=payload)
+        resp = client.post("/api/v1/ingest/batch/async", json=payload)
         responses.append(resp.status_code)
 
     # The first 10 should be 202 (Accepted) or 400 (Bad Request), but anyway not 429

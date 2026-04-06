@@ -4,6 +4,7 @@ Mories SDK — Python Client for the Mories Cognitive Engine.
 
 import httpx
 from typing import Dict, Any, Optional
+from .errors import parse_api_error, MoriesError
 
 
 class MoriesClient:
@@ -36,6 +37,17 @@ class MoriesClient:
         # Persistent session — created lazily or via context‐manager
         self._client: Optional[httpx.Client] = None
 
+    def _handle_error(self, response: httpx.Response):
+        """Raises specific SDK exceptions if the response has an error status code."""
+        if not response.is_success:
+            try:
+                data = response.json()
+                if "error" in data:
+                    raise parse_api_error(response.status_code, data)
+            except ValueError:
+                pass # Not JSON
+            response.raise_for_status()
+
     # --- context-manager support ---
 
     def __enter__(self):
@@ -60,7 +72,7 @@ class MoriesClient:
                 headers=self._headers, timeout=self.timeout
             ) as c:
                 resp = c.request(method, url, **kwargs)
-        resp.raise_for_status()
+        self._handle_error(resp)
         return resp
 
     # --- public API ---
@@ -78,7 +90,7 @@ class MoriesClient:
         """Search the Mories knowledge graph."""
         return self._request(
             "POST",
-            "/api/search",
+            "/api/v1/search",
             json={"query": query, "limit": limit, "graph_id": graph_id},
         ).json()
 
@@ -87,10 +99,10 @@ class MoriesClient:
         return self._request("GET", "/api/health").json()
 
     def ingest(self, content: str, source: str = "sdk", salience: float = 0.7) -> Dict[str, Any]:
-        """Ingest content into the Mories knowledge graph."""
+        """Ingest content into the Mories knowledge pipeline."""
         return self._request(
             "POST",
-            "/api/ingest/text",
+            "/api/v1/ingest/pipeline/process",
             json={"content": content, "source": source, "salience": salience},
         ).json()
 
@@ -99,8 +111,8 @@ class MoriesClient:
         payload: Dict[str, Any] = {"content": content, "source": source}
         if ttl is not None:
             payload["ttl"] = ttl
-        return self._request("POST", "/api/memory/stm", json=payload).json()
+        return self._request("POST", "/api/v1/memory/stm/add", json=payload).json()
 
     def stm_list(self) -> Dict[str, Any]:
         """List all Short-Term Memory items."""
-        return self._request("GET", "/api/memory/stm").json()
+        return self._request("GET", "/api/v1/memory/stm/list").json()

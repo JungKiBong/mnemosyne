@@ -162,7 +162,7 @@ curl -X POST http://localhost:5050/api/reconciliation/run \
 
 ### 7.2 Troubleshooting
 * **Neo4j Connection Failed**: Check container status with `docker logs mirofish-neo4j` and verify `NEO4J_URI` inside `.env`.
-* **Decay Scheduler Stopped**: Verify via `curl http://localhost:5050/api/health` that `"scheduler": "running"`. If stopped, invoke a manual run using `curl -X POST http://localhost:5050/api/memory/decay -d '{"dry_run": false}'`.
+* **Decay Scheduler Stopped**: Verify via `curl http://localhost:5050/api/health` that `"scheduler": "running"`. If stopped, invoke a manual run using `curl -X POST http://localhost:5050/api/v1/memory/decay -d '{"dry_run": false}'`.
 
 ---
 *Last updated: 2026-04-01*
