@@ -361,7 +361,9 @@ async function sendRequest() {
 
   const start = performance.now();
   try {
-    const resp = await fetch(url, options);
+    const resp = await (window.moriesApi 
+      ? window.moriesApi.rawRequest(method, url, body, options) 
+      : fetch(url, options));
     const elapsed = Math.round(performance.now() - start);
     const text = await resp.text();
 
@@ -384,11 +386,13 @@ async function sendMcpRequest() {
 
   const start = performance.now();
   try {
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: window.moriesApi ? window.moriesApi.getHeaders() : { 'Content-Type': 'application/json' },
-      body,
-    });
+    const resp = await (window.moriesApi
+      ? window.moriesApi.rawRequest('POST', url, body)
+      : fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body,
+        }));
     const elapsed = Math.round(performance.now() - start);
     const text = await resp.text();
 
@@ -436,8 +440,9 @@ function copyUrl() {
 async function checkConnection() {
   try {
     const options = { signal: AbortSignal.timeout(3000) };
-    if (window.moriesApi) options.headers = window.moriesApi.getHeaders();
-    const resp = await fetch(BASE + '/api/health', options);
+    const resp = await (window.moriesApi 
+      ? window.moriesApi.rawRequest('GET', BASE + '/api/health', null, options) 
+      : fetch(BASE + '/api/health', options));
     const data = await resp.json();
     document.getElementById('connDot').className = 'conn-dot online';
     document.getElementById('connLabel').textContent = `Connected — Neo4j: ${data.neo4j?.status || 'unknown'}, ${data.neo4j?.node_count || 0} nodes`;

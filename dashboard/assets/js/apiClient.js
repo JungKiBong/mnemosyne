@@ -99,6 +99,18 @@ class ApiClient {
     }
   }
 
+  async rawRequest(method, endpoint, body = null, options = {}) {
+    const url = this._joinUrl(endpoint);
+    const fetchOptions = {
+      method,
+      headers: this.getHeaders(options.headers || {}),
+    };
+    if (body) {
+      fetchOptions.body = typeof body === 'string' ? body : JSON.stringify(body);
+    }
+    return fetch(url, fetchOptions);
+  }
+
   async get(endpoint, options = {}) {
     return this._request('GET', endpoint, null, options);
   }
