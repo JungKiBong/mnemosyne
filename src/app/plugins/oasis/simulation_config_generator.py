@@ -18,9 +18,9 @@ from datetime import datetime
 
 from openai import OpenAI
 
-from ..config import Config
-from ..utils.logger import get_logger
-from .entity_reader import EntityNode
+from src.app.config import Config
+from src.app.utils.logger import get_logger
+from src.app.services.entity_reader import EntityNode
 
 logger = get_logger('mirofish.simulation_config')
 

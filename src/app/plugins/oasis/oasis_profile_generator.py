@@ -17,10 +17,10 @@ from datetime import datetime
 
 from openai import OpenAI
 
-from ..config import Config
-from ..utils.logger import get_logger
-from .entity_reader import EntityNode
-from ..storage import GraphStorage
+from src.app.config import Config
+from src.app.utils.logger import get_logger
+from src.app.services.entity_reader import EntityNode
+from src.app.storage import GraphStorage
 
 logger = get_logger('mirofish.oasis_profile')
 

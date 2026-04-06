@@ -188,7 +188,10 @@ from flask import request, jsonify, send_file, current_app
 
 from ..config import Config
 from ..services.report_agent import ReportAgent, ReportManager, ReportStatus
-from ..services.simulation_manager import SimulationManager
+try:
+    from src.app.plugins.oasis.simulation_manager import SimulationManager
+except ImportError:
+    SimulationManager = None
 from ..models.project import ProjectManager
 from ..models.task import TaskManager, TaskStatus
 from ..services.graph_tools import GraphToolsService
@@ -208,6 +211,9 @@ def generate_report():
             return jsonify({"success": False, "error": "Please provide simulation_id"}), 400
 
         force_regenerate = data.get('force_regenerate', False)
+        if SimulationManager is None:
+            return jsonify({"success": False, "error": "OASIS simulation plugin is not installed. Report generation is not available."}), 503
+        
         manager = SimulationManager()
         state = manager.get_simulation(simulation_id)
         if not state:
@@ -411,6 +417,9 @@ def chat_with_report_agent():
         if not message:
             return jsonify({"success": False, "error": "Please provide message"}), 400
 
+        if SimulationManager is None:
+            return jsonify({"success": False, "error": "OASIS simulation plugin is not installed. Report agent chat is not available."}), 503
+            
         manager = SimulationManager()
         state = manager.get_simulation(simulation_id)
         if not state:

@@ -18,9 +18,9 @@ from datetime import datetime
 from enum import Enum
 from queue import Queue
 
-from ..config import Config
-from ..utils.logger import get_logger
-from .graph_memory_updater import GraphMemoryManager
+from src.app.config import Config
+from src.app.utils.logger import get_logger
+from src.app.services.graph_memory_updater import GraphMemoryManager
 from .simulation_ipc import SimulationIPCClient, CommandType, IPCResponse
 
 logger = get_logger('mirofish.simulation_runner')

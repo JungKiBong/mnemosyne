@@ -199,8 +199,12 @@ def create_default_registry() -> ExecutorRegistry:
     
     from .ray_executor import RayExecutor
     from .nomad_executor import NomadExecutor
+    from .container_executor import ContainerExecutor
+    from .wasm_executor import WasmExecutor
     registry.register("ray", RayExecutor())
     registry.register("nomad", NomadExecutor())
+    registry.register("container_exec", ContainerExecutor())
+    registry.register("wasm_exec", WasmExecutor())
     
     return registry
 

@@ -1,13 +1,17 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Mories Harness v4 Workflow DSL",
-  "description": "분기/반복/조건/코드실행/API호출을 자연어에서 자동 생성 가능한 범용 워크플로우 정의 형식",
+  "description": "분기/반복/조건/코드실행/API호출/분산실행/샌드박스를 자연어에서 자동 생성 가능한 범용 워크플로우 정의 형식",
   "type": "object",
-  "required": ["harness_id", "version", "domain", "steps"],
+  "required": ["harness_id", "domain", "steps"],
   "properties": {
     "harness_id": {
       "type": "string",
       "description": "Mories 하네스 UUID 또는 사용자 지정 ID"
+    },
+    "scenario_id": {
+      "type": "string",
+      "description": "시나리오 식별자 (테스트/운영 구분)"
     },
     "version": {
       "type": "integer",
@@ -17,6 +21,10 @@
       "type": "string",
       "description": "시나리오 도메인 (engineering, marketing, data_science 등)"
     },
+    "trigger": {
+      "type": "string",
+      "description": "이 워크플로우를 트리거한 자연어 요청 또는 이벤트"
+    },
     "description": {
       "type": "string"
     },
@@ -25,109 +33,21 @@
       "description": "워크플로우 전역 환경변수 (DIFY_BASE_URL, N8N_BASE_URL 등)",
       "additionalProperties": {"type": "string"}
     },
+    "data_flow": {
+      "type": "object",
+      "description": "워크플로우 입출력 데이터 바인딩",
+      "additionalProperties": true
+    },
+    "tool_chain": {
+      "type": "array",
+      "description": "스텝 실행 순서의 논리적 요약 (step ID 목록)",
+      "items": {"type": "string"}
+    },
     "steps": {
       "type": "array",
       "minItems": 1,
       "items": {
-        "type": "object",
-        "required": ["id", "type"],
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "스텝 고유 ID (goto 참조용)"
-          },
-          "type": {
-            "type": "string",
-            "enum": ["code", "api_call", "webhook", "branch", "loop", "parallel", "wait", "end", "container_exec", "hitl_gate"],
-            "description": "스텝 실행 방식"
-          },
-          "description": {
-            "type": "string",
-            "description": "이 스텝이 하는 일에 대한 자연어 설명"
-          },
-
-          "action": {
-            "type": "string",
-            "description": "[code] 실행할 Python 함수 경로 (module.function)"
-          },
-          "params": {
-            "type": "object",
-            "description": "[code] 함수 매개변수. ${prev_step.output_key} 형태로 변수 참조 가능"
-          },
-          "output_key": {
-            "type": "string",
-            "description": "이 스텝의 실행 결과를 저장할 변수명"
-          },
-
-          "method": {
-            "type": "string",
-            "enum": ["GET", "POST", "PUT", "DELETE"],
-            "description": "[api_call/webhook] HTTP 메서드"
-          },
-          "url": {
-            "type": "string",
-            "description": "[api_call/webhook] 호출할 URL. 환경변수 참조 가능"
-          },
-          "headers": {
-            "type": "object",
-            "description": "[api_call] 요청 헤더",
-            "additionalProperties": {"type": "string"}
-          },
-          "body": {
-            "type": "object",
-            "description": "[api_call/webhook] 요청 바디"
-          },
-
-          "condition": {
-            "type": "string",
-            "description": "[branch] 평가할 조건식: ${step_id.output_key} op value"
-          },
-          "then": {
-            "type": "string",
-            "description": "[branch] 조건이 참일 때 이동할 step id"
-          },
-          "else": {
-            "type": "string",
-            "description": "[branch] 조건이 거짓일 때 이동할 step id"
-          },
-
-          "max_iterations": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 100,
-            "description": "[loop] 최대 반복 횟수"
-          },
-          "goto": {
-            "type": "string",
-            "description": "[loop] 반복 시 되돌아갈 step id"
-          },
-
-          "branches": {
-            "type": "array",
-            "description": "[parallel] 동시에 실행할 step id 목록",
-            "items": {"type": "string"}
-          },
-
-          "timeout_seconds": {
-            "type": "integer",
-            "description": "[wait/api_call] 타임아웃(초)"
-          },
-
-          "on_error": {
-            "type": "string",
-            "enum": ["skip", "retry", "abort", "fallback"],
-            "description": "에러 발생 시 행동"
-          },
-          "fallback_step": {
-            "type": "string",
-            "description": "[on_error=fallback] 이동할 step id"
-          },
-          "retry_count": {
-            "type": "integer",
-            "description": "[on_error=retry] 최대 재시도 횟수",
-            "default": 3
-          }
-        }
+        "$ref": "#/definitions/step"
       }
     },
     "state_storage": {
@@ -175,7 +95,7 @@
     },
     "evolution": {
       "type": "object",
-      "description": "v3: 자기 진화 설정",
+      "description": "v4: 자기 진화 설정",
       "properties": {
         "auto_fix": {
           "type": "boolean",
@@ -191,6 +111,242 @@
           "type": "boolean",
           "default": true,
           "description": "새 패턴 자동 포착 여부"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "sandbox": {
+      "type": "object",
+      "description": "v4: 코드 실행 샌드박스 제약 조건",
+      "properties": {
+        "max_memory_mb": {
+          "type": "integer",
+          "minimum": 16,
+          "maximum": 4096,
+          "default": 256,
+          "description": "최대 메모리 (MB)"
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600,
+          "default": 30,
+          "description": "실행 타임아웃 (초)"
+        },
+        "allow_network": {
+          "type": "boolean",
+          "default": false,
+          "description": "네트워크 접근 허용 여부"
+        }
+      }
+    },
+    "nomad_job_spec": {
+      "type": "object",
+      "description": "v4: Nomad batch Job 실행 설정",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Nomad Job ID"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["batch", "service"],
+          "default": "batch"
+        },
+        "image": {
+          "type": "string",
+          "description": "Docker 이미지 (docker 드라이버 사용 시)"
+        },
+        "command": {
+          "type": "string",
+          "description": "실행할 명령"
+        },
+        "datacenter": {
+          "type": "string",
+          "default": "dc1"
+        },
+        "cpu": {
+          "type": "integer",
+          "minimum": 100,
+          "default": 500,
+          "description": "CPU 할당 (MHz)"
+        },
+        "memory": {
+          "type": "integer",
+          "minimum": 64,
+          "default": 256,
+          "description": "메모리 할당 (MB)"
+        }
+      }
+    },
+    "ray_parameters": {
+      "type": "object",
+      "description": "v4: Ray 분산 실행 리소스 설정",
+      "properties": {
+        "num_cpus": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "요청 CPU 코어 수"
+        },
+        "memory": {
+          "type": "string",
+          "pattern": "^[0-9]+(\\.[0-9]+)?[GMK]?$",
+          "description": "메모리 요청 (예: '8G', '512M')"
+        },
+        "runtime_env": {
+          "type": "object",
+          "description": "Ray runtime_env 설정 (pip, working_dir 등)"
+        }
+      }
+    },
+    "step": {
+      "type": "object",
+      "required": ["id", "type"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "스텝 고유 ID (goto 참조용)"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "code", "api_call", "webhook", "branch", "loop",
+            "parallel", "wait", "end", "container_exec",
+            "hitl_gate", "ray", "nomad", "wasm_exec"
+          ],
+          "description": "스텝 실행 방식"
+        },
+        "description": {
+          "type": "string",
+          "description": "이 스텝이 하는 일에 대한 자연어 설명"
+        },
+        "task": {
+          "type": "string",
+          "description": "LLM/에이전트에게 전달할 태스크 설명"
+        },
+
+        "action": {
+          "type": "string",
+          "description": "[code] 실행할 Python 함수 경로 (module.function)"
+        },
+        "script": {
+          "type": "string",
+          "description": "[ray/wasm_exec] 실행할 Python 코드 문자열"
+        },
+        "params": {
+          "type": "object",
+          "description": "[code] 함수 매개변수. ${prev_step.output_key} 형태로 변수 참조 가능"
+        },
+        "parameters": {
+          "$ref": "#/definitions/ray_parameters",
+          "description": "[ray] 리소스 설정"
+        },
+        "output_key": {
+          "type": "string",
+          "description": "이 스텝의 실행 결과를 저장할 변수명"
+        },
+
+        "method": {
+          "type": "string",
+          "enum": ["GET", "POST", "PUT", "DELETE"],
+          "description": "[api_call/webhook] HTTP 메서드"
+        },
+        "url": {
+          "type": "string",
+          "description": "[api_call/webhook] 호출할 URL. 환경변수 참조 가능"
+        },
+        "headers": {
+          "type": "object",
+          "description": "[api_call] 요청 헤더",
+          "additionalProperties": {"type": "string"}
+        },
+        "body": {
+          "type": "object",
+          "description": "[api_call/webhook] 요청 바디"
+        },
+
+        "image": {
+          "type": "string",
+          "description": "[container_exec] Docker 이미지"
+        },
+        "command": {
+          "type": "string",
+          "description": "[container_exec/nomad] 실행할 명령"
+        },
+        "environment": {
+          "type": "object",
+          "description": "[container_exec] 컨테이너 환경변수",
+          "additionalProperties": {"type": "string"}
+        },
+
+        "wasm_module": {
+          "type": "string",
+          "description": "[wasm_exec] 실행할 .wasm 파일 경로"
+        },
+        "sandbox": {
+          "$ref": "#/definitions/sandbox",
+          "description": "[wasm_exec] 샌드박스 제약 조건"
+        },
+
+        "job_spec": {
+          "$ref": "#/definitions/nomad_job_spec",
+          "description": "[nomad] Nomad Job 설정"
+        },
+
+        "condition": {
+          "type": "string",
+          "description": "[branch] 평가할 조건식: ${step_id.output_key} op value"
+        },
+        "then": {
+          "type": "string",
+          "description": "[branch] 조건이 참일 때 이동할 step id"
+        },
+        "else": {
+          "type": "string",
+          "description": "[branch] 조건이 거짓일 때 이동할 step id"
+        },
+
+        "max_iterations": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "description": "[loop] 최대 반복 횟수"
+        },
+        "goto": {
+          "type": "string",
+          "description": "[loop] 반복 시 되돌아갈 step id"
+        },
+
+        "branches": {
+          "type": "array",
+          "description": "[parallel] 동시에 실행할 step id 목록",
+          "items": {"type": "string"}
+        },
+
+        "timeout": {
+          "type": "integer",
+          "description": "실행 타임아웃(초) — ray/nomad/wasm_exec/container_exec"
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "description": "[wait/api_call/hitl_gate] 타임아웃(초)"
+        },
+
+        "on_error": {
+          "type": "string",
+          "enum": ["skip", "retry", "abort", "fallback"],
+          "description": "에러 발생 시 행동"
+        },
+        "fallback_step": {
+          "type": "string",
+          "description": "[on_error=fallback] 이동할 step id"
+        },
+        "retry_count": {
+          "type": "integer",
+          "description": "[on_error=retry] 최대 재시도 횟수",
+          "default": 3
         }
       }
     }

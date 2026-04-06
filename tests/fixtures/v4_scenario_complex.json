@@ -1,9 +1,14 @@
 {
   "scenario_id": "v4_complex_orchestration_demo",
+  "harness_id": "v4_distributed_pipeline",
   "domain": "engineering",
   "trigger": "Run AI model training with parallel data processing on distributed infrastructure",
   "data_flow": {
     "input_data": "s3://bucket/raw_data"
+  },
+  "evolution": {
+    "auto_fix": false,
+    "capture_new_patterns": true
   },
   "tool_chain": [
     "data_preprocessing",
@@ -16,41 +21,50 @@
       "id": "data_preprocessing",
       "type": "ray",
       "action": "distribute_data",
-      "task": "Clean and tokenize massive datasets using Ray cluster",
+      "task": "Clean and tokenize datasets using Ray cluster",
+      "script": "import time; time.sleep(0.1); result = {'rows_processed': 50000, 'status': 'clean'}",
       "parameters": {
-        "num_cpus": 8,
-        "memory": "16G"
-      }
+        "num_cpus": 2,
+        "memory": "1G"
+      },
+      "timeout": 60
     },
     {
       "id": "parallel_training",
       "type": "parallel",
-      "branches": ["model_a_container", "model_b_nomad"]
+      "branches": ["model_a_sandbox", "model_b_nomad"]
     },
     {
-      "id": "model_a_container",
-      "type": "container_exec",
+      "id": "model_a_sandbox",
+      "type": "wasm_exec",
       "action": "train_model_a",
-      "image": "pytorch/pytorch:latest",
-      "command": "python train_a.py",
-      "environment": {
-        "EPOCHS": "10"
+      "script": "import json, time; time.sleep(0.2); print(json.dumps({'model': 'A', 'accuracy': 0.92, 'epochs': 10}))",
+      "sandbox": {
+        "max_memory_mb": 256,
+        "timeout_seconds": 30,
+        "allow_network": false
       }
     },
     {
       "id": "model_b_nomad",
       "type": "nomad",
       "action": "train_model_b",
-      "task": "Train Model B on GPU instances via Nomad",
-      "parameters": {
+      "task": "Train Model B on batch instances via Nomad",
+      "job_spec": {
+        "name": "harness-model-b",
+        "type": "batch",
+        "image": "busybox:latest",
+        "command": "echo model_b_score=0.89",
         "datacenter": "dc1",
-        "job_type": "batch"
-      }
+        "cpu": 500,
+        "memory": 256
+      },
+      "timeout": 120
     },
     {
       "id": "model_evaluation",
       "type": "branch",
-      "condition": "results.branch_a.score > results.branch_b.score",
+      "condition": "results.model_a_sandbox.accuracy > results.model_b_nomad.score",
       "then": "hitl_approval",
       "else": "hitl_approval"
     },
@@ -60,7 +74,8 @@
       "action": "request_deploy_approval",
       "task": "Review model metrics and approve for production deployment",
       "parameters": {
-        "timeout_seconds": 3600
+        "timeout_seconds": 5,
+        "auto_approve": true
       }
     }
   ]

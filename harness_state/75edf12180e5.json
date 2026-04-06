@@ -1,0 +1,12 @@
+{
+  "current_step_idx": 1,
+  "context": {
+    "_meta": {
+      "harness_id": "v4_distributed_pipeline",
+      "domain": "engineering",
+      "run_id": "75edf12180e5",
+      "started_at": "2026-04-05T13:04:29.964726+00:00"
+    }
+  },
+  "_updated_at": "2026-04-05T13:04:30.139267+00:00"
+}

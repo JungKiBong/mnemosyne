@@ -24,7 +24,7 @@ from mcp.types import (
 )
 
 # ─── Configuration ────────────────────────────────
-MORIES_URL = os.environ.get("MORIES_URL", "http://192.168.35.86:5001")
+MORIES_URL = os.environ.get("MORIES_URL", "http://localhost:5001")
 MORIES_API_KEY = os.environ.get("MORIES_API_KEY", "")
 REQUEST_TIMEOUT = int(os.environ.get("MORIES_TIMEOUT", "30"))
 AGENT_ID = os.environ.get("MORIES_AGENT_ID", "mcp-agent")

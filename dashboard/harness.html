@@ -251,9 +251,15 @@ a:hover{text-decoration:underline}
       <div id="recentExecTable"></div>
     </div>
 
-    <div class="chart-box">
-      <h3>📉 실행 성공률 트렌드 (최근 20회)</h3>
-      <div id="trendChartContainer" style="height:120px; display:flex; align-items:flex-end; gap:2px; padding:12px 0;"></div>
+    <div class="chart-grid">
+      <div class="chart-box">
+        <h3>📉 실행 성공률 트렌드 (최근 20회)</h3>
+        <div id="trendChartContainer" style="height:120px; display:flex; align-items:flex-end; gap:2px; padding:12px 0;"></div>
+      </div>
+      <div class="chart-box">
+        <h3>🛠️ 도구 신뢰성 (Top 5)</h3>
+        <div id="toolsChartContainer" class="bar-chart" style="margin-top: 12px;"></div>
+      </div>
     </div>
   </div>
 
@@ -434,6 +440,7 @@ async function loadData() {
     buildDomainFilter();
     renderRecentTable();
     loadTrendChart();
+    loadToolsChart();
   } catch (e) {
     console.error('Harness load error:', e);
     toast(window.t('harness.loadError'), 'error');
@@ -442,13 +449,25 @@ async function loadData() {
 
 async function loadTrendChart() {
   try {
-    const resp = await fetch(BASE + '/metrics/trend?limit=20');
+    const resp = await fetch('/api/harness/analytics/trend?days=30');
     const data = await resp.json();
-    if (data.status === 'success' && data.trend) {
-      renderTrendChart(data.trend);
+    if (data.status === 'ok' && data.data) {
+      renderTrendChart(data.data);
     }
   } catch (e) {
     console.warn('Trend chart load failed:', e);
+  }
+}
+
+async function loadToolsChart() {
+  try {
+    const resp = await fetch('/api/harness/analytics/tools?limit=5');
+    const data = await resp.json();
+    if (data.status === 'ok' && data.tools) {
+      renderToolsChart(data.tools);
+    }
+  } catch (e) {
+    console.warn('Tools chart load failed:', e);
   }
 }
 
@@ -470,6 +489,28 @@ function renderTrendChart(runs) {
       <div style="font-size:9px;color:${color};margin-bottom:2px;">${r.success?'✓':'✗'}</div>
       <div style="width:100%;height:${h}%;background:${bg};border:1px solid ${color};border-radius:3px;min-height:4px;transition:height 0.3s;"></div>
     </div>`;
+  }).join('');
+}
+
+function renderToolsChart(tools) {
+  const container = document.getElementById('toolsChartContainer');
+  if (!container || tools.length === 0) {
+    if (container) container.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;">No tool data yet</div>';
+    return;
+  }
+  
+  // tools array contains { name, total_uses, success_rate (0-100) }
+  const colors = ['c0', 'c1', 'c2', 'c3', 'c4'];
+  container.innerHTML = tools.map((t, i) => {
+    const rate = Math.round(t.success_rate || 0);
+    return `
+      <div class="bar-row">
+        <div class="bar-label" title="${t.total_uses} uses">${t.name}</div>
+        <div class="bar-track">
+          <div class="bar-fill ${colors[i % colors.length]}" style="width:${Math.max(rate, 5)}%">${rate}%</div>
+        </div>
+      </div>
+    `;
   }).join('');
 }
 

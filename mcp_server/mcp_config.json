@@ -4,7 +4,7 @@
       "command": "python3",
       "args": ["/Users/jungkibong/Projects/tmp/mirofish-supermemory/mcp_server/mories_mcp.py"],
       "env": {
-        "MORIES_URL": "http://192.168.35.86:5001",
+        "MORIES_URL": "http://localhost:5001",
         "MORIES_AGENT_ID": "antigravity",
         "MORIES_API_KEY": "",
         "MORIES_TIMEOUT": "30"

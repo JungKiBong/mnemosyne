@@ -1,0 +1,18 @@
+{
+  "current_step_idx": 2,
+  "context": {
+    "_meta": {
+      "harness_id": "unknown",
+      "domain": "engineering",
+      "run_id": "a88b618a96ac",
+      "started_at": "2026-04-05T03:26:56.710829+00:00"
+    },
+    "model_b_nomad": {
+      "_parallel_result": {
+        "status": "nomad_simulated",
+        "job": null
+      }
+    }
+  },
+  "_updated_at": "2026-04-05T03:26:56.720472+00:00"
+}

@@ -27,7 +27,7 @@ class MCPConfig:
     RATE_LIMIT_PER_MIN = int(os.environ.get('MCP_RATE_LIMIT', '60'))
 
     # LLM (for search agent)
-    LLM_BASE_URL = os.environ.get('LLM_BASE_URL', 'http://192.168.35.86:11434/v1')
+    LLM_BASE_URL = os.environ.get('LLM_BASE_URL', 'http://localhost:11434/v1')
     LLM_MODEL = os.environ.get('LLM_MODEL_NAME', 'llama3.1:8b')
-    EMBEDDING_BASE_URL = os.environ.get('EMBEDDING_BASE_URL', 'http://192.168.35.86:11434')
+    EMBEDDING_BASE_URL = os.environ.get('EMBEDDING_BASE_URL', 'http://localhost:11434')
     EMBEDDING_MODEL = os.environ.get('EMBEDDING_MODEL', 'bge-m3')

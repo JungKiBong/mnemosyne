@@ -155,10 +155,13 @@ def create_app(config_class=Config):
     # Closing it inside teardown_appcontext destroys it after the first request.
     # Teardown logic handled at the application level.
     # Register simulation process cleanup function (ensure all simulation processes terminate on server shutdown)
-    from .services.simulation_runner import SimulationRunner
-    SimulationRunner.register_cleanup()
-    if should_log_startup:
-        logger.info("Simulation process cleanup function registered")
+    try:
+        from .plugins.oasis.simulation_runner import SimulationRunner
+        SimulationRunner.register_cleanup()
+        if should_log_startup:
+            logger.info("Simulation process cleanup function registered")
+    except ImportError:
+        logger.info("OASIS plugin not installed. Skipping simulation cleanup registration.")
 
     # Request tracking middleware
     @app.before_request
@@ -195,10 +198,17 @@ def create_app(config_class=Config):
         return response
 
     # Register blueprints
-    from .api import graph_bp, simulation_bp, terminology_bp
+    from .api import graph_bp, terminology_bp
     app.register_blueprint(graph_bp, url_prefix='/api/graph')
-    app.register_blueprint(simulation_bp, url_prefix='/api/simulation')
     app.register_blueprint(terminology_bp, url_prefix='/api/terminology')
+
+    try:
+        from .plugins.oasis import simulation_bp
+        app.register_blueprint(simulation_bp, url_prefix='/api/simulation')
+        if should_log_startup:
+            logger.info("OASIS simulation blueprint registered")
+    except ImportError:
+        logger.info("OASIS plugin not installed. Skipping simulation blueprint registration.")
 
     # Data Ingestion API (Phase 1.5)
 
@@ -212,6 +222,9 @@ def create_app(config_class=Config):
     # Analytics API (Maturity, Reconciliation, Reports, Data Products)
     from .api.analytics import analytics_bp
     app.register_blueprint(analytics_bp, url_prefix='/api/analytics')
+    # Harness Analytics API (v4: Execution Trends, Tool Reliability)
+    from .api.harness_analytics import harness_analytics_bp
+    app.register_blueprint(harness_analytics_bp, url_prefix='/api')
     # Admin API (Security, Settings, Tools)
     from .api.admin import admin_bp
     app.register_blueprint(admin_bp, url_prefix='/api/admin')

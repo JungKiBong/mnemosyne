@@ -21,11 +21,14 @@ class Config:
     """Flask configuration class"""
 
     # Flask configuration
-    SECRET_KEY = os.environ.get('SECRET_KEY', 'mirofish-secret-key')
+    SECRET_KEY = os.environ.get('SECRET_KEY')
     DEBUG = os.environ.get('FLASK_DEBUG', 'True').lower() == 'true'
 
-    # CORS configuration
-    CORS_ORIGINS = [org.strip() for org in os.environ.get('CORS_ORIGINS', '*').split(',') if org.strip()]
+    # CORS configuration - default to local development ports instead of wildcard '*'
+    CORS_ORIGINS = [
+        org.strip() for org in os.environ.get('CORS_ORIGINS', 'http://localhost:5173,http://localhost:3000').split(',') 
+        if org.strip()
+    ]
 
     # JSON configuration - disable ASCII escaping to display Chinese directly (not as \uXXXX)
     JSON_AS_ASCII = False
@@ -82,6 +85,8 @@ class Config:
     def validate(cls):
         """Validate required configuration"""
         errors = []
+        if not cls.SECRET_KEY and not cls.DEBUG:
+            errors.append("SECRET_KEY must be configured in production (DEBUG=False).")
         if not cls.LLM_API_KEY:
             errors.append("LLM_API_KEY not configured (set to any non-empty value, e.g. 'ollama')")
         if not cls.NEO4J_URI:

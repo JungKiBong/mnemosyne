@@ -12,9 +12,9 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 
-from ..config import Config
-from ..utils.logger import get_logger
-from .entity_reader import EntityReader, FilteredEntities
+from src.app.config import Config
+from src.app.utils.logger import get_logger
+from src.app.services.entity_reader import EntityReader, FilteredEntities
 from .oasis_profile_generator import OasisProfileGenerator, OasisAgentProfile
 from .simulation_config_generator import SimulationConfigGenerator, SimulationParameters
 

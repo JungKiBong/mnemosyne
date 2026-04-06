@@ -42,7 +42,7 @@ class ContainerExecutor(BaseExecutor):
     """
     Execute a command inside a Docker container and capture stdout/stderr.
 
-    Falls back gracefully if Docker is unavailable.
+    Falls back to WasmExecutor if Docker is unavailable.
     """
 
     executor_type = "container_exec"
@@ -139,18 +139,49 @@ class ContainerExecutor(BaseExecutor):
                 )
 
         except RuntimeError as e:
-            # Docker not available
-            elapsed_ms = int((time.time() - start) * 1000)
-            return ExecutorResult(
-                success=False,
-                error=f"Docker unavailable: {e}",
-                elapsed_ms=elapsed_ms,
-                metadata={"fallback": True},
-            )
+            # Docker not available — try Wasm fallback
+            logger.warning(f"  [container_exec] Docker unavailable, attempting Wasm fallback: {e}")
+            return self._wasm_fallback(step, context, start)
         except Exception as e:
             elapsed_ms = int((time.time() - start) * 1000)
             return ExecutorResult(
                 success=False,
                 error=f"Container execution failed: {e}",
                 elapsed_ms=elapsed_ms,
+            )
+
+    def _wasm_fallback(
+        self, step: dict, context: dict, start: float
+    ) -> ExecutorResult:
+        """Fallback to WasmExecutor when Docker is not available."""
+        try:
+            from src.app.harness.executors.wasm_executor import WasmExecutor
+
+            # Convert container step to wasm-compatible format
+            wasm_step = {
+                "id": step.get("id", "wasm_fallback"),
+                "type": "wasm_exec",
+                "script": step.get("command", "echo 'fallback'"),
+                "sandbox": {
+                    "timeout_seconds": step.get("timeout", 120),
+                    "max_memory_mb": 256,
+                },
+                "env": step.get("env", {}),
+            }
+
+            executor = WasmExecutor()
+            result = executor.execute(wasm_step, context)
+
+            # Tag metadata with fallback info
+            result.metadata["fallback"] = "wasm"
+            result.metadata["original_image"] = step.get("image", "unknown")
+            return result
+
+        except Exception as fallback_err:
+            elapsed_ms = int((time.time() - start) * 1000)
+            return ExecutorResult(
+                success=False,
+                error=f"Docker unavailable and Wasm fallback also failed: {fallback_err}",
+                elapsed_ms=elapsed_ms,
+                metadata={"fallback": "failed"},
             )

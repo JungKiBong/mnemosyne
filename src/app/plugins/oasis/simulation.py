@@ -8,13 +8,13 @@ import traceback
 from flask import request, jsonify, send_file, current_app
 
 from . import simulation_bp
-from ..config import Config
-from ..services.entity_reader import EntityReader
-from ..services.oasis_profile_generator import OasisProfileGenerator
-from ..services.simulation_manager import SimulationManager, SimulationStatus
-from ..services.simulation_runner import SimulationRunner, RunnerStatus
-from ..utils.logger import get_logger
-from ..models.project import ProjectManager
+from src.app.config import Config
+from src.app.services.entity_reader import EntityReader
+from .oasis_profile_generator import OasisProfileGenerator
+from .simulation_manager import SimulationManager, SimulationStatus
+from .simulation_runner import SimulationRunner, RunnerStatus
+from src.app.utils.logger import get_logger
+from src.app.models.project import ProjectManager
 
 logger = get_logger('mirofish.api.simulation')
 
@@ -244,7 +244,7 @@ def _check_simulation_prepared(simulation_id: str) -> tuple:
         (is_prepared: bool, info: dict)
     """
     import os
-    from ..config import Config
+    from src.app.config import Config
     
     simulation_dir = os.path.join(Config.OASIS_SIMULATION_DATA_DIR, simulation_id)
     
@@ -389,8 +389,8 @@ def prepare_simulation():
     """
     import threading
     import os
-    from ..models.task import TaskManager, TaskStatus
-    from ..config import Config
+    from src.app.models.task import TaskManager, TaskStatus
+    from src.app.config import Config
     
     try:
         data = request.get_json() or {}
@@ -659,7 +659,7 @@ def get_prepare_status():
             }
         }
     """
-    from ..models.task import TaskManager
+    from src.app.models.task import TaskManager
     
     try:
         data = request.get_json() or {}

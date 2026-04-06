@@ -35,7 +35,7 @@ class TestExecutorRegistry:
 
     def test_list_types(self, registry):
         types = registry.list_types()
-        assert set(types) == {"code", "api_call", "webhook", "hitl_gate"}
+        assert set(types) == {"code", "api_call", "webhook", "hitl_gate", "ray", "nomad", "container_exec", "wasm_exec"}
 
     def test_register_custom_executor(self, registry):
         class CustomExec(BaseExecutor):
