@@ -9,6 +9,7 @@ Implements human-like memory mechanisms:
   5. Audit Trail — all changes are tracked as MemoryRevision nodes (Phase 10)
 """
 
+import json
 import logging
 import time
 import uuid
@@ -167,10 +168,25 @@ class MemoryManager:
         # Ensure salience-related properties exist
         self._ensure_salience_schema()
 
+        # Redis setup
+        self._redis = None
+        if hasattr(Config, 'REDIS_URL') and Config.REDIS_URL:
+            try:
+                import redis
+                self._redis = redis.from_url(Config.REDIS_URL, decode_responses=True)
+                self._redis.ping()
+                logger.info("Redis STM backend initialized successfully")
+            except Exception as e:
+                logger.warning(f"Failed to initialize Redis STM backend: {e}. Falling back to InMemory buffer.")
+                self._redis = None
+
         MemoryManager._initialized = True
         logger.info("MemoryManager singleton initialized with config: "
                      f"decay_rate={self.config.decay_rate}, "
                      f"stm_ttl={self.config.stm_default_ttl}s")
+
+    def _stm_key(self, item_id: str) -> str:
+        return f"mories:stm:{item_id}"
 
     def close(self):
         """Close driver only if we own it (self-created)."""
@@ -222,12 +238,18 @@ class MemoryManager:
         )
 
         with self._lock:
-            # Enforce max items
-            if len(self._stm_buffer) >= self.config.stm_max_items:
-                self._stm_cleanup()
-
-            self._stm_buffer[item.id] = item
             self._stats['total_ingested'] += 1
+            if self._redis:
+                self._redis.setex(
+                    self._stm_key(item.id),
+                    int(item.ttl),
+                    json.dumps(asdict(item))
+                )
+            else:
+                # Enforce max items
+                if len(self._stm_buffer) >= self.config.stm_max_items:
+                    self._stm_cleanup()
+                self._stm_buffer[item.id] = item
 
         logger.info(f"STM added: {item.id} (source={source}, ttl={item.ttl}s)")
         return item
@@ -235,23 +257,53 @@ class MemoryManager:
     def stm_list(self) -> List[dict]:
         """List all STM items (expired items are cleaned first)."""
         with self._lock:
-            self._stm_cleanup()
-            return [item.to_dict() for item in self._stm_buffer.values()]
+            if self._redis:
+                keys = self._redis.keys("mories:stm:*")
+                items = []
+                for k in keys:
+                    data = self._redis.get(k)
+                    if data:
+                        try:
+                            item_dict = json.loads(data)
+                            items.append(STMItem(**item_dict).to_dict())
+                        except Exception:
+                            pass
+                return items
+            else:
+                self._stm_cleanup()
+                return [item.to_dict() for item in self._stm_buffer.values()]
 
     def stm_get(self, item_id: str) -> Optional[dict]:
         """Get a specific STM item."""
         with self._lock:
-            item = self._stm_buffer.get(item_id)
-            if item and not item.is_expired:
-                return item.to_dict()
-            return None
+            if self._redis:
+                data = self._redis.get(self._stm_key(item_id))
+                if data:
+                    try:
+                        item_dict = json.loads(data)
+                        return STMItem(**item_dict).to_dict()
+                    except Exception:
+                        return None
+                return None
+            else:
+                item = self._stm_buffer.get(item_id)
+                if item and not item.is_expired:
+                    return item.to_dict()
+                return None
 
     def stm_evaluate(self, item_id: str, salience: float) -> dict:
         """Manually set salience for an STM item (HITL evaluation)."""
         with self._lock:
-            item = self._stm_buffer.get(item_id)
-            if not item:
-                return {"error": "Item not found"}
+            if self._redis:
+                data = self._redis.get(self._stm_key(item_id))
+                if not data:
+                    return {"error": "Item not found"}
+                item_dict = json.loads(data)
+                item = STMItem(**item_dict)
+            else:
+                item = self._stm_buffer.get(item_id)
+                if not item:
+                    return {"error": "Item not found"}
 
             item.salience = max(0.0, min(1.0, salience))
             item.evaluated = True
@@ -263,14 +315,27 @@ class MemoryManager:
             else:
                 item.evaluation_result = 'pending_hitl'
 
+            if self._redis:
+                ttl = self._redis.ttl(self._stm_key(item_id))
+                if ttl > 0:
+                    self._redis.setex(self._stm_key(item_id), ttl, json.dumps(asdict(item)))
+
             return item.to_dict()
 
     def stm_promote(self, item_id: str, graph_id: str = "") -> dict:
         """Promote an STM item to LTM (Neo4j)."""
         with self._lock:
-            item = self._stm_buffer.pop(item_id, None)
-            if not item:
-                return {"error": "Item not found in STM"}
+            if self._redis:
+                data = self._redis.get(self._stm_key(item_id))
+                if not data:
+                    return {"error": "Item not found in STM"}
+                item_dict = json.loads(data)
+                item = STMItem(**item_dict)
+                self._redis.delete(self._stm_key(item_id))
+            else:
+                item = self._stm_buffer.pop(item_id, None)
+                if not item:
+                    return {"error": "Item not found in STM"}
 
         # Store to Neo4j with salience
         now = datetime.now(timezone.utc).isoformat()
@@ -344,9 +409,14 @@ class MemoryManager:
     def stm_discard(self, item_id: str) -> dict:
         """Discard an STM item (explicit forgetting)."""
         with self._lock:
-            item = self._stm_buffer.pop(item_id, None)
-            if not item:
-                return {"error": "Item not found"}
+            if self._redis:
+                deleted = self._redis.delete(self._stm_key(item_id))
+                if deleted == 0:
+                    return {"error": "Item not found"}
+            else:
+                item = self._stm_buffer.pop(item_id, None)
+                if not item:
+                    return {"error": "Item not found"}
 
         self._stats['total_forgotten'] += 1
         logger.info(f"STM discarded: {item_id}")
@@ -721,9 +791,22 @@ class MemoryManager:
                 LIMIT 10
             """).data()
 
-        stm_count = len(self._stm_buffer)
-        stm_items = [item.to_dict() for item in self._stm_buffer.values()
-                     if not item.is_expired]
+        if self._redis:
+            keys = self._redis.keys("mories:stm:*")
+            stm_count = len(keys)
+            stm_items = []
+            for k in keys[:20]:
+                data = self._redis.get(k)
+                if data:
+                    try:
+                        item_dict = json.loads(data)
+                        stm_items.append(STMItem(**item_dict).to_dict())
+                    except Exception:
+                        pass
+        else:
+            stm_count = len(self._stm_buffer)
+            stm_items = [item.to_dict() for item in self._stm_buffer.values()
+                         if not item.is_expired]
 
         return {
             'stm': {

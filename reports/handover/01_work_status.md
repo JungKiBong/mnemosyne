@@ -21,8 +21,8 @@
 |---|------|------|------|
 | 1.1 | `exec()` 취약점 제거 — AST 기반 보안 검증 | ✅ 완료 | `ray_executor.py` 재작성, 테스트 통과 |
 | 1.2 | 하드코딩 IP 제거 & ENV 기반 전환, CORS 화이트리스트 | ✅ 완료 | `config.py`, `mcp_server/` 4개 파일 수정 |
-| 1.3 | OASIS 시뮬레이션 코드 → plugins 분리 | ❌ 미착수 | **다음 세션 최우선 작업** |
-| 1.4 | Redis STM 백엔드 구현 | ❌ 미착수 | 현재 InMemory만 동작 |
+| 1.3 | OASIS 시뮬레이션 코드 → plugins 분리 | ✅ 완료 | `src/app/plugins/oasis/` 로 분리, 시스템 안정성 복원 완료 |
+| 1.4 | Redis STM 백엔드 구현 | ✅ 완료 | memory_manager.py 연동 완료, Dict 백엔드는 fallback으로 유지 |
 
 ### Step 2: 사내 인프라 통합 (Weeks 3-6)
 

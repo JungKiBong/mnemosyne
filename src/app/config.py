@@ -45,6 +45,7 @@ class Config:
 
     # Storage Backend
     STORAGE_BACKEND = os.environ.get('STORAGE_BACKEND', 'neo4j')
+    REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
 
     # Rate Limiting configuration
     RATELIMIT_STORAGE_URI = os.environ.get('RATELIMIT_STORAGE_URI', 'memory://')
