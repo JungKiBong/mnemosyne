@@ -109,5 +109,21 @@ echo "  ✅ OK"
 
 echo ""
 echo "========================================="
-echo "✅ 전체 Phase 검증 완료!"
+echo "✅ 전체 Phase 검증 완료! (Curl Checks)"
+echo "========================================="
+
+echo ""
+echo "🚀 파이썬 단위 및 E2E 테스트 (SDK 등) 검증 수행..."
+echo ""
+PYTHONPATH=. .venv/bin/pytest tests/e2e/test_sdk_e2e.py -v
+if [ $? -eq 0 ]; then
+    echo "  ✅ SDK E2E 테스트 통과 (보안 / Airgap 네트워크 모의 환경)"
+else
+    echo "  ❌ SDK E2E 테스트 실패"
+    exit 1
+fi
+
+echo ""
+echo "========================================="
+echo "🎉 CI/CD 파이프라인 검증 모두 정상 완료!"
 echo "========================================="

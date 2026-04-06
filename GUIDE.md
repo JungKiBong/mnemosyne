@@ -458,4 +458,22 @@ for doc in docs:
 
 ---
 
+## 12. 에어갭(Air-gap) 및 CI/CD 테스트 환경
+
+Mories는 외부 Keycloak 의존성 없이 로컬이나 CI/CD 파이프라인에서 테스트할 수 있도록 에어갭 로컬 테스트 모드를 지원합니다.
+
+### 12.1 완전 인증 우회 (Unit Tests)
+앱 설정에서 플래그를 통해 인증을 우회할 수 있습니다.
+- `AUTH_DISABLED=True` 또는 `TESTING=True`
+이 설정은 `@require_auth` 데코레이터에서 실제 토큰 디코딩 절차를 단락(bypass)시켜 모든 요청을 통과시킵니다. **(보안상 프로덕션 환경에서는 절대 설정하지 마십시오.)**
+
+### 12.2 로컬 서명 E2E 모의 테스트 (SDK & CI/CD)
+Mories E2E 테스트(`tests/e2e/test_sdk_e2e.py`)는 SDK 전체 파이프라인 무결성을 보장하기 위해, 인증 처리 우회를 넘어서서 **PyJWKClient 거두채기(Mocking) 기반의 환경**을 사용합니다.
+- Pytest 초기화(conftest.py) 시 즉석(Runtime)으로 2048비트 RSA 키 쌍 생성
+- 가상의 JWT(JSON Web Token)를 생성하여 클라이언트에 주입
+- `app.utils.auth._get_jwks_client` 함수를 Mocking 하여, 통신 중인 애플리케이션 코드가 외부 Keycloak API 대신 방금 생성한 로컬 키를 이용해 서명을 검증하도록 유도
+이를 통해 인하우스 배포 및 CI 환경에서도 별도의 네트워크 접근 권한(방화벽)이나 Keycloak 구동 없이 실제와 100% 동일한 권한 체계 적용 및 토큰 헤더 검증을 완벽히 테스트할 수 있습니다.
+
+---
+
 *Last updated: 2026-04-06*
