@@ -643,6 +643,12 @@ const API_REGISTRY = {
     { id:"maturity_rules", method:"GET", path:"/api/analytics/maturity/rules", name:"Maturity Rules", desc:"성숙도 승격 규칙을 조회합니다." },
   ],
 
+  "Authentication & Versioning": [
+    { id:"auth_me", method:"GET", path:"/api/auth/me", name:"Auth — Who Am I", desc:"현재 JWT 토큰의 사용자 정보를 반환합니다. Keycloak SSO 연동 시 Bearer 토큰 필요.",
+      params:[{name:"Authorization",type:"header",required:true,desc:"Bearer <JWT 토큰>"}] },
+    { id:"v1_info", method:"GET", path:"/api/v1/info", name:"API v1 Info", desc:"API v1 버전 정보, 지원 엔드포인트 목록, 서버 상태를 반환합니다." },
+  ],
+
   "Search & Query": [
     { id:"search", method:"POST", path:"/api/search", name:"Search Memories", desc:"지식 그래프에서 기억을 검색합니다. 검색된 기억은 자동으로 Retrieval Boost됩니다.",
       body: '{"query":"TurboQuant quantization","limit":10}' },

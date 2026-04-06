@@ -241,6 +241,10 @@ def create_app(config_class=Config):
     # Core/UI Routes (Dashboard, n8n, MCP, Health)
     from .api.core import core_bp
     app.register_blueprint(core_bp)
+    
+    # API v1 Versioning (Phase 2.3)
+    from .api.v1 import api_v1_bp
+    app.register_blueprint(api_v1_bp, url_prefix='/api/v1')
 
     if should_log_startup:
         logger.info("MiroFish-Offline Backend startup complete")

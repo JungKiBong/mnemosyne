@@ -47,6 +47,12 @@ class Config:
     STORAGE_BACKEND = os.environ.get('STORAGE_BACKEND', 'neo4j')
     REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
 
+    # Keycloak configuration
+    KEYCLOAK_URL = os.environ.get('KEYCLOAK_URL', 'http://localhost:8180')
+    KEYCLOAK_REALM = os.environ.get('KEYCLOAK_REALM', 'jupyterhub')
+    KEYCLOAK_CLIENT_ID = os.environ.get('KEYCLOAK_CLIENT_ID', 'jupyterhub-api')
+
+
     # Rate Limiting configuration
     RATELIMIT_STORAGE_URI = os.environ.get('RATELIMIT_STORAGE_URI', 'memory://')
 

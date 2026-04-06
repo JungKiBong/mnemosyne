@@ -2,7 +2,23 @@ import os
 import json as _json
 import glob as _glob
 import logging
-from flask import Blueprint, send_from_directory, jsonify, request, current_app
+from flask import Blueprint, send_from_directory, jsonify, request, current_app, g
+
+try:
+    from app.utils.auth import require_auth
+except ImportError:
+    # Graceful fallback: if PyJWT is not installed, auth decorator is a no-op
+    import logging as _logging
+    _logging.getLogger(__name__).warning("PyJWT not available — @require_auth will reject all requests")
+
+    def require_auth(roles=None):
+        from functools import wraps
+        def decorator(f):
+            @wraps(f)
+            def wrapper(*args, **kwargs):
+                return jsonify({"error": "Authentication module not configured (PyJWT missing)"}), 503
+            return wrapper
+        return decorator
 
 logger = logging.getLogger(__name__)
 
@@ -365,6 +381,15 @@ def mcp_proxy():
         return '', 204
     return jsonify(response)
 
+
+@core_bp.route('/api/auth/me', methods=['GET'])
+@require_auth()
+def get_current_user():
+    """Retrieve the currently authenticated user's details."""
+    return jsonify({
+        "status": "success",
+        "user": g.user
+    }), 200
 
 @core_bp.route('/api/search', methods=['POST'])
 def search_api():

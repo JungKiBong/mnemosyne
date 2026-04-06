@@ -173,6 +173,8 @@ a { color: var(--accent); text-decoration: none; }
             <div class="endpoint-item" onclick="document.getElementById('81-rbac').scrollIntoView({behavior:'smooth'})">8.1 RBAC (역할 기반 접근 제어)</div>
         
             <div class="endpoint-item" onclick="document.getElementById('82-aes-256').scrollIntoView({behavior:'smooth'})">8.2 필드 암호화 (AES-256)</div>
+
+            <div class="endpoint-item" onclick="document.getElementById('83-keycloak').scrollIntoView({behavior:'smooth'})">8.3 Keycloak SSO 연동</div>
         </div></div>
 
         <div class="cat-group">
@@ -187,6 +189,8 @@ a { color: var(--accent); text-decoration: none; }
             <div class="endpoint-item" onclick="document.getElementById('92-full-reconciliation').scrollIntoView({behavior:'smooth'})">9.2 Full Reconciliation</div>
         
             <div class="endpoint-item" onclick="document.getElementById('93').scrollIntoView({behavior:'smooth'})">9.3 검사 항목</div>
+
+            <div class="endpoint-item" onclick="document.getElementById('94-redis').scrollIntoView({behavior:'smooth'})">9.4 Redis STM 백엔드</div>
         </div></div>
 
         <div class="cat-group">
@@ -214,6 +218,18 @@ a { color: var(--accent); text-decoration: none; }
             <div class="endpoint-item" onclick="document.getElementById('111').scrollIntoView({behavior:'smooth'})">11.1 Harness 개념 및 역할</div>
             <div class="endpoint-item" onclick="document.getElementById('112').scrollIntoView({behavior:'smooth'})">11.2 대시보드 시각화</div>
             <div class="endpoint-item" onclick="document.getElementById('113').scrollIntoView({behavior:'smooth'})">11.3 오케스트레이션 및 활용</div>
+          </div>
+        </div>
+
+        <div class="cat-group">
+          <div class="cat-header" onclick="this.parentElement.classList.toggle('collapsed')">
+            <span><a href="#12-sdk" style="color:inherit">12. Python SDK 사용법</a></span>
+            <span class="arrow">▼</span>
+          </div>
+          <div class="cat-items">
+            <div class="endpoint-item" onclick="document.getElementById('121').scrollIntoView({behavior:'smooth'})">12.1 설치</div>
+            <div class="endpoint-item" onclick="document.getElementById('122').scrollIntoView({behavior:'smooth'})">12.2 기본 사용</div>
+            <div class="endpoint-item" onclick="document.getElementById('123').scrollIntoView({behavior:'smooth'})">12.3 LangChain 통합</div>
           </div>
         </div>
 
@@ -537,6 +553,22 @@ curl -X POST http://localhost:5050/api/security/encrypt \
   -H &quot;Content-Type: application/json&quot; \
   -d '{&quot;uuid&quot;: &quot;&lt;memory-uuid&gt;&quot;, &quot;fields&quot;: [&quot;content&quot;]}'
 </code></pre>
+<h3 id="83-keycloak">8.3 Keycloak SSO 연동</h3>
+<p>Mories는 Keycloak을 통한 JWT 기반 인증을 지원합니다. 설정하지 않으면 인증 없이 동작합니다.</p>
+<pre><code class="language-bash"># .env에 아래 변수 설정
+KEYCLOAK_URL=http://localhost:8080
+KEYCLOAK_REALM=mories
+KEYCLOAK_CLIENT_ID=mories-app
+</code></pre>
+<p>인증이 활성화되면 보호된 엔드포인트에 Bearer 토큰을 전달해야 합니다:</p>
+<pre><code class="language-bash"># 토큰으로 사용자 정보 확인
+curl http://localhost:5050/api/auth/me \
+  -H &quot;Authorization: Bearer &lt;JWT_TOKEN&gt;&quot;
+
+# 응답 예시
+# {&quot;sub&quot;: &quot;user-uuid&quot;, &quot;preferred_username&quot;: &quot;admin&quot;, &quot;roles&quot;: [&quot;admin&quot;]}
+</code></pre>
+<blockquote><p><strong>참고</strong>: PyJWT가 설치되지 않은 환경에서도 서버는 정상 기동됩니다 (인증 기능만 비활성화).</p></blockquote>
 <hr />
 <h2 id="9">9. 데이터 정합성 관리</h2>
 <h3 id="91-quick-check">9.1 Quick Check</h3>
@@ -591,6 +623,16 @@ curl -X POST http://localhost:5050/api/reconciliation/run \
 </tr>
 </tbody>
 </table>
+<h3 id="94-redis">9.4 Redis STM 백엔드</h3>
+<p>STM(단기기억) 버퍼를 Redis로 운영하면 서버 재시작 시에도 STM이 유지됩니다.</p>
+<pre><code class="language-bash"># .env에 Redis URL 설정
+REDIS_URL=redis://localhost:6379/0
+</code></pre>
+<ul>
+<li>Redis 연결 실패 시 자동으로 InMemory fallback으로 전환됩니다.</li>
+<li>서버 로그에 <code>Falling back to InMemory buffer</code> 메시지가 출력되면 Redis 연결을 확인하세요.</li>
+<li>Redis <code>SCAN</code> 기반으로 구현되어 프로덕션 블로킹이 없습니다.</li>
+</ul>
 <hr />
 <h2 id="10">10. 트러블슈팅</h2>
 <h3 id="neo4j">Neo4j 연결 실패</h3>
@@ -678,6 +720,42 @@ curl http://localhost:5050/api/harness/list?domain=engineering
 <li><code>mories_harness_rollback</code>: 특정 과거 버전으로 패턴을 즉각 롤백하여 복구</li>
 </ul>
 <hr />
+<h2 id="12-sdk">12. Python SDK 사용법</h2>
+<p>Mories Python SDK를 사용하면 외부 애플리케이션에서 기억을 검색하고 저장할 수 있습니다.</p>
+<h3 id="121">12.1 설치</h3>
+<pre><code class="language-bash"># 프로젝트 루트에서 로컬 설치
+pip install -e ./mories_sdk
+</code></pre>
+<h3 id="122">12.2 기본 사용</h3>
+<pre><code class="language-python">from mories import MoriesClient
+
+client = MoriesClient(base_url="http://localhost:5050")
+
+# 시스템 상태 확인
+print(client.health())
+
+# 기억 검색
+results = client.search("아키텍처 결정", limit=5)
+for r in results:
+    print(r["name"], r["salience"])
+
+# STM에 기억 추가
+client.stm_add("새로운 기억 내용", source="sdk")
+</code></pre>
+<h3 id="123">12.3 LangChain 통합</h3>
+<pre><code class="language-python">from mories import MoriesClient
+from mories.langchain import MoriesRetriever
+
+client = MoriesClient(base_url="http://localhost:5050")
+retriever = MoriesRetriever(client=client, top_k=5)
+
+# LangChain 체인에서 사용
+docs = retriever.invoke("프로젝트 아키텍처")
+for doc in docs:
+    print(doc.page_content)
+</code></pre>
+<blockquote><p><strong>참고</strong>: <code>langchain-core</code>가 설치되지 않은 환경에서는 <code>MoriesRetriever</code> import 시 에러가 발생합니다. <code>pip install langchain-core</code>로 먼저 설치하세요.</p></blockquote>
+<hr />
 <h2 id="_5">📋 주요 환경 변수 정리</h2>
 <table>
 <thead>
@@ -733,10 +811,35 @@ curl http://localhost:5050/api/harness/list?domain=engineering
 <td>—</td>
 <td>웹훅 HMAC 시크릿</td>
 </tr>
+<tr>
+<td><code>KEYCLOAK_URL</code></td>
+<td><code>http://localhost:8080</code></td>
+<td>Keycloak 서버 URL</td>
+</tr>
+<tr>
+<td><code>KEYCLOAK_REALM</code></td>
+<td><code>mories</code></td>
+<td>Keycloak Realm 이름</td>
+</tr>
+<tr>
+<td><code>KEYCLOAK_CLIENT_ID</code></td>
+<td><code>mories-app</code></td>
+<td>Keycloak 클라이언트 ID</td>
+</tr>
+<tr>
+<td><code>REDIS_URL</code></td>
+<td>—</td>
+<td>Redis STM 백엔드 (선택)</td>
+</tr>
+<tr>
+<td><code>CORS_ORIGINS</code></td>
+<td><code>http://localhost:5050</code></td>
+<td>CORS 허용 오리진 (쉼표 구분)</td>
+</tr>
 </tbody>
 </table>
 <hr />
-<p><em>Last updated: 2026-03-28</em></p>
+<p><em>Last updated: 2026-04-06</em></p>
     </div>
   </div>
 </div>

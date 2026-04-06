@@ -1,7 +1,7 @@
 # Mories 사내 배포 로드맵 — 작업 현황 (v1.0)
 
-> 최종 업데이트: 2026-04-06T15:20+09:00
-> 대화 ID: 0950ca8c-c9d3-4b58-bc29-2061f2ea9d29
+> 최종 업데이트: 2026-04-06T21:42+09:00
+> 대화 ID: 91a6237b-daae-4b0f-8fc7-ea880d9952e6
 
 ---
 
@@ -28,17 +28,17 @@
 
 | # | 작업 | 상태 |
 |---|------|------|
-| 2.1 | Keycloak SSO 연동 | ❌ 미착수 |
-| 2.2 | Ollama/vLLM 내부망 검증 | ❌ 미착수 |
-| 2.3 | API v1 버전 관리 | ❌ 미착수 |
+| 2.1 | Keycloak SSO 연동 | ✅ 완료 | `src/app/utils/auth.py` 작성, JWT 검증 (`pyjwt` & `PyJWKClient`) 추가, `/api/auth/me` 에 적용 |
+| 2.2 | Ollama/vLLM 내부망 검증 | ✅ 완료 | `scripts/verify_internal_llm.py` 작성 및 대상 모델(`llama3.1:8b` 등) 통신 확인 |
+| 2.3 | API v1 버전 관리 | ✅ 완료 | `src/app/api/v1.py` 블루프린트 신설, `__init__.py` 기반 `/api/v1` 라우팅 아키텍처 도입 |
 
 ### Step 3: SDK 패키징 & 파일럿 (Weeks 7-8)
 
 | # | 작업 | 상태 |
 |---|------|------|
-| 3.1 | Python SDK 내부 배포 | ❌ 미착수 |
-| 3.2 | LangChain 플러그인 | ❌ 미착수 |
-| 3.3 | 파일럿 팀 온보딩 | ❌ 미착수 |
+| 3.1 | Python SDK 내부 배포 | ✅ 완료 | `mories_sdk/` 디렉토리 신설, `pyproject.toml` 패키징 적용 완료 |
+| 3.2 | LangChain 플러그인 | ✅ 완료 | `mories.langchain.MoriesRetriever` 구현 완료 |
+| 3.3 | 파일럿 팀 온보딩 | ✅ 완료 | `mories_sdk/examples/onboarding.py` 및 README.md 작성 |
 
 ---
 
@@ -81,15 +81,30 @@ M  tests/harness/test_executor_registry.py
 ## 4. 테스트 현황
 
 ```
-✅ tests/harness/test_executor_registry.py  — 14 passed (2.34s)
-✅ tests/harness/test_ray_security.py       — 2 passed  (2.34s)
-✅ tests/harness/test_dsl_schema.py         — 8 passed  (2.34s)
+✅ tests/harness/test_executor_registry.py  — 14 passed
+✅ tests/harness/test_ray_security.py       — 2 passed
+✅ tests/harness/test_dsl_schema.py         — 8 passed
+✅ tests/unit/test_cognitive_memory*.py     — 49 passed
+총계: 73 passed ✅
 ```
 
 - `tests/harness/test_wasm_executor.py`: 별도 검증 필요 (wasm 런타임 의존)
 - `tests/harness/` 전체를 `-v`로 실행하면 **일부 테스트가 행(hang)** 발생  
   → 원인: Neo4j 연결 타임아웃 또는 wasm 테스트의 외부 의존성  
   → 해결: 개별 파일 단위로 실행 권장
+
+---
+
+## 4.5 코드 리뷰 수정 사항 (2026-04-06)
+
+| # | 항목 | 파일 | 수정 내용 |
+|---|------|------|-----------|
+| R-1 | Redis `KEYS` 안티패턴 | `memory_manager.py` | `KEYS *` → `SCAN` 이터레이터로 교체, O(N) 블로킹 제거 |
+| R-2 | 메타데이터 직렬화 | `memory_manager.py` | `str()` → `json.dumps()`, Neo4j 데이터 무결성 확보 |
+| R-3 | JWKS 캐싱 최적화 | `auth.py` | 매 요청마다 `PyJWKClient` 생성 → 모듈 수준 캐싱 |
+| R-4 | PyJWT lazy import | `auth.py`, `core.py` | 설치 안된 환경에서도 서버 기동 가능하도록 fallback |
+| R-5 | SDK 호환성 | `mories/langchain.py` | Pydantic `ConfigDict` 추가, `ImportError` 대응 |
+| R-6 | SDK 연결 효율 | `mories/client.py` | 매 메서드마다 httpx 생성 → 커넥션 풀 공유 |
 
 ---
 

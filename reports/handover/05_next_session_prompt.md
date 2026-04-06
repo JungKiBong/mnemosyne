@@ -1,4 +1,4 @@
-# 다음 세션 프롬프트 (v1.0)
+# 다음 세션 프롬프트 (v2.0)
 
 > 아래 전체를 새 대화창에 붙여넣기하세요.
 
@@ -8,17 +8,47 @@
 ## 프로젝트: Mories (사내 에이전틱 메모리 엔진)
 
 프로젝트 경로: /Users/jungkibong/Projects/tmp/mirofish-supermemory
-핸드오버 문서: reports/handover/ (4개 파일)
+핸드오버 문서: reports/handover/ (5개 파일)
 
-### 이전 세션에서 완료된 작업
-- Step 1.1: exec() 보안 취약점 → AST 기반 검증으로 교체 완료
-- Step 1.2: 하드코딩 IP 제거, CORS 화이트리스트, SECRET_KEY 강제 설정 완료
-- 핵심 테스트 24개 통과 확인 (test_executor_registry 14 + test_ray_security 2 + test_dsl_schema 8)
+### 이전 세션에서 완료된 작업 (Step 1~3 전체 완료)
 
-### 지금 해야 할 작업
-- **Step 1.3: OASIS 시뮬레이션 코드를 plugins/ 디렉토리로 분리**
-  → 상세 가이드: reports/handover/04_step1_3_guide.md 참조
-- Step 1.4: Redis STM 백엔드 구현 (Step 1.3 이후)
+**Step 1: 보안 강화 & 경량화**
+- 1.1: exec() 보안 취약점 → AST 기반 검증으로 교체 완료
+- 1.2: 하드코딩 IP 제거, CORS 화이트리스트, SECRET_KEY 강제 설정 완료
+- 1.3: OASIS 시뮬레이션 코드 → plugins/ 디렉토리 분리 완료
+- 1.4: Redis STM 백엔드 구현 (InMemory fallback 포함)
+
+**Step 2: 사내 인프라 통합**
+- 2.1: Keycloak SSO 연동 (auth.py + /api/auth/me)
+- 2.2: Ollama/vLLM 내부망 검증 (verify_internal_llm.py)
+- 2.3: API v1 블루프린트 도입 (/api/v1/info)
+
+**Step 3: SDK 패키징 & 파일럿**
+- 3.1: Python SDK (mories_sdk/) 패키징 완료
+- 3.2: LangChain MoriesRetriever 구현 완료
+- 3.3: 온보딩 예제 (onboarding.py) 작성 완료
+
+**코드 리뷰 수정사항 (GAP 분석 결과)**
+- Redis KEYS 안티패턴 → SCAN 이터레이터로 교체
+- 메타데이터 직렬화 str() → json.dumps() 수정
+- PyJWT/langchain-core lazy import + fallback stub 적용
+- .env.example에 KEYCLOAK/REDIS/CORS 변수 추가
+- GUIDE.md에 Keycloak SSO + Redis STM + SDK 섹션 추가
+- API Explorer에 /api/auth/me, /api/v1/info 등록
+
+핵심 테스트 73개 통과 확인:
+  - test_executor_registry: 14 passed
+  - test_ray_security: 2 passed
+  - test_dsl_schema: 8 passed
+  - test_cognitive_memory: 49 passed
+
+### 지금 해야 할 작업 (P1~P2 잔존 기술 부채)
+
+1. **P1: API v1 마이그레이션** — 기존 /api/search, /api/memory/* 엔드포인트를 /api/v1 블루프린트로 이전
+2. **P1: Keycloak 인증 범위 확대** — 현재 /api/auth/me에만 적용된 @require_auth를 주요 API로 확대
+3. **P1: MemoryManager 리팩토링** — Redis/Neo4j 백엔드 분기를 ABC 기반 전략 패턴으로 변환
+4. **P2: SDK 단위 테스트** — mories_sdk/tests/ 디렉토리에 MoriesClient, MoriesRetriever 테스트 추가
+5. **P2: API 에러 응답 표준화** — 일관된 에러 포맷 (error_code, message, details)
 
 ### 필수 규칙 (모든 작업에 적용)
 
@@ -48,12 +78,15 @@
 - 핵심 설정: src/app/config.py
 - 메모리 엔진: src/app/storage/ (memory_manager, search_service, embedding_service)
 - 하네스 실행기: src/app/harness/executors/ (ray, nomad, wasm, container, hitl)
+- 인증: src/app/utils/auth.py (Keycloak JWT 검증)
+- SDK: mories_sdk/ (MoriesClient + LangChain MoriesRetriever)
+- API v1: src/app/api/v1.py
 - MCP 서버: mcp_server/
 - 대시보드: dashboard/
 - 인프라 스크립트: scripts/ (플래닛 Nomad/Ray 관련)
 
 ### 커밋 상태
-아직 변경사항이 커밋되지 않았습니다. 작업 진행 전 커밋 여부를 검토해주세요.
+많은 변경사항이 커밋되지 않았습니다. 작업 진행 전 커밋 여부를 검토해주세요.
 git diff --stat HEAD 으로 확인 가능합니다.
 ```
 

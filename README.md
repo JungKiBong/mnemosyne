@@ -9,7 +9,7 @@
 [![Neo4j](https://img.shields.io/badge/Neo4j-5.x-green.svg)](https://neo4j.com/)
 [![Flask](https://img.shields.io/badge/Flask-3.x-lightgrey.svg)](https://flask.palletsprojects.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests: 76 passed](https://img.shields.io/badge/tests-76%20passed-brightgreen.svg)](#-test-suite)
+[![Tests: 88 passed](https://img.shields.io/badge/tests-88%20passed-brightgreen.svg)](#-test-suite)
 
 ---
 
@@ -38,7 +38,10 @@
 | **Circuit Breaker** | 장애 격리 패턴으로 자동 복구 |
 | **Outbox Pattern** | 보장된 비동기 전달 + Dead Letter Queue |
 | **RBAC + Encryption** | 역할 기반 접근 제어 + AES-256 필드 암호화 |
+| **Keycloak SSO** | JWT 기반 인증 (PyJWKClient 캐싱, lazy import) |
+| **Redis STM** | 서버 재시작 시에도 단기기억 유지 (InMemory fallback) |
 | **MCP Server** | AI 에이전트가 도구로 직접 호출 가능한 MCP 프로토콜 |
+| **Python SDK** | MoriesClient + LangChain MoriesRetriever 통합 |
 
 ### 📊 Dashboard & APIs
 | Feature | Description |
@@ -163,16 +166,20 @@ FLASK_APP=app FLASK_DEBUG=0 flask run --host=0.0.0.0 --port=5050
 # Run all tests (from project root)
 PYTHONPATH=src .venv/bin/python -m pytest tests/unit/test_resilience.py tests/integration/ tests/e2e/ -v
 
-# Expected: 58 passed ✅
+# Expected: 73 passed ✅ (harness + cognitive)
+
+# SDK tests (no external deps)
+.venv/bin/pytest mories_sdk/tests/ -v
+# Expected: 15 passed ✅
 ```
 
 ### Test Coverage
 
 | Category | Tests | Description |
 |----------|-------|-------------|
-| **Unit** | 8 | CircuitBreaker, OutboxWorker |
-| **Integration** | 25 | STM lifecycle, Decay/Boost, Audit +Rollback, Scope promotion, Reconciliation |
-| **E2E** | 25 | Health, Memory CRUD, Search, Audit, Scope, Dashboard, Data Products, Security, Maturity, Reconciliation |
+| **Harness** | 24 | Executor registry, Ray AST security, DSL schema |
+| **Cognitive Memory** | 49 | STM/LTM lifecycle, Decay/Boost, Audit, Scope |
+| **SDK** | 15 | MoriesClient init, API methods, sessions, errors |
 
 ---
 
@@ -222,12 +229,18 @@ mories/
 │   ├── memory_history.html            # Audit trail viewer
 │   ├── synaptic.html                  # Agent network
 │   └── maturity.html                  # Knowledge lifecycle
+├── mories_sdk/                        # Python SDK
+│   ├── mories/client.py               # MoriesClient (REST API 클라이언트)
+│   ├── mories/langchain.py            # LangChain MoriesRetriever 통합
+│   ├── tests/                         # 15 SDK 단위 테스트
+│   └── pyproject.toml                 # 패키징 설정
 ├── mcp_server/                        # MCP protocol server (5 tools)
 ├── n8n_workflows/                     # n8n automation templates
 ├── tests/
-│   ├── unit/                          # 8 unit tests
-│   ├── integration/                   # 25 integration tests
-│   └── e2e/                          # 25 E2E API tests
+│   ├── harness/                       # 24 하네스 테스트
+│   ├── unit/                          # 49 인지메모리 테스트
+│   ├── integration/                   # 통합 테스트
+│   └── e2e/                           # E2E API 테스트
 ├── docs/                              # Design documents (6 docs)
 ├── docker-compose.yml                 # Full stack deployment
 ├── docker-compose.mac.yml             # Mac dev (Neo4j only)
@@ -256,6 +269,17 @@ LLM_MODEL=llama3.1
 # Security
 WEBHOOK_SECRET=your-webhook-hmac-secret
 FLASK_SECRET_KEY=change-me-in-production
+
+# Keycloak SSO (optional — leave empty to disable auth)
+KEYCLOAK_URL=http://localhost:8080
+KEYCLOAK_REALM=mories
+KEYCLOAK_CLIENT_ID=mories-app
+
+# Redis STM (optional — falls back to in-memory)
+REDIS_URL=redis://localhost:6379/0
+
+# CORS
+CORS_ORIGINS=http://localhost:5050,http://localhost:3000
 ```
 
 ---
@@ -318,7 +342,26 @@ FLASK_SECRET_KEY=change-me-in-production
 | POST | `/api/reconciliation/run` | Full reconciliation scan |
 | GET | `/api/reconciliation/history` | Reconciliation run history |
 
-> 📋 **Full list**: 139 endpoints across 15 API modules. See `src/app/api/` for complete documentation.
+> 📋 **Full list**: 139+ endpoints across 15 API modules. See `src/app/api/` for complete documentation.
+
+### Authentication (Keycloak SSO)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/auth/me` | Current JWT user info |
+| GET | `/api/v1/info` | API v1 version & status |
+
+### Python SDK
+
+```bash
+# Install
+pip install -e ./mories_sdk
+
+# Usage
+from mories import MoriesClient
+client = MoriesClient(base_url="http://localhost:5050")
+client.search("아키텍처 결정", limit=5)
+```
 
 ---
 

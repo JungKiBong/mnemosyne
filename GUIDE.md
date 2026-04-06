@@ -266,6 +266,30 @@ curl -X POST http://localhost:5050/api/security/encrypt \
   -d '{"uuid": "<memory-uuid>", "fields": ["content"]}'
 ```
 
+### 8.3 Keycloak SSO 연동
+
+Mories는 Keycloak을 통한 JWT 기반 인증을 지원합니다. 설정하지 않으면 인증 없이 동작합니다.
+
+```bash
+# .env에 아래 변수 설정
+KEYCLOAK_URL=http://localhost:8080
+KEYCLOAK_REALM=mories
+KEYCLOAK_CLIENT_ID=mories-app
+```
+
+인증이 활성화되면 보호된 엔드포인트에 Bearer 토큰을 전달해야 합니다:
+
+```bash
+# 토큰으로 사용자 정보 확인
+curl http://localhost:5050/api/auth/me \
+  -H "Authorization: Bearer <JWT_TOKEN>"
+
+# 응답 예시
+# {"sub": "user-uuid", "preferred_username": "admin", "roles": ["admin"]}
+```
+
+> **참고**: PyJWT가 설치되지 않은 환경에서도 서버는 정상 기동됩니다 (인증 기능만 비활성화).
+
 ---
 
 ## 9. 데이터 정합성 관리
@@ -296,6 +320,19 @@ curl -X POST http://localhost:5050/api/reconciliation/run \
 | Salience Staleness | 30일 이상 미갱신 | ❌ (경고만) |
 | Dead Letter Queue | Outbox 실패 건수 | ❌ (경고만) |
 | Orphaned Revisions | 고아 리비전 노드 | ✅ |
+
+### 9.4 Redis STM 백엔드
+
+STM(단기기억) 버퍼를 Redis로 운영하면 서버 재시작 시에도 STM이 유지됩니다.
+
+```bash
+# .env에 Redis URL 설정
+REDIS_URL=redis://localhost:6379/0
+```
+
+- Redis 연결 실패 시 자동으로 InMemory fallback으로 전환됩니다.
+- 서버 로그에 `Falling back to InMemory buffer` 메시지가 출력되면 Redis 연결을 확인하세요.
+- Redis `SCAN` 기반으로 구현되어 프로덕션 블로킹이 없습니다.
 
 ---
 
@@ -351,6 +388,55 @@ lsof -i :7474
 
 ---
 
+## 11. Python SDK 사용법
+
+Mories Python SDK를 사용하면 외부 애플리케이션에서 기억을 검색하고 저장할 수 있습니다.
+
+### 11.1 설치
+
+```bash
+# 프로젝트 루트에서 로컬 설치
+pip install -e ./mories_sdk
+```
+
+### 11.2 기본 사용
+
+```python
+from mories import MoriesClient
+
+client = MoriesClient(base_url="http://localhost:5050")
+
+# 시스템 상태 확인
+print(client.health())
+
+# 기억 검색
+results = client.search("아키텍처 결정", limit=5)
+for r in results:
+    print(r["name"], r["salience"])
+
+# STM에 기억 추가
+client.stm_add("새로운 기억 내용", source="sdk")
+```
+
+### 11.3 LangChain 통합
+
+```python
+from mories import MoriesClient
+from mories.langchain import MoriesRetriever
+
+client = MoriesClient(base_url="http://localhost:5050")
+retriever = MoriesRetriever(client=client, top_k=5)
+
+# LangChain 체인에서 사용
+docs = retriever.invoke("프로젝트 아키텍처")
+for doc in docs:
+    print(doc.page_content)
+```
+
+> **참고**: `langchain-core`가 설치되지 않은 환경에서는 `MoriesRetriever` import 시 에러가 발생합니다. `pip install langchain-core`로 먼저 설치하세요.
+
+---
+
 ## 📋 주요 환경 변수 정리
 
 | 변수 | 기본값 | 설명 |
@@ -364,7 +450,12 @@ lsof -i :7474
 | `LLM_MODEL` | `llama3.1` | LLM 모델명 |
 | `FLASK_SECRET_KEY` | — | Flask 세션 키 |
 | `WEBHOOK_SECRET` | — | 웹훅 HMAC 시크릿 |
+| `KEYCLOAK_URL` | `http://localhost:8080` | Keycloak 서버 URL |
+| `KEYCLOAK_REALM` | `mories` | Keycloak Realm 이름 |
+| `KEYCLOAK_CLIENT_ID` | `mories-app` | Keycloak 클라이언트 ID |
+| `REDIS_URL` | — | Redis STM 백엔드 (선택) |
+| `CORS_ORIGINS` | `http://localhost:5050` | CORS 허용 오리진 (쉼표 구분) |
 
 ---
 
-*Last updated: 2026-03-28*
+*Last updated: 2026-04-06*

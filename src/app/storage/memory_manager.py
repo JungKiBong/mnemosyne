@@ -258,16 +258,20 @@ class MemoryManager:
         """List all STM items (expired items are cleaned first)."""
         with self._lock:
             if self._redis:
-                keys = self._redis.keys("mories:stm:*")
                 items = []
-                for k in keys:
-                    data = self._redis.get(k)
-                    if data:
-                        try:
-                            item_dict = json.loads(data)
-                            items.append(STMItem(**item_dict).to_dict())
-                        except Exception:
-                            pass
+                cursor = 0
+                while True:
+                    cursor, keys = self._redis.scan(cursor, match="mories:stm:*", count=100)
+                    for k in keys:
+                        data = self._redis.get(k)
+                        if data:
+                            try:
+                                item_dict = json.loads(data)
+                                items.append(STMItem(**item_dict).to_dict())
+                            except Exception:
+                                pass
+                    if cursor == 0:
+                        break
                 return items
             else:
                 self._stm_cleanup()
@@ -363,7 +367,7 @@ class MemoryManager:
                 name=item.content[:80],
                 name_lower=item.content[:80].lower(),
                 content=item.content,
-                meta_json=str(item.metadata),
+                meta_json=json.dumps(item.metadata, ensure_ascii=False),
                 salience=item.salience,
                 now=now,
                 source=item.source,
@@ -792,17 +796,25 @@ class MemoryManager:
             """).data()
 
         if self._redis:
-            keys = self._redis.keys("mories:stm:*")
-            stm_count = len(keys)
             stm_items = []
-            for k in keys[:20]:
-                data = self._redis.get(k)
-                if data:
-                    try:
-                        item_dict = json.loads(data)
-                        stm_items.append(STMItem(**item_dict).to_dict())
-                    except Exception:
-                        pass
+            stm_count = 0
+            cursor = 0
+            while True:
+                cursor, keys = self._redis.scan(cursor, match="mories:stm:*", count=100)
+                stm_count += len(keys)
+                if len(stm_items) < 20:
+                    for k in keys:
+                        if len(stm_items) >= 20:
+                            break
+                        data = self._redis.get(k)
+                        if data:
+                            try:
+                                item_dict = json.loads(data)
+                                stm_items.append(STMItem(**item_dict).to_dict())
+                            except Exception:
+                                pass
+                if cursor == 0:
+                    break
         else:
             stm_count = len(self._stm_buffer)
             stm_items = [item.to_dict() for item in self._stm_buffer.values()
