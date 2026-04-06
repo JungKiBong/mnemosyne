@@ -1,95 +1,40 @@
-# 다음 세션 프롬프트 (v2.0)
+# 다음 세션 프롬프트 (v2.1)
 
-> 아래 전체를 새 대화창에 붙여넣기하세요.
+> 아래 전체를 복사해서 **새 대화창(New Conversation)** 의 첫 번째 메시지로 붙여넣기 해 주세요.
 
 ---
-
-```
+```markdown
 ## 프로젝트: Mories (사내 에이전틱 메모리 엔진)
 
-프로젝트 경로: /Users/jungkibong/Projects/tmp/mirofish-supermemory
-핸드오버 문서: reports/handover/ (5개 파일)
+- **프로젝트 경로**: `/Users/jungkibong/Projects/tmp/mirofish-supermemory`
+- **핸드오버 문서 위치**: `reports/handover/` (이 폴더의 문서들을 먼저 반드시 숙지할 것)
 
-### 이전 세션에서 완료된 작업 (Step 1~3 전체 완료)
+### 📌 이전 세션까지 완료된 주요 작업
+1. **백엔드 보안 및 구조 단일화 (P1~P3)**: AST 검증 도입, Keycloak 인증 연동, Redis STM 백엔드 추가, Async SDK 구현 및 로깅 보완 완료. 모든 테스트 73개 통과 확인.
+2. **대시보드 통합 API 연동 (P3)**: 프론트엔드의 파편화된 raw `fetch()`를 모두 `/assets/js/apiClient.js` (싱글톤) 모듈 기반으로 치환 완료. CSS 경고 해결. 
+3. **분산 인프라 준비**: 현재 시스템은 독립적인 P4(분산 인프라 및 배포 파일럿 단계)로 넘어갈 준비가 완벽히 된 상태. 코드 베이스 정리가 성공적으로 수행되었습니다.
 
-**Step 1: 보안 강화 & 경량화**
-- 1.1: exec() 보안 취약점 → AST 기반 검증으로 교체 완료
-- 1.2: 하드코딩 IP 제거, CORS 화이트리스트, SECRET_KEY 강제 설정 완료
-- 1.3: OASIS 시뮬레이션 코드 → plugins/ 디렉토리 분리 완료
-- 1.4: Redis STM 백엔드 구현 (InMemory fallback 포함)
+### 🎯 다음 단계 목표
+- **P4: 분산 인프라 연결 점검 (Planet)**: Nomad/Ray 파이프라인 실제 연동 안정화 및 검증
+- **P4: 지속적 유지보수 및 파일럿 대응**: 새롭게 요구되는 프론트엔드의 화면 개선(의미없이 복잡하거나 실제 작동하지 않는 요소의 경량화/단순화) 및 UX/UI 에러 수정.
+- (사용자가 구체적인 다음 Phase나 UX 개선 태스크를 제시하면 그에 맞춰 진행할 것)
 
-**Step 2: 사내 인프라 통합**
-- 2.1: Keycloak SSO 연동 (auth.py + /api/auth/me)
-- 2.2: Ollama/vLLM 내부망 검증 (verify_internal_llm.py)
-- 2.3: API v1 블루프린트 도입 (/api/v1/info)
-
-**Step 3: SDK 패키징 & 파일럿**
-- 3.1: Python SDK (mories_sdk/) 패키징 완료
-- 3.2: LangChain MoriesRetriever 구현 완료
-- 3.3: 온보딩 예제 (onboarding.py) 작성 완료
-
-**코드 리뷰 수정사항 (GAP 분석 결과)**
-- Redis KEYS 안티패턴 → SCAN 이터레이터로 교체
-- 메타데이터 직렬화 str() → json.dumps() 수정
-- PyJWT/langchain-core lazy import + fallback stub 적용
-- .env.example에 KEYCLOAK/REDIS/CORS 변수 추가
-- GUIDE.md에 Keycloak SSO + Redis STM + SDK 섹션 추가
-- API Explorer에 /api/auth/me, /api/v1/info 등록
-
-핵심 테스트 73개 통과 확인:
-  - test_executor_registry: 14 passed
-  - test_ray_security: 2 passed
-  - test_dsl_schema: 8 passed
-  - test_cognitive_memory: 49 passed
-
-### 지금 해야 할 작업 (P1~P2 잔존 기술 부채)
-
-1. **P1: API v1 마이그레이션** — 기존 /api/search, /api/memory/* 엔드포인트를 /api/v1 블루프린트로 이전
-2. **P1: Keycloak 인증 범위 확대** — 현재 /api/auth/me에만 적용된 @require_auth를 주요 API로 확대
-3. **P1: MemoryManager 리팩토링** — Redis/Neo4j 백엔드 분기를 ABC 기반 전략 패턴으로 변환
-4. **P2: SDK 단위 테스트** — mories_sdk/tests/ 디렉토리에 MoriesClient, MoriesRetriever 테스트 추가
-5. **P2: API 에러 응답 표준화** — 일관된 에러 포맷 (error_code, message, details)
-
-### 필수 규칙 (모든 작업에 적용)
-
-1. **가상환경 필수**: `.venv/bin/python`, `.venv/bin/pytest` 사용. bare `python` 금지
-2. **테스트 기준선**: 작업 전후 반드시 아래 커맨드로 핵심 테스트 통과 확인
-   ```
-   .venv/bin/pytest tests/harness/test_executor_registry.py tests/harness/test_ray_security.py tests/harness/test_dsl_schema.py -v
-   ```
-3. **건드리면 안 되는 것들**:
-   - `.env`, `src/.env` 파일 내용 출력/노출 금지 (비밀번호 포함)
-   - `docker-compose.yml` 무단 수정 금지 (다른 프로젝트 공용 자원)
-   - Neo4j 전체 삭제 쿼리 금지
-   - 시스템 글로벌 패키지 설치 금지
-4. **테스트 파일 관리**: `tests/harness/` 또는 `tests/tmp/`에 배치하여 나중에 한번에 정리 가능하도록
-5. **코드 작성 시**:
-   - 예외처리와 추적을 위한 로깅(logging) 반드시 포함
-   - 자원(DB 커넥션, 파일 핸들) 점유 후 반드시 반환 (with문 사용)
-   - 주석은 한글로 최대한 쉽고 상세하게 작성
-   - 복잡한 로직은 docs/ 폴더에 별도 설명문서를 만들고, 소스 주석에 문서 경로/이름/버전 기입
-   - 단일 파일 300줄 이하 목표
-6. **트러블슈팅 참고**: reports/handover/02_troubleshooting.md — 특히 TS-001(pytest 행 현상), TS-003(가상환경 혼동) 주의
-7. **컨텍스트 관리**: 작업 중 컨텍스트가 길어져서 품질이 저하된다고 판단되면, 즉시 알려주세요. 핸드오버 문서를 업데이트하고 새 대화에서 이어갑니다
-8. **코딩 컨벤션**: reports/handover/03_coding_conventions.md 참조
-
-### 프로젝트 아키텍처 요약
-- Flask 앱 팩토리: src/app/__init__.py
-- 핵심 설정: src/app/config.py
-- 메모리 엔진: src/app/storage/ (memory_manager, search_service, embedding_service)
-- 하네스 실행기: src/app/harness/executors/ (ray, nomad, wasm, container, hitl)
-- 인증: src/app/utils/auth.py (Keycloak JWT 검증)
-- SDK: mories_sdk/ (MoriesClient + LangChain MoriesRetriever)
-- API v1: src/app/api/v1.py
-- MCP 서버: mcp_server/
-- 대시보드: dashboard/
-- 인프라 스크립트: scripts/ (플래닛 Nomad/Ray 관련)
-
-### 커밋 상태
-많은 변경사항이 커밋되지 않았습니다. 작업 진행 전 커밋 여부를 검토해주세요.
-git diff --stat HEAD 으로 확인 가능합니다.
+### 🚨 필수 준수 규칙 (엄격하게 지킬 것)
+1. **컨텍스트 품질 관리 (주기적 환기)**: 
+   - 하나의 파일이 너무 길어지지 않도록 모듈화에 신경 쓸 것.
+   - 대화(컨텍스트)가 너무 길어져서 코드 품질 저하/할루시네이션이 의심된다면, 사용자에게 **"컨텍스트가 길어졌습니다. 새 대화창으로 넘어가는 것이 좋으니 핸드오버를 구성하겠습니다."** 라고 자발적으로 제안할 것.
+2. **안전한 격리 실행**:
+   - Python 코드는 항상 가상환경 관할 내에서 실행. (`.venv/bin/python`, `.venv/bin/pytest`)
+   - 테스트 작성 시 격리를 위해 `tests/tmp/` 등 테스트 전용 경로를 사용해 나중에 쉽게 삭제할 수 있도록 관리할 것.
+3. **공용 자원 및 비밀정보 보호**: 
+   - `docker-compose.yml`, 다른 프로젝트 공용 자원에 영향을 미치는 패키지 전역 설치, 전체 파일 시스템 변형 등을 엄격히 금지.
+   - `.env` 및 패스워드를 텍스트로 절대 노출하지 말 것.
+4. **추적성 / 유지보수 / 로그**:
+   - 코드를 작성할 땐 예외처리와 원인 추적을 위한 명시적인 `logging` 구문을 반드시 포함할 것.
+   - DB, 파일 핸들 등 자원을 얻으면 사용 후 반드시 반납(`with` 사용 등)하여 행(hang)이나 자원 릭을 예방할 것.
+   - 주석은 한글로 알기 쉽고 최대한 상세히 작성. 설명이 길어지면 `docs/`나 `reports/` 내에 별도 Markdown 설명서를 만들고 코드 주석에 경로/이름/버전을 매핑할 것.
+5. **학습된 트러블슈팅 참고**: 
+   - 개발 중 문제가 발생하면 구글링 전에 먼저 `reports/handover/02_troubleshooting.md`를 열어서 과거 해결책을 참고하여 중복 실수를 방지할 것.
 ```
-
 ---
-
-> 참고: 이 프롬프트는 reports/handover/05_next_session_prompt.md에도 저장되어 있습니다.
+> 위 프롬프트를 새 채팅창에 입력하시면 이전 작업 맥락과 필수 지침이 그대로 이식됩니다.

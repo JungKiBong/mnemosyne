@@ -202,8 +202,9 @@ a:hover{text-decoration:underline}
   </div>
 </div>
 
+<script src="/assets/js/apiClient.js"></script>
 <script>
-const BASE = window.location.origin;
+// API via centralized apiClient
 
 // Workflow metadata enrichment
 const WORKFLOW_META = {
@@ -227,8 +228,7 @@ let currentWfFile = null;
 
 async function loadWorkflows() {
   try {
-    const resp = await fetch(`${BASE}/api/workflows`);
-    const data = await resp.json();
+    const data = await window.moriesApi.get('workflows');
     allWorkflows = data.workflows || [];
     document.getElementById('totalCount').textContent = allWorkflows.length;
     renderGrid(allWorkflows);
@@ -241,8 +241,7 @@ async function loadWorkflows() {
 
 async function loadExecutions() {
   try {
-    const resp = await fetch(`${BASE}/api/workflows/executions`);
-    const data = await resp.json();
+    const data = await window.moriesApi.get('workflows/executions');
     const exTbody = document.getElementById('executionsTable');
     if (!data.executions || data.executions.length === 0) {
       exTbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--muted)">${window.t('wf.noExecutions')}</td></tr>`;
@@ -301,8 +300,7 @@ async function openModal(filename) {
   document.getElementById('modalTitle').textContent = wf?.name || filename;
 
   try {
-    const resp = await fetch(`${BASE}/api/workflows/${filename}`);
-    const json = await resp.json();
+    const json = await window.moriesApi.get(`workflows/${filename}`);
     document.getElementById('modalCode').textContent = JSON.stringify(json, null, 2);
   } catch(e) {
     document.getElementById('modalCode').textContent = 'Error loading workflow';
@@ -330,7 +328,7 @@ function downloadWorkflow() {
 
 function downloadFile(filename) {
   const a = document.createElement('a');
-  a.href = `${BASE}/api/workflows/${filename}`;
+  a.href = `${window.moriesApi?.baseUrl || window.location.origin}/api/workflows/${filename}`;
   a.download = filename;
   a.click();
 }

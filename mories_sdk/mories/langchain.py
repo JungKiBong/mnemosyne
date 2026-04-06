@@ -6,7 +6,7 @@ Requires: langchain-core >= 0.2
 
 from __future__ import annotations
 
-from typing import List, TYPE_CHECKING
+from typing import List, TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from .client import MoriesClient
@@ -36,7 +36,7 @@ if _HAS_LANGCHAIN:
 
         model_config = ConfigDict(arbitrary_types_allowed=True)
 
-        client: "MoriesClient"
+        client: Any
         limit: int = 10
         graph_id: str = ""
 

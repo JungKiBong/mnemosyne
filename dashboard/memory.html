@@ -23,7 +23,7 @@
         }
         .header-left { display: flex; align-items: center; gap: 16px; }
         .header-left h1 { font-size: 20px; font-weight: 700; }
-        .header-left h1 span { background: var(--gradient-1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .header-left h1 span { background: var(--gradient-1); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
         .header-badge { padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; background: rgba(139,92,246,0.15); color: var(--accent-purple); border: 1px solid rgba(139,92,246,0.3); }
         .header-actions { display: flex; gap: 8px; }
         .btn { padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: all 0.2s; font-family: 'Inter', sans-serif; }
@@ -342,8 +342,10 @@
     <!-- Toast -->
     <div class="toast" id="toast"></div>
 
+    <script src="/assets/js/apiClient.js"></script>
     <script>
-        const API_BASE = window.location.origin + '/api/v1/memory';
+        // API_BASE is managed by apiClient.js — use moriesApi for auth header injection
+        const MEMORY_PREFIX = 'v1/memory';
         let distributionChart = null;
         let decayCurveChart = null;
 
@@ -365,18 +367,12 @@
             setTimeout(() => t.classList.remove('show'), 3000);
         }
 
-        // ──── API Helpers ────
+        // ──── API Helpers (via centralized apiClient) ────
         async function apiGet(path) {
-            const res = await fetch(API_BASE + path);
-            return res.json();
+            return window.moriesApi.get(MEMORY_PREFIX + path);
         }
         async function apiPost(path, body = {}) {
-            const res = await fetch(API_BASE + path, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
-            });
-            return res.json();
+            return window.moriesApi.post(MEMORY_PREFIX + path, body);
         }
 
         // ──── Load Overview ────

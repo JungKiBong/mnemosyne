@@ -15,7 +15,7 @@
         .container { max-width: 1400px; margin: 0 auto; padding: 24px 32px; }
 
         .page-header { margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; }
-        .page-header h1 { font-size: 24px; font-weight: 700; background: var(--gradient-1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .page-header h1 { font-size: 24px; font-weight: 700; background: var(--gradient-1); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
         .page-header p { color: var(--text-muted); font-size: 14px; margin-top: 4px; }
 
         .btn { padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: all 0.2s; font-family: 'Inter', sans-serif; }
@@ -156,6 +156,7 @@
         </div>
     </div>
 
+    <script src="/assets/js/apiClient.js"></script>
     <!-- Include Nav Script -->
     <script src="/nav-component.js?v=2"></script>
     <script>
@@ -167,11 +168,22 @@
 
         async function fetchAPI(url, options = {}) {
             const userId = document.getElementById('userIdInput').value || 'anonymous';
-            const headers = { 'Content-Type': 'application/json', 'X-User-ID': userId };
-            const res = await fetch(url, { ...options, headers: { ...headers, ...(options.headers || {}) } });
-            const data = await res.json();
-            if (!data.success) throw new Error(data.error || 'Unknown error');
-            return data.data;
+            // Strip leading /api/ for moriesApi path
+            const path = url.replace(/^\/api\//, '');
+            const method = (options.method || 'GET').toUpperCase();
+            let data;
+            if (method === 'GET') {
+                data = await window.moriesApi.get(path);
+            } else if (method === 'POST') {
+                data = await window.moriesApi.post(path, options.body ? JSON.parse(options.body) : {});
+            } else if (method === 'DELETE') {
+                data = await window.moriesApi.delete(path);
+            } else {
+                // PUT, PATCH, etc. — use put method
+                data = await window.moriesApi.put(path, options.body ? JSON.parse(options.body) : {});
+            }
+            if (data && data.success === false) throw new Error(data.error || 'Unknown error');
+            return data.data !== undefined ? data.data : data;
         }
 
         async function loadMappings() {

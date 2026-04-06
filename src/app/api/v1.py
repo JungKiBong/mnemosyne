@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request
 import os
 import logging
 from app.utils.auth import require_auth
+from app.utils.limiter import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -9,6 +10,7 @@ logger = logging.getLogger(__name__)
 api_v1_bp = Blueprint('api_v1', __name__)
 
 @api_v1_bp.route('/info', methods=['GET'])
+@limiter.exempt
 def get_v1_info():
     """Returns information about the API v1."""
     return jsonify({
@@ -19,6 +21,7 @@ def get_v1_info():
 
 @api_v1_bp.route('/search', methods=['POST'])
 @require_auth()
+@limiter.limit("50 per minute")
 def search_api():
     """Direct REST search endpoint (secured)."""
     import sys
@@ -58,6 +61,7 @@ def search_api():
 
 @api_v1_bp.route('/query', methods=['POST'])
 @require_auth()
+@limiter.limit("20 per minute")
 def query_api():
     """Direct REST Cypher query endpoint (read-only, secured)."""
     import sys

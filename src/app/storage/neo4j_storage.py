@@ -49,7 +49,10 @@ class Neo4jStorage(GraphStorage):
         self._password = password or Config.NEO4J_PASSWORD
 
         self._driver = GraphDatabase.driver(
-            self._uri, auth=(self._user, self._password)
+            self._uri, 
+            auth=(self._user, self._password),
+            max_connection_pool_size=100,
+            connection_acquisition_timeout=60.0
         )
         self._embedding = embedding_service or EmbeddingService()
         self._ner = ner_extractor or NERExtractor()

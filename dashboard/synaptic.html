@@ -171,8 +171,9 @@ a:hover { text-decoration:underline; }
 </div>
 </div>
 
+<script src="/assets/js/apiClient.js"></script>
 <script>
-const API = '';
+// API calls via centralized apiClient (auth headers auto-injected)
 
 // ═══════════════════════════════════════
 // Tab Navigation
@@ -190,7 +191,7 @@ document.querySelectorAll('.tab').forEach(tab => {
 // Tab 1: Synaptic Network
 // ═══════════════════════════════════════
 async function loadNetworkStats() {
-  const data = await fetch(API + '/api/v1/memory/synaptic/stats').then(r => r.json());
+  const data = await window.moriesApi.get('v1/memory/synaptic/stats');
   document.getElementById('ns-agents').textContent = data.total_agents;
   document.getElementById('ns-events').textContent = data.total_events;
   document.getElementById('ns-shares').textContent = data.total_shares;
@@ -198,7 +199,7 @@ async function loadNetworkStats() {
 }
 
 async function loadAgents() {
-  const agents = await fetch(API + '/api/v1/memory/synaptic/agents').then(r => r.json());
+  const agents = await window.moriesApi.get('v1/memory/synaptic/agents');
   const el = document.getElementById('agent-list');
   if (!agents.length) { el.innerHTML = `<p style="color:var(--text-2);font-size:.85rem;">${window.t('syn.noAgents')}</p>`; return; }
   el.innerHTML = agents.map(a => `
@@ -217,7 +218,7 @@ async function loadAgents() {
 }
 
 async function loadEvents() {
-  const events = await fetch(API + '/api/v1/memory/synaptic/events?limit=30').then(r => r.json());
+  const events = await window.moriesApi.get('v1/memory/synaptic/events?limit=30');
   const el = document.getElementById('event-feed');
   if (!events.length) { el.innerHTML = `<p style="color:var(--text-2);font-size:.85rem;">${window.t('syn.noEvents')}</p>`; return; }
   el.innerHTML = events.map(e => {
@@ -248,7 +249,7 @@ const SCOPE_LABELS = {personal:'Personal',tribal:'Tribal',social:'Social',global
 const SCOPE_DECAY = {personal:0.95,tribal:0.98,social:0.99,global:1.0};
 
 async function loadScopes() {
-  const data = await fetch(API + '/api/v1/memory/scopes/summary').then(r => r.json());
+  const data = await window.moriesApi.get('v1/memory/scopes/summary');
 
   // Ladder
   const ladder = document.getElementById('scope-ladder');
@@ -291,7 +292,7 @@ async function loadScopes() {
   });
 
   // Candidates
-  const candidates = await fetch(API + '/api/v1/memory/scopes/candidates?scope=personal').then(r => r.json());
+  const candidates = await window.moriesApi.get('v1/memory/scopes/candidates?scope=personal');
   const cEl = document.getElementById('candidates-list');
   if (!candidates.length) { cEl.innerHTML = `<p style="color:var(--text-2);font-size:.85rem;">${window.t('syn.noCandidates')}</p>`; return; }
   cEl.innerHTML = candidates.map(c => `
@@ -304,10 +305,7 @@ async function loadScopes() {
 }
 
 async function promoteMemory(uuid, target) {
-  const res = await fetch(API + '/api/v1/memory/scopes/promote', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({uuid,target_scope:target,reason:'Admin promoted from dashboard'})
-  }).then(r=>r.json());
+  const res = await window.moriesApi.post('v1/memory/scopes/promote', {uuid,target_scope:target,reason:'Admin promoted from dashboard'});
   if(res.status==='promoted') { alert(`✅ ${res.name}: ${res.old_scope} → ${res.new_scope}`); location.reload(); }
   else { alert('❌ ' + (res.error||'Unknown error')); }
 }
@@ -316,7 +314,7 @@ async function promoteMemory(uuid, target) {
 // Tab 3: Data Products
 // ═══════════════════════════════════════
 async function loadDataProducts() {
-  const catalog = await fetch(API + '/api/v1/memory/data/catalog').then(r => r.json());
+  const catalog = await window.moriesApi.get('v1/memory/data/catalog');
   const grid = document.getElementById('product-grid');
   const icons = {rag_corpus:'📄',knowledge_snapshot:'🕸️',training_dataset:'🎓',memory_manifest:'📦',analytics_csv:'📊'};
 
@@ -332,7 +330,7 @@ async function loadDataProducts() {
   `).join('');
 
   // Manifests
-  const manifests = await fetch(API + '/api/v1/memory/data/manifest/list').then(r => r.json());
+  const manifests = await window.moriesApi.get('v1/memory/data/manifest/list');
   const ml = document.getElementById('manifest-list');
   if (!manifests.length) { ml.innerHTML = `<p style="color:var(--text-2);font-size:.85rem;">${window.t('syn.noManifests')}</p>`; return; }
   ml.innerHTML = manifests.map(m => `
@@ -350,8 +348,8 @@ function previewProduct(endpoint, method) {
   if (method === 'POST') {
     const name = prompt(window.t('syn.enterManifestName'));
     if (!name) return;
-    fetch(endpoint, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, description:'Created from dashboard'})})
-      .then(r=>r.json()).then(d => { alert(`✅ Manifest: ${d.manifest_id?.slice(0,8)}`); loadDataProducts(); });
+    window.moriesApi.post(endpoint.replace(/^\/api\//, ''), {name, description:'Created from dashboard'})
+      .then(d => { alert(`✅ Manifest: ${d.manifest_id?.slice(0,8)}`); loadDataProducts(); });
   } else {
     window.open(endpoint, '_blank');
   }

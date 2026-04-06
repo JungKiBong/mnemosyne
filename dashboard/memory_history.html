@@ -236,8 +236,9 @@
   </div>
 </div>
 
+<script src="/assets/js/apiClient.js"></script>
 <script>
-const API = '/api/v1/memory/audit';
+const AUDIT_PREFIX = 'v1/memory/audit';
 let allActivity = [];
 let selectedMemoryUuid = null;
 let pendingRollbackId = null;
@@ -253,8 +254,7 @@ async function refreshAll() {
 // ── Stats ──
 async function loadStats() {
   try {
-    const res = await fetch(`${API}/stats`);
-    const data = await res.json();
+    const data = await window.moriesApi.get(`${AUDIT_PREFIX}/stats`);
     document.getElementById('stat-total').textContent = data.total_revisions || 0;
     document.getElementById('stat-boost').textContent = data.by_type?.boost || 0;
     document.getElementById('stat-decay').textContent = data.by_type?.decay || 0;
@@ -266,8 +266,7 @@ async function loadStats() {
 async function loadActivity() {
   const typeFilter = document.getElementById('filter-type').value;
   try {
-    const res = await fetch(`${API}/activity?limit=100`);
-    allActivity = await res.json();
+    allActivity = await window.moriesApi.get(`${AUDIT_PREFIX}/activity?limit=100`);
     renderActivity(allActivity, typeFilter);
   } catch (e) {
     console.error('Activity failed:', e);
@@ -326,8 +325,7 @@ function renderActivity(items, typeFilter) {
 async function selectMemory(uuid) {
   selectedMemoryUuid = uuid;
   try {
-    const res = await fetch(`${API}/history/${uuid}?limit=30`);
-    const history = await res.json();
+    const history = await window.moriesApi.get(`${AUDIT_PREFIX}/history/${uuid}?limit=30`);
     renderDetail(history);
     renderSalienceChart(history);
   } catch (e) { console.error('History failed:', e); }
@@ -411,12 +409,7 @@ function closeRollbackModal() {
 async function executeRollback() {
   if (!pendingRollbackId) return;
   try {
-    const res = await fetch(`${API}/rollback`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ revision_id: pendingRollbackId })
-    });
-    const result = await res.json();
+    const result = await window.moriesApi.post(`${AUDIT_PREFIX}/rollback`, { revision_id: pendingRollbackId });
     closeRollbackModal();
     if (result.status === 'rolled_back') {
       alert(`✅ ${window.t('history.rollbackSuccess')}\n${result.field}: ${result.restored_value}`);

@@ -23,7 +23,7 @@
         }
         .header-left { display: flex; align-items: center; gap: 16px; }
         .header-left h1 { font-size: 20px; font-weight: 700; }
-        .header-left h1 span { background: var(--gradient-1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .header-left h1 span { background: var(--gradient-1); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
         .header-badge { padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; }
         .badge-maturity { background: rgba(236,72,153,0.15); color: var(--accent-pink); border: 1px solid rgba(236,72,153,0.3); }
         .header-nav { display: flex; gap: 8px; }
@@ -286,15 +286,21 @@
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
+<script src="/assets/js/apiClient.js"></script>
 <script>
-const API = '';
+// API calls via centralized apiClient (auth headers auto-injected)
 let overviewData = null;
 let maturityChart = null;
 let matrixChart = null;
 
 async function fetchJSON(url, opts) {
-    const res = await fetch(url, opts);
-    return res.json();
+    // Strip leading /api/ prefix for moriesApi
+    const path = url.replace(/^\/api\//, '');
+    const method = (opts?.method || 'GET').toUpperCase();
+    if (method === 'POST') {
+        return window.moriesApi.post(path, opts?.body ? JSON.parse(opts.body) : {});
+    }
+    return window.moriesApi.get(path);
 }
 
 function showToast(msg, isError) {
@@ -307,7 +313,7 @@ function showToast(msg, isError) {
 
 // ── Load Overview ──
 async function loadOverview() {
-    overviewData = await fetchJSON(`${API}/api/maturity/overview`);
+    overviewData = await fetchJSON('/api/maturity/overview');
     const m = overviewData.maturity || {};
 
     let total = 0;
@@ -434,13 +440,13 @@ async function loadMemoryList(level) {
         // Load all levels
         for (const lv of ['learning','unstable','mature','secret']) {
             try {
-                const data = await fetchJSON(`${API}/api/maturity/list/${lv}?limit=20`);
+                const data = await fetchJSON(`/api/maturity/list/${lv}?limit=20`);
                 memories = memories.concat(data.memories || []);
             } catch(e) {}
         }
         memories.sort((a,b) => (b.salience||0)-(a.salience||0));
     } else {
-        const data = await fetchJSON(`${API}/api/maturity/list/${level}?limit=50`);
+        const data = await fetchJSON(`/api/maturity/list/${level}?limit=50`);
         memories = data.memories || [];
     }
 
@@ -478,7 +484,7 @@ async function loadMemoryList(level) {
 
 // ── Actions ──
 async function setMaturityQuick(uuid, level) {
-    const result = await fetchJSON(`${API}/api/maturity/set`, {
+    const result = await fetchJSON('/api/maturity/set', {
         method: 'POST',
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify({ uuid, level, changed_by: 'dashboard-admin' }),
@@ -494,7 +500,7 @@ async function setMaturityQuick(uuid, level) {
 }
 
 async function runPromotions() {
-    const result = await fetchJSON(`${API}/api/maturity/check-promotions`, {
+    const result = await fetchJSON('/api/maturity/check-promotions', {
         method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}',
     });
     showToast(`자동 승격: ${result.promoted}건 처리됨`);
@@ -512,7 +518,7 @@ async function submitSetMaturity() {
 
     if (!uuid) return showToast('UUID를 입력해주세요', true);
 
-    const result = await fetchJSON(`${API}/api/maturity/set`, {
+    const result = await fetchJSON('/api/maturity/set', {
         method: 'POST',
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify({ uuid, level, changed_by: 'dashboard-admin', reason }),

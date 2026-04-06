@@ -116,3 +116,100 @@ class MoriesClient:
     def stm_list(self) -> Dict[str, Any]:
         """List all Short-Term Memory items."""
         return self._request("GET", "/api/v1/memory/stm/list").json()
+
+class AsyncMoriesClient:
+    """Asynchronous Client for interacting with the Mories Cognitive Engine.
+
+    Supports both context-manager (``async with``) and long-lived usage patterns.
+
+    Example (persistent session)::
+
+        async with AsyncMoriesClient(base_url="http://localhost:5001") as client:
+            print(await client.search("agents"))
+    """
+
+    def __init__(
+        self,
+        base_url: str = "http://localhost:5001",
+        token: Optional[str] = None,
+        timeout: float = 30.0,
+    ):
+        self.base_url = base_url.rstrip("/")
+        self.timeout = timeout
+        self._headers: Dict[str, str] = {"Content-Type": "application/json"}
+        if token:
+            self._headers["Authorization"] = f"Bearer {token}"
+        self._client: Optional[httpx.AsyncClient] = None
+
+    def _handle_error(self, response: httpx.Response):
+        if not response.is_success:
+            try:
+                data = response.json()
+                if "error" in data:
+                    raise parse_api_error(response.status_code, data)
+            except ValueError:
+                pass 
+            response.raise_for_status()
+
+    async def __aenter__(self):
+        self._client = httpx.AsyncClient(
+            headers=self._headers, timeout=self.timeout
+        )
+        return self
+
+    async def __aexit__(self, *exc):
+        if self._client:
+            await self._client.aclose()
+            self._client = None
+
+    async def _request(self, method: str, path: str, **kwargs) -> httpx.Response:
+        url = f"{self.base_url}{path}"
+        if self._client:
+            resp = await self._client.request(method, url, **kwargs)
+        else:
+            async with httpx.AsyncClient(
+                headers=self._headers, timeout=self.timeout
+            ) as c:
+                resp = await c.request(method, url, **kwargs)
+        self._handle_error(resp)
+        return resp
+
+    async def info(self) -> Dict[str, Any]:
+        resp = await self._request("GET", "/api/v1/info")
+        return resp.json()
+
+    async def search(
+        self,
+        query: str,
+        limit: int = 10,
+        graph_id: str = "",
+    ) -> Dict[str, Any]:
+        resp = await self._request(
+            "POST",
+            "/api/v1/search",
+            json={"query": query, "limit": limit, "graph_id": graph_id},
+        )
+        return resp.json()
+
+    async def health(self) -> Dict[str, Any]:
+        resp = await self._request("GET", "/api/health")
+        return resp.json()
+
+    async def ingest(self, content: str, source: str = "sdk", salience: float = 0.7) -> Dict[str, Any]:
+        resp = await self._request(
+            "POST",
+            "/api/v1/ingest/pipeline/process",
+            json={"content": content, "source": source, "salience": salience},
+        )
+        return resp.json()
+
+    async def stm_add(self, content: str, source: str = "sdk", ttl: Optional[float] = None) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {"content": content, "source": source}
+        if ttl is not None:
+            payload["ttl"] = ttl
+        resp = await self._request("POST", "/api/v1/memory/stm/add", json=payload)
+        return resp.json()
+
+    async def stm_list(self) -> Dict[str, Any]:
+        resp = await self._request("GET", "/api/v1/memory/stm/list")
+        return resp.json()
