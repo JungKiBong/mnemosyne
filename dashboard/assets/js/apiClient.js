@@ -17,8 +17,8 @@ class ApiClient {
     if (window.API_BASE) return window.API_BASE;
     const origin = window.location.origin;
     const port = window.location.port;
-    // If served from the API server itself (port 5001) or standard ports, use same origin
-    if (port === '5001' || port === '') {
+    // If served from the API server itself, standard ports, or nginx proxy (8080), use same origin
+    if (port === '5001' || port === '' || port === '8080' || port === '80') {
       return `${origin}/api`;
     }
     // Otherwise, assume API is on localhost:5001
