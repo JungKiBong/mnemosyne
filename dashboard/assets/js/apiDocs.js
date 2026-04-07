@@ -472,5 +472,8 @@ document.getElementById('searchInput').addEventListener('input', (e) => {
 // ──────────────────────────────────────────
 
 renderSidebar();
+// Set MCP URL dynamically
+const mcpUrlEl = document.getElementById('mcpUrl');
+if (mcpUrlEl && !mcpUrlEl.value) mcpUrlEl.value = BASE + '/api/mcp';
 checkConnection();
 setInterval(checkConnection, 15000);

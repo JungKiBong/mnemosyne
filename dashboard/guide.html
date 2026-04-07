@@ -845,5 +845,16 @@ for doc in docs:
 </div>
 
 <script src="/nav-component.js?v=2"></script>
+<script>
+// Dynamically replace localhost:5050 in code examples with the actual server origin
+(function() {
+  const origin = window.location.origin;
+  if (origin && !origin.includes('localhost:5050') && window.location.protocol !== 'file:') {
+    document.querySelectorAll('pre code').forEach(function(block) {
+      block.innerHTML = block.innerHTML.replace(/http:\/\/localhost:5050/g, origin);
+    });
+  }
+})();
+</script>
 </body>
 </html>

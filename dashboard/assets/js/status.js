@@ -1,6 +1,8 @@
 // dashboard/assets/js/status.js
 // API_BASE is now auto-detected by apiClient.js — expose for backward compatibility
-window.API_BASE = window.moriesApi ? window.moriesApi.baseUrl : 'http://localhost:5001/api';
+window.API_BASE = window.moriesApi
+  ? window.moriesApi.baseUrl
+  : (window.location.protocol === 'file:' ? 'http://localhost:5001/api' : `${window.location.origin}/api`);
 
 function updateSystemStatus() {
   const el = document.getElementById('sys-backend');
