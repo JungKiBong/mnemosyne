@@ -80,14 +80,18 @@ def chat_with_memory(uuid):
     from flask import current_app
     driver = current_app.extensions.get('neo4j_driver')
     
-    # 1. Fetch node and contiguous context up to 3 hops using variable length path
+    # 1. Fetch node and contiguous context up to 5 hops using variable length path
     with driver.session() as session:
         if revision_id:
             query = """
             MATCH (n {uuid: $uuid})-[:HAS_REVISION]->(r:MemoryRevision {id: $revision_id})
-            OPTIONAL MATCH path = (n)-[*1..3]-(m)
-            RETURN n, r,
-                   collect(distinct m) as connected_nodes
+            CALL {
+                WITH n
+                MATCH (n)-[*1..5]-(m) WHERE m <> n
+                RETURN DISTINCT m
+                LIMIT 35
+            }
+            RETURN n, r, collect(m) as connected_nodes
             LIMIT 1
             """
             result = session.run(query, {"uuid": uuid, "revision_id": revision_id}).single()
@@ -101,9 +105,13 @@ def chat_with_memory(uuid):
         else:
             query = """
             MATCH (n {uuid: $uuid})
-            OPTIONAL MATCH path = (n)-[*1..3]-(m)
-            RETURN n, 
-                   collect(distinct m) as connected_nodes
+            CALL {
+                WITH n
+                MATCH (n)-[*1..5]-(m) WHERE m <> n
+                RETURN DISTINCT m
+                LIMIT 35
+            }
+            RETURN n, collect(m) as connected_nodes
             LIMIT 1
             """
             result = session.run(query, {"uuid": uuid}).single()
@@ -118,7 +126,7 @@ def chat_with_memory(uuid):
     context_str = f"=== TARGET MEMORY NODE (Focus){rev_label} ===\n{json.dumps(node_data, indent=2, ensure_ascii=False)}\n\n"
     
     if connected:
-        context_str += "=== EXTENDED GRAPH CONTEXT (Up to 3-Hops) ===\n"
+        context_str += "=== EXTENDED GRAPH CONTEXT (Up to 5-Hops) ===\n"
         # We limit the number of connected nodes printed so we don't blow up context limit
         for m in connected[:30]:
             if m:
@@ -133,7 +141,7 @@ def chat_with_memory(uuid):
     system_prompt = (
         "You are the Oracle of the Mories Knowledge Graph. "
         "The user is asking a question about a specific target memory node. "
-        "You are provided with BOTH the target node and its extended neighborhood (up to 3 hops away). "
+        "You are provided with BOTH the target node and its extended neighborhood (up to 5 hops away). "
         "This allows you to answer questions about 'what caused this', 'what happened next', or deep graph traversal. "
         "Rely ONLY on the provided context. If the answer is not in the context, clearly state that you don't know."
     )
@@ -539,14 +547,63 @@ def empathy_boost():
         return jsonify(result), 404
     return jsonify(result)
 
+@memory_bp.route('/synaptic/conflict/report', methods=['POST'])
+def report_conflict():
+    """Report a semantic conflict."""
+    data = request.get_json(force=True)
+    from_agent = data.get('from_agent')
+    m1 = data.get('memory_uuid')
+    m2 = data.get('conflicting_memory_uuid')
+    if not all([from_agent, m1, m2]):
+        return jsonify({"error": "Missing required fields"}), 400
+
+    bridge = _get_bridge()
+    result = bridge.report_conflict(
+        from_agent, m1, m2, data.get('reason', '')
+    )
+    if "error" in result:
+        return jsonify(result), 400
+    return jsonify(result)
+
+@memory_bp.route('/synaptic/conflict/resolve', methods=['POST'])
+def resolve_conflict():
+    """Resolve a conflict by boosting the favored memory."""
+    data = request.get_json(force=True)
+    admin_agent = data.get('admin_agent', 'admin')
+    event_id = data.get('event_id')
+    action = data.get('resolution_action')  # "favor_target" or "favor_conflicting"
+    boost = data.get('boost_amount', 0.5)
+
+    if not event_id or not action:
+        return jsonify({"error": "Missing event_id or resolution_action"}), 400
+
+    if action not in ["favor_target", "favor_conflicting"]:
+        return jsonify({"error": "Invalid resolution_action"}), 400
+
+    bridge = _get_bridge()
+    result = bridge.resolve_conflict(admin_agent, event_id, action, boost)
+    if "error" in result:
+        return jsonify(result), 400
+    return jsonify(result)
+
+
 
 # ── Events & Stats ──
 
 @memory_bp.route('/synaptic/events', methods=['GET'])
 def get_events():
     limit = request.args.get('limit', 50, type=int)
+    event_type = request.args.get('event_type', None)
     bridge = _get_bridge()
-    return jsonify(bridge.get_events(limit))
+    return jsonify(bridge.get_events(limit, event_type=event_type))
+
+
+@memory_bp.route('/synaptic/conflicts', methods=['GET'])
+def get_conflicts():
+    """Dedicated endpoint for conflict events only — avoids over-fetching."""
+    limit = request.args.get('limit', 50, type=int)
+    bridge = _get_bridge()
+    return jsonify(bridge.get_events(limit, event_type='conflict'))
 
 
 @memory_bp.route('/synaptic/stats', methods=['GET'])

@@ -90,6 +90,8 @@ class SynapticBridge:
             "CREATE CONSTRAINT agent_id_uniq IF NOT EXISTS FOR (a:Agent) REQUIRE a.agent_id IS UNIQUE",
             "CREATE INDEX agent_role IF NOT EXISTS FOR (a:Agent) ON (a.role)",
             "CREATE INDEX synaptic_event_time IF NOT EXISTS FOR (e:SynapticEvent) ON (e.created_at)",
+            "CREATE INDEX synaptic_event_type IF NOT EXISTS FOR (e:SynapticEvent) ON (e.event_type)",
+            "CREATE INDEX synaptic_event_status IF NOT EXISTS FOR (e:SynapticEvent) ON (e.status)",
         ]
         with self._driver.session() as session:
             for q in queries:
@@ -360,59 +362,175 @@ class SynapticBridge:
             "from_agent": from_agent,
         }
 
+    def report_conflict(
+        self,
+        from_agent: str,
+        memory_uuid: str,
+        conflicting_memory_uuid: str,
+        reason: str = ""
+    ) -> Dict[str, Any]:
+        """Report a conflict between two memories (single atomic transaction)."""
+        event_id = str(uuid.uuid4())
+        now = datetime.now(timezone.utc).isoformat()
+
+        with self._driver.session() as session:
+            # Single atomic query: verify both entities exist AND create event
+            res = session.run("""
+                MATCH (e1:Entity {uuid: $m1})
+                MATCH (e2:Entity {uuid: $m2})
+                MATCH (a:Agent {agent_id: $from_agent})
+                CREATE (a)-[:REPORTED]->(evt:SynapticEvent {
+                    event_id: $event_id,
+                    event_type: 'conflict',
+                    from_agent: $from_agent,
+                    memory_uuid: $m1,
+                    conflicting_memory_uuid: $m2,
+                    reason: $reason,
+                    status: 'active',
+                    created_at: $now
+                })-[:TARGETS]->(e1)
+                CREATE (evt)-[:CONFLICTS_WITH]->(e2)
+                RETURN evt.event_id AS eid
+            """,
+                event_id=event_id,
+                from_agent=from_agent,
+                m1=memory_uuid,
+                m2=conflicting_memory_uuid,
+                reason=reason,
+                now=now
+            ).single()
+
+            if not res:
+                return {"error": "One or both memories (or agent) not found"}
+
+            return {"status": "conflict_reported", "event_id": event_id}
+
+    def resolve_conflict(
+        self,
+        admin_agent: str,
+        event_id: str,
+        resolution_action: str,
+        boost_amount: float = 0.5
+    ) -> Dict[str, Any]:
+        """Resolve a reported conflict and boost the chosen memory."""
+        now = datetime.now(timezone.utc).isoformat()
+        with self._driver.session() as session:
+            res = session.run("""
+                MATCH (evt:SynapticEvent {event_id: $event_id, event_type: 'conflict'})
+                RETURN evt
+            """, event_id=event_id).single()
+            if not res:
+                return {"error": "Conflict event not found"}
+            
+            evt = res["evt"]
+            status = evt.get("status", "active")
+            if status == "resolved":
+                return {"error": "Conflict already resolved"}
+
+            m1_uuid = evt.get("memory_uuid")
+            m2_uuid = evt.get("conflicting_memory_uuid")
+
+            target_boost = m1_uuid if resolution_action == "favor_target" else m2_uuid
+            target_decay = m2_uuid if resolution_action == "favor_target" else m1_uuid
+
+            # Resolve event + boost winner + decay loser in one atomic write
+            session.run("""
+                MATCH (evt:SynapticEvent {event_id: $event_id})
+                SET evt.status = 'resolved',
+                    evt.resolved_by = $admin_agent,
+                    evt.resolution_action = $action,
+                    evt.resolved_at = $now
+                WITH evt
+                OPTIONAL MATCH (e1:Entity {uuid: $boost_uuid})
+                SET e1.salience = CASE WHEN e1.salience + $boost > 1.0 THEN 1.0 ELSE e1.salience + $boost END
+                WITH evt, e1
+                OPTIONAL MATCH (e2:Entity {uuid: $decay_uuid})
+                SET e2.salience = CASE WHEN e2.salience - $boost < 0.0 THEN 0.0 ELSE e2.salience - $boost END
+            """,
+                event_id=event_id,
+                admin_agent=admin_agent,
+                action=resolution_action,
+                now=now,
+                boost_uuid=target_boost,
+                decay_uuid=target_decay,
+                boost=boost_amount
+            )
+            
+            logger.info(f"Conflict {event_id} resolved by {admin_agent} via {resolution_action}.")
+            return {
+                "status": "conflict_resolved",
+                "event_id": event_id,
+                "resolution_action": resolution_action
+            }
+
     # ──────────────────────────────────────────
     # Event Log & Status
     # ──────────────────────────────────────────
 
-    def get_events(self, limit: int = 50) -> List[Dict[str, Any]]:
-        """Get recent synaptic events from Neo4j."""
+    def get_events(self, limit: int = 50, event_type: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get recent synaptic events from Neo4j, optionally filtered by type."""
         with self._driver.session() as session:
-            records = session.run("""
+            type_filter = "WHERE evt.event_type = $etype" if event_type else ""
+            params = {"limit": limit}
+            if event_type:
+                params["etype"] = event_type
+
+            records = session.run(f"""
                 MATCH (a:Agent)-[]->(evt:SynapticEvent)
+                {type_filter}
                 OPTIONAL MATCH (evt)-[:TARGETS]->(e:Entity)
+                OPTIONAL MATCH (evt)-[:CONFLICTS_WITH]->(ce:Entity)
                 RETURN evt.event_id AS event_id,
                        evt.event_type AS event_type,
                        evt.from_agent AS from_agent,
                        a.name AS agent_name,
                        evt.memory_uuid AS memory_uuid,
                        e.name AS memory_name,
+                       e.content AS memory_content,
+                       evt.conflicting_memory_uuid AS conflicting_memory_uuid,
+                       ce.name AS conflicting_memory_name,
+                       ce.content AS conflicting_memory_content,
                        evt.target_scope AS target_scope,
                        evt.boost_amount AS boost_amount,
                        evt.message AS message,
                        evt.reason AS reason,
+                       evt.status AS status,
+                       evt.resolved_by AS resolved_by,
+                       evt.resolution_action AS resolution_action,
                        evt.created_at AS created_at
                 ORDER BY evt.created_at DESC
                 LIMIT $limit
-            """, limit=limit).data()
+            """, **params).data()
         return records
 
     def get_network_stats(self) -> Dict[str, Any]:
-        """Get overall synaptic network statistics."""
+        """Get overall synaptic network statistics in a single aggregation query."""
         with self._driver.session() as session:
-            agents = session.run(
-                "MATCH (a:Agent) RETURN count(a) AS cnt"
-            ).single()
-            events = session.run(
-                "MATCH (e:SynapticEvent) RETURN count(e) AS cnt"
-            ).single()
-            shares = session.run(
-                "MATCH (e:SynapticEvent {event_type: 'share'}) RETURN count(e) AS cnt"
-            ).single()
-            boosts = session.run(
-                "MATCH (e:SynapticEvent {event_type: 'empathy_boost'}) RETURN count(e) AS cnt"
-            ).single()
-            # Scope distribution of shared memories
+            # Single query: aggregate all event-type counts at once
+            row = session.run("""
+                MATCH (a:Agent) WITH count(a) AS agent_cnt
+                OPTIONAL MATCH (ev:SynapticEvent)
+                WITH agent_cnt,
+                     count(ev) AS total,
+                     count(CASE WHEN ev.event_type = 'share' THEN 1 END) AS shares,
+                     count(CASE WHEN ev.event_type = 'empathy_boost' THEN 1 END) AS boosts,
+                     count(CASE WHEN ev.event_type = 'conflict' THEN 1 END) AS conflicts,
+                     count(CASE WHEN ev.event_type = 'conflict' AND ev.status = 'resolved' THEN 1 END) AS resolved
+                RETURN agent_cnt, total, shares, boosts, conflicts, resolved
+            """).single()
+
             scope_dist = session.run("""
-                MATCH (evt:SynapticEvent)-[:TARGETS]->(e:Entity)
-                WHERE evt.event_type = 'share'
+                MATCH (evt:SynapticEvent {event_type: 'share'})-[:TARGETS]->(e:Entity)
                 RETURN COALESCE(e.scope, 'personal') AS scope, count(e) AS cnt
                 ORDER BY cnt DESC
             """).data()
 
         return {
-            "total_agents": agents["cnt"] if agents else 0,
-            "total_events": events["cnt"] if events else 0,
-            "total_shares": shares["cnt"] if shares else 0,
-            "total_empathy_boosts": boosts["cnt"] if boosts else 0,
+            "total_agents": row["agent_cnt"] if row else 0,
+            "total_events": row["total"] if row else 0,
+            "total_shares": row["shares"] if row else 0,
+            "total_empathy_boosts": row["boosts"] if row else 0,
+            "total_conflicts": row["conflicts"] if row else 0,
+            "resolved_conflicts": row["resolved"] if row else 0,
             "scope_distribution": {s["scope"]: s["cnt"] for s in scope_dist},
         }

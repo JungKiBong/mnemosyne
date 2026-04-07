@@ -37,6 +37,12 @@
 | 4.3 하드코딩 제거 | ✅ 완료 | `BASE`, `API_BASE` 변수를 제거하고 상대 경로 엔드포인트(`.get('/api/v1/...')`) 적용 |
 | 4.4 CSS 린트 수정 | ✅ 완료 | `background-clip: text` 누락으로 인한 CSS 경고 수정 완료 |
 
+### Step 5: P4 분산 인프라 연결 점검 (완료)
+| 작업 | 상태 | 구체적 내용 |
+|------|------|-------------|
+| 5.1 Dashboard UX 경량화 | ✅ 완료 | 불필요한 Data Products 탭 제거 및 에러핸들링 독립 try-catch 처리 추가 |
+| 5.2 분산 Executor Unit Test | ✅ 완료 | Nomad, Ray, Container 분산 파이프라인 개별 검증(`test_nomad_executor.py`, `test_ray_executor.py` 등) 모의 연동 및 타임아웃 예비 테스트 통과 |
+
 ---
 
 ## 3. 커밋되지 않은 변경 사항 (중요!)

@@ -68,25 +68,12 @@ a:hover { text-decoration:underline; }
 .event-body .event-title { font-size:.85rem; font-weight:500; }
 .event-body .event-meta { font-size:.75rem; color:var(--text-2); margin-top:3px; }
 
-/* Data Products */
-.product-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:16px; }
-.product-card { background:var(--bg-2); border-radius:var(--radius); padding:20px; border:1px solid rgba(255,255,255,.06); transition:transform .2s,border-color .2s; }
-.product-card:hover { transform:translateY(-2px); border-color:rgba(139,92,246,.3); }
-.product-card h3 { font-size:1rem; margin-bottom:8px; display:flex; align-items:center; gap:8px; }
-.product-card p { font-size:.8rem; color:var(--text-2); margin-bottom:14px; line-height:1.4; }
-.product-card .product-actions { display:flex; gap:8px; }
 .btn { padding:8px 16px; border-radius:8px; border:none; cursor:pointer; font-size:.8rem; font-weight:500; transition:.2s; }
 .btn-primary { background:linear-gradient(135deg,var(--accent-purple),var(--accent-blue)); color:#fff; }
 .btn-primary:hover { opacity:.85; }
 .btn-secondary { background:var(--bg-3); color:var(--text-1); }
 .btn-secondary:hover { background:#475569; }
 .btn-small { padding:5px 12px; font-size:.75rem; }
-
-/* Manifest List */
-.manifest-list { margin-top:20px; }
-.manifest-item { background:var(--bg-1); border-radius:var(--radius); padding:16px; border:1px solid rgba(255,255,255,.06); margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; }
-.manifest-item .manifest-name { font-weight:600; }
-.manifest-item .manifest-meta { font-size:.75rem; color:var(--text-2); }
 
 /* Charts */
 .chart-container { background:var(--bg-2); border-radius:var(--radius); padding:20px; border:1px solid rgba(255,255,255,.06); }
@@ -107,7 +94,7 @@ a:hover { text-decoration:underline; }
 <div class="tabs">
   <div class="tab active" data-tab="network" data-i18n-html="syn.network">🌐 Synaptic Network</div>
   <div class="tab" data-tab="scopes" data-i18n-html="syn.scopes">🏗️ Memory Scopes</div>
-  <div class="tab" data-tab="data" data-i18n-html="syn.data">📦 Data Products</div>
+  <div class="tab" data-tab="conflicts">⚔️ Conflict Management</div>
 </div>
 
 <!-- ═══════════════════════════════════════ -->
@@ -157,18 +144,33 @@ a:hover { text-decoration:underline; }
 </div>
 
 <!-- ═══════════════════════════════════════ -->
-<!-- TAB 3: Data Products                   -->
+<!-- TAB 3: Conflict Management             -->
 <!-- ═══════════════════════════════════════ -->
-<div id="tab-data" class="tab-content">
-<div class="panel">
-  <h3 style="margin-bottom:14px;" data-i18n-html="syn.dataProducts">📦 AI-Ready Data Products</h3>
-  <div class="product-grid" id="product-grid"></div>
-
-  <h3 style="margin:24px 0 14px;" data-i18n-html="syn.manifests">📋 생성된 Manifests</h3>
-  <div class="manifest-list" id="manifest-list">
-    <div class="loading"><span class="spinner"></span> 로딩 중...</div>
+<div class="tab-content" id="tab-conflicts">
+  <div class="panel">
+    <h2>Conflict Management</h2>
+    <p style="color:var(--text-2);font-size:0.85rem;margin-top:6px;margin-bottom:20px;">
+      Resolve contradictions and verify memory alignment across the Synaptic Network.
+    </p>
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="label">⚠️ Active Conflicts</div>
+        <div class="value" id="conflict-count">0</div>
+        <div class="sub">Awaiting resolution</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">✅ Resolved</div>
+        <div class="value" id="resolved-count">0</div>
+        <div class="sub">Historical resolutions</div>
+      </div>
+    </div>
+    <div style="background:var(--bg-2);border-radius:var(--radius);padding:20px;border:1px solid rgba(255,255,255,.06);">
+      <h3 style="margin-bottom:16px;font-size:1rem;">Detected Conflicts Feed</h3>
+      <div id="conflict-feed" class="event-feed">
+        <p style="color:var(--text-2);font-size:.85rem;">Listening for real-time conflicts...</p>
+      </div>
+    </div>
   </div>
-</div>
 </div>
 
 <script src="/assets/js/apiClient.js"></script>
@@ -191,53 +193,73 @@ document.querySelectorAll('.tab').forEach(tab => {
 // Tab 1: Synaptic Network
 // ═══════════════════════════════════════
 async function loadNetworkStats() {
-  const data = await window.moriesApi.get('v1/memory/synaptic/stats');
-  document.getElementById('ns-agents').textContent = data.total_agents;
-  document.getElementById('ns-events').textContent = data.total_events;
-  document.getElementById('ns-shares').textContent = data.total_shares;
-  document.getElementById('ns-boosts').textContent = data.total_empathy_boosts;
+  try {
+    const data = await window.moriesApi.get('v1/memory/synaptic/stats');
+    document.getElementById('ns-agents').textContent = data.total_agents;
+    document.getElementById('ns-events').textContent = data.total_events;
+    document.getElementById('ns-shares').textContent = data.total_shares;
+    document.getElementById('ns-boosts').textContent = data.total_empathy_boosts;
+    const activeConflicts = (data.total_conflicts || 0) - (data.resolved_conflicts || 0);
+    document.getElementById('conflict-count').textContent = activeConflicts;
+    document.getElementById('resolved-count').textContent = data.resolved_conflicts || 0;
+  } catch (error) {
+    console.error('Error loading network stats:', error);
+    ['ns-agents', 'ns-events', 'ns-shares', 'ns-boosts'].forEach(id => {
+      document.getElementById(id).textContent = 'Error';
+    });
+  }
 }
 
 async function loadAgents() {
-  const agents = await window.moriesApi.get('v1/memory/synaptic/agents');
-  const el = document.getElementById('agent-list');
-  if (!agents.length) { el.innerHTML = `<p style="color:var(--text-2);font-size:.85rem;">${window.t('syn.noAgents')}</p>`; return; }
-  el.innerHTML = agents.map(a => `
-    <div class="agent-card">
-      <div class="agent-name">
-        ${a.role === 'observer' ? '👁️' : a.role === 'analyst' ? '🔬' : '🛡️'} ${a.name}
-        <span class="agent-role">${a.role}</span>
+  try {
+    const agents = await window.moriesApi.get('v1/memory/synaptic/agents');
+    const el = document.getElementById('agent-list');
+    if (!agents.length) { el.innerHTML = `<p style="color:var(--text-2);font-size:.85rem;">${window.t('syn.noAgents')}</p>`; return; }
+    el.innerHTML = agents.map(a => `
+      <div class="agent-card">
+        <div class="agent-name">
+          ${a.role === 'observer' ? '👁️' : a.role === 'analyst' ? '🔬' : '🛡️'} ${a.name}
+          <span class="agent-role">${a.role}</span>
+        </div>
+        <div class="agent-stats">
+          <span>📤 ${window.t('syn.shared')}: ${a.shared_count || 0}</span>
+          <span>📥 ${window.t('syn.received')}: ${a.received_count || 0}</span>
+          <span>🔖 ${window.t('syn.subscribed')}: ${(a.subscribed_scopes || []).join(', ')}</span>
+        </div>
       </div>
-      <div class="agent-stats">
-        <span>📤 ${window.t('syn.shared')}: ${a.shared_count || 0}</span>
-        <span>📥 ${window.t('syn.received')}: ${a.received_count || 0}</span>
-        <span>🔖 ${window.t('syn.subscribed')}: ${(a.subscribed_scopes || []).join(', ')}</span>
-      </div>
-    </div>
-  `).join('');
+    `).join('');
+  } catch (error) {
+    console.error('Error loading agents:', error);
+    document.getElementById('agent-list').innerHTML = `<p style="color:var(--accent-amber);font-size:.85rem;">⚠️ Failed to load agents</p>`;
+  }
 }
 
 async function loadEvents() {
-  const events = await window.moriesApi.get('v1/memory/synaptic/events?limit=30');
-  const el = document.getElementById('event-feed');
-  if (!events.length) { el.innerHTML = `<p style="color:var(--text-2);font-size:.85rem;">${window.t('syn.noEvents')}</p>`; return; }
-  el.innerHTML = events.map(e => {
-    const icon = e.event_type === 'share' ? '🔗' : '💚';
-    const ago = timeAgo(e.created_at);
-    return `
-      <div class="event-item">
-        <div class="event-icon ${e.event_type}">${icon}</div>
-        <div class="event-body">
-          <div class="event-title">${e.memory_name || e.memory_uuid?.slice(0,8)}</div>
-          <div class="event-meta">
-            ${e.event_type} · ${e.agent_name || e.from_agent?.slice(0,8)} · ${ago}
-            ${e.boost_amount ? ` · +${e.boost_amount}` : ''}
-            ${e.message ? ` · "${e.message}"` : ''}
+  try {
+    const events = await window.moriesApi.get('v1/memory/synaptic/events?limit=30');
+    const el = document.getElementById('event-feed');
+    if (!events.length) { el.innerHTML = `<p style="color:var(--text-2);font-size:.85rem;">${window.t('syn.noEvents')}</p>`; return; }
+    el.innerHTML = events.map(e => {
+      const icon = e.event_type === 'share' ? '🔗' : '💚';
+      const ago = timeAgo(e.created_at);
+      return `
+        <div class="event-item">
+          <div class="event-icon ${e.event_type}">${icon}</div>
+          <div class="event-body">
+            <div class="event-title">${e.memory_name || e.memory_uuid?.slice(0,8)}</div>
+            <div class="event-meta">
+              ${e.event_type} · ${e.agent_name || e.from_agent?.slice(0,8)} · ${ago}
+              ${e.boost_amount ? ` · +${e.boost_amount}` : ''}
+              ${e.message ? ` · "${e.message}"` : ''}
+            </div>
           </div>
         </div>
-      </div>
-    `;
-  }).join('');
+      `;
+    }).join('');
+  } catch (error) {
+    console.error('Error loading events:', error);
+    document.getElementById('event-feed').innerHTML = `<p style="color:var(--accent-amber);font-size:.85rem;">⚠️ Failed to load events feed</p>`;
+  }
 }
 
 // ═══════════════════════════════════════
@@ -249,59 +271,69 @@ const SCOPE_LABELS = {personal:'Personal',tribal:'Tribal',social:'Social',global
 const SCOPE_DECAY = {personal:0.95,tribal:0.98,social:0.99,global:1.0};
 
 async function loadScopes() {
-  const data = await window.moriesApi.get('v1/memory/scopes/summary');
+  try {
+    const data = await window.moriesApi.get('v1/memory/scopes/summary');
 
-  // Ladder
-  const ladder = document.getElementById('scope-ladder');
-  ladder.innerHTML = ['personal','tribal','social','global'].map(s => {
-    const info = data.scopes[s] || {count:0,avg_salience:0,total_accesses:0};
-    return `
-      <div class="scope-tier ${s}">
-        <h4>${SCOPE_ICONS[s]} ${SCOPE_LABELS[s]}</h4>
-        <div style="font-size:1.6rem;font-weight:700;">${info.count}</div>
-        <div class="scope-meta">
-          Avg Salience: ${(info.avg_salience || 0).toFixed(3)}<br>
-          Decay Rate: ${SCOPE_DECAY[s]}<br>
-          Accesses: ${info.total_accesses || 0}
+    // Ladder
+    const ladder = document.getElementById('scope-ladder');
+    ladder.innerHTML = ['personal','tribal','social','global'].map(s => {
+      const info = data.scopes[s] || {count:0,avg_salience:0,total_accesses:0};
+      return `
+        <div class="scope-tier ${s}">
+          <h4>${SCOPE_ICONS[s]} ${SCOPE_LABELS[s]}</h4>
+          <div style="font-size:1.6rem;font-weight:700;">${info.count}</div>
+          <div class="scope-meta">
+            Avg Salience: ${(info.avg_salience || 0).toFixed(3)}<br>
+            Decay Rate: ${SCOPE_DECAY[s]}<br>
+            Accesses: ${info.total_accesses || 0}
+          </div>
         </div>
-      </div>
-    `;
-  }).join('');
+      `;
+    }).join('');
 
-  // Charts
-  const scopes = Object.keys(data.scopes);
-  const counts = scopes.map(s => data.scopes[s].count);
-  new Chart(document.getElementById('scope-chart'), {
-    type: 'doughnut',
-    data: {
-      labels: scopes.map(s => SCOPE_LABELS[s] || s),
-      datasets: [{data:counts, backgroundColor:scopes.map(s=>SCOPE_COLORS[s]||'#64748b'), borderWidth:0}]
-    },
-    options: {plugins:{legend:{labels:{color:'#cbd5e1'}}}}
-  });
+    // Charts
+    const scopes = Object.keys(data.scopes);
+    const counts = scopes.map(s => data.scopes[s].count);
+    new Chart(document.getElementById('scope-chart'), {
+      type: 'doughnut',
+      data: {
+        labels: scopes.map(s => SCOPE_LABELS[s] || s),
+        datasets: [{data:counts, backgroundColor:scopes.map(s=>SCOPE_COLORS[s]||'#64748b'), borderWidth:0}]
+      },
+      options: {plugins:{legend:{labels:{color:'#cbd5e1'}}}}
+    });
 
-  const stypes = Object.keys(data.source_types || {});
-  const scnts = stypes.map(s => data.source_types[s]);
-  new Chart(document.getElementById('source-chart'), {
-    type: 'bar',
-    data: {
-      labels: stypes,
-      datasets: [{label:'Count',data:scnts,backgroundColor:'rgba(139,92,246,.5)',borderRadius:4}]
-    },
-    options: {indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'#cbd5e1'},grid:{display:false}}}}
-  });
+    const stypes = Object.keys(data.source_types || {});
+    const scnts = stypes.map(s => data.source_types[s]);
+    new Chart(document.getElementById('source-chart'), {
+      type: 'bar',
+      data: {
+        labels: stypes,
+        datasets: [{label:'Count',data:scnts,backgroundColor:'rgba(139,92,246,.5)',borderRadius:4}]
+      },
+      options: {indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'#cbd5e1'},grid:{display:false}}}}
+    });
+  } catch (error) {
+    console.error('Error loading scopes summary:', error);
+    document.getElementById('scope-ladder').innerHTML = `<p style="color:var(--accent-amber);font-size:.85rem;">⚠️ Failed to load scope data</p>`;
+  }
 
   // Candidates
-  const candidates = await window.moriesApi.get('v1/memory/scopes/candidates?scope=personal');
-  const cEl = document.getElementById('candidates-list');
-  if (!candidates.length) { cEl.innerHTML = `<p style="color:var(--text-2);font-size:.85rem;">${window.t('syn.noCandidates')}</p>`; return; }
-  cEl.innerHTML = candidates.map(c => `
-    <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg-2);border-radius:8px;margin-bottom:6px;">
-      <span style="font-weight:600;flex:1;">${c.name}</span>
-      <span style="font-size:.8rem;color:var(--accent-green);">salience: ${c.salience?.toFixed(3)}</span>
-      <button class="btn btn-primary btn-small" onclick="promoteMemory('${c.uuid}','tribal')">→ ${window.t('syn.promoteTribal')}</button>
-    </div>
-  `).join('');
+  try {
+    const candidates = await window.moriesApi.get('v1/memory/scopes/candidates?scope=personal');
+    const cEl = document.getElementById('candidates-list');
+    if (!candidates.length) { cEl.innerHTML = `<p style="color:var(--text-2);font-size:.85rem;">${window.t('syn.noCandidates')}</p>`; return; }
+    cEl.innerHTML = candidates.map(c => `
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg-2);border-radius:8px;margin-bottom:6px;">
+        <span style="font-weight:600;flex:1;">${c.name}</span>
+        <span style="font-size:.8rem;color:var(--accent-green);">salience: ${c.salience?.toFixed(3)}</span>
+        <button class="btn btn-primary btn-small" onclick="promoteMemory('${c.uuid}','tribal')">→ ${window.t('syn.promoteTribal')}</button>
+      </div>
+    `).join('');
+  } catch (error) {
+    console.error('Error loading scope candidates:', error);
+    document.getElementById('candidates-list').innerHTML = `<p style="color:var(--accent-amber);font-size:.85rem;">⚠️ Failed to load candidate data</p>`;
+  }
 }
 
 async function promoteMemory(uuid, target) {
@@ -310,50 +342,6 @@ async function promoteMemory(uuid, target) {
   else { alert('❌ ' + (res.error||'Unknown error')); }
 }
 
-// ═══════════════════════════════════════
-// Tab 3: Data Products
-// ═══════════════════════════════════════
-async function loadDataProducts() {
-  const catalog = await window.moriesApi.get('v1/memory/data/catalog');
-  const grid = document.getElementById('product-grid');
-  const icons = {rag_corpus:'📄',knowledge_snapshot:'🕸️',training_dataset:'🎓',memory_manifest:'📦',analytics_csv:'📊'};
-
-  grid.innerHTML = catalog.products.map(p => `
-    <div class="product-card">
-      <h3>${icons[p.id]||'📦'} ${p.name}</h3>
-      <p>${p.description}</p>
-      <div class="product-actions">
-        ${p.download ? `<a href="${p.download}" class="btn btn-primary btn-small" download>⬇️ ${window.t('download')}</a>` : ''}
-        <button class="btn btn-secondary btn-small" onclick="previewProduct('${p.endpoint}','${p.method||'GET'}')">👁️ ${window.t('view')}</button>
-      </div>
-    </div>
-  `).join('');
-
-  // Manifests
-  const manifests = await window.moriesApi.get('v1/memory/data/manifest/list');
-  const ml = document.getElementById('manifest-list');
-  if (!manifests.length) { ml.innerHTML = `<p style="color:var(--text-2);font-size:.85rem;">${window.t('syn.noManifests')}</p>`; return; }
-  ml.innerHTML = manifests.map(m => `
-    <div class="manifest-item">
-      <div>
-        <div class="manifest-name">📦 ${m.name}</div>
-        <div class="manifest-meta">v${m.version} · ${m.node_count} nodes · ${m.edge_count} edges · ${timeAgo(m.created_at)}</div>
-      </div>
-      <span class="badge badge-11">${m.scope_filter || 'all'}</span>
-    </div>
-  `).join('');
-}
-
-function previewProduct(endpoint, method) {
-  if (method === 'POST') {
-    const name = prompt(window.t('syn.enterManifestName'));
-    if (!name) return;
-    window.moriesApi.post(endpoint.replace(/^\/api\//, ''), {name, description:'Created from dashboard'})
-      .then(d => { alert(`✅ Manifest: ${d.manifest_id?.slice(0,8)}`); loadDataProducts(); });
-  } else {
-    window.open(endpoint, '_blank');
-  }
-}
 
 // ═══════════════════════════════════════
 // Utils
@@ -369,14 +357,96 @@ function timeAgo(ts) {
 }
 
 // ═══════════════════════════════════════
+// Tab 3: Conflict Management
+// ═══════════════════════════════════════
+async function loadConflicts() {
+  try {
+    const conflicts = await window.moriesApi.get('v1/memory/synaptic/conflicts?limit=50');
+    const el = document.getElementById('conflict-feed');
+    if (!conflicts.length) { el.innerHTML = `<p style="color:var(--text-2);font-size:.85rem;">No conflicts detected.</p>`; return; }
+    
+    el.innerHTML = conflicts.map(c => `
+      <div class="event-item" style="border: 1px solid ${c.status === 'resolved' ? 'rgba(255,255,255,0.1)' : 'var(--accent-amber)'}; padding: 16px; margin-bottom: 12px; border-radius: var(--radius); flex-direction: column; align-items: stretch;">
+        <div style="display: flex; gap: 16px; margin-bottom: 12px;">
+          <div style="flex:1; background: var(--bg-1); padding: 12px; border-radius: var(--radius);">
+            <strong style="display:block; margin-bottom:6px;">Memory A: ${escapeHtml(c.memory_name || c.memory_uuid?.slice(0,8))}</strong>
+            <small style="color:var(--text-2); line-height: 1.4;">${escapeHtml(c.memory_content || 'No content')}</small>
+          </div>
+          <div style="flex:1; background: var(--bg-1); padding: 12px; border-radius: var(--radius);">
+            <strong style="display:block; margin-bottom:6px;">Memory B: ${escapeHtml(c.conflicting_memory_name || c.conflicting_memory_uuid?.slice(0,8))}</strong>
+            <small style="color:var(--text-2); line-height: 1.4;">${escapeHtml(c.conflicting_memory_content || 'No content')}</small>
+          </div>
+        </div>
+        
+        <div style="display:flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 12px;">
+          <span style="font-size: 0.8rem; color: var(--text-2);">
+            Reported by ${escapeHtml(c.agent_name || c.from_agent)} · ${timeAgo(c.created_at)}
+            ${c.reason ? `<br><em>Reason: ${escapeHtml(c.reason)}</em>` : ''}
+          </span>
+          ${c.status === 'resolved' ? 
+            `<span style="color: var(--accent-green); font-size: 0.85rem; font-weight: 500;">
+              ✓ Resolved by ${escapeHtml(c.resolved_by || 'admin')}
+             </span>` :
+            `<div style="display:flex; gap: 8px;">
+              <button onclick="resolveConflict('${c.event_id}', 'favor_target')" class="btn" style="font-size:0.8rem; padding: 6px 12px; background: rgba(255,255,255,0.1);">Favor A</button>
+              <button onclick="resolveConflict('${c.event_id}', 'favor_conflicting')" class="btn" style="font-size:0.8rem; padding: 6px 12px; background: rgba(255,255,255,0.1);">Favor B</button>
+            </div>`
+          }
+        </div>
+      </div>
+    `).join('');
+  } catch (err) {
+    console.error('Error loading conflicts:', err);
+    document.getElementById('conflict-feed').innerHTML = `<p style="color:var(--accent-red);font-size:.85rem;">Failed to load conflicts.</p>`;
+  }
+}
+
+async function resolveConflict(eventId, action) {
+  try {
+    await window.moriesApi.post('v1/memory/synaptic/conflict/resolve', {
+      event_id: eventId,
+      resolution_action: action,
+      admin_agent: 'dashboard_admin',
+      boost_amount: 0.5
+    });
+    // Visual feedback
+    loadNetworkStats();
+    loadConflicts();
+    loadEvents(); // Reload generic events too
+  } catch (err) {
+    alert('Failed to resolve conflict: ' + (err.response?.data?.error || err.message));
+    console.error(err);
+  }
+}
+
+function escapeHtml(unsafe) {
+  if (!unsafe) return '';
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+
+// ═══════════════════════════════════════
 // Init
 // ═══════════════════════════════════════
-async function init() {
-  await Promise.all([loadNetworkStats(), loadAgents(), loadEvents()]);
-  loadScopes();
-  loadDataProducts();
-}
-init();
+Promise.all([
+  loadNetworkStats(),
+  loadAgents(),
+  loadEvents(),
+  loadScopes(),
+  loadConflicts()
+]).then(() => {
+  // Update charts every 60s
+  setInterval(() => {
+    loadNetworkStats();
+    loadEvents();
+    loadConflicts();
+  }, 60000);
+});
 </script>
 <script src="/nav-component.js?v=2"></script>
 </body>
