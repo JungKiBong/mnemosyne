@@ -16,13 +16,10 @@ class ApiClient {
   _detectBaseUrl() {
     if (window.API_BASE) return window.API_BASE;
     const origin = window.location.origin;
-    const port = window.location.port;
-    // If served from the API server itself, standard ports, or nginx proxy (8080), use same origin
-    if (port === '5001' || port === '' || port === '8080' || port === '80') {
-      return `${origin}/api`;
+    if (window.location.protocol === 'file:') {
+      return 'http://localhost:5001/api';
     }
-    // Otherwise, assume API is on localhost:5001
-    return 'http://localhost:5001/api';
+    return `${origin}/api`;
   }
 
   /** Join base URL and endpoint safely, avoiding double slashes */

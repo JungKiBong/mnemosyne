@@ -1,7 +1,7 @@
 // ──────────────────────────────────────────
 // API Registry — All Mories Endpoints
 // ──────────────────────────────────────────
-const BASE = 'http://localhost:5001';
+const BASE = window.moriesApi ? window.moriesApi.baseUrl.replace(/\/api$/, '') : (window.location.protocol === 'file:' ? 'http://localhost:5001' : window.location.origin);
 
 const API_REGISTRY = {
   "System": [
